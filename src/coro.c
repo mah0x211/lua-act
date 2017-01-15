@@ -24,8 +24,6 @@
  *  Created by Masatoshi Teruya on 17/01/08.
  *
  */
-
-
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
@@ -34,21 +32,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include "lauxhlib.h"
-
-
-// helper macros for lua_State
-#define lstate_fn2tbl(L,k,v) do{ \
-    lua_pushstring(L,k); \
-    lua_pushcfunction(L,v); \
-    lua_rawset(L,-3); \
-}while(0)
-
-
-#define lstate_num2tbl(L,k,v) do{ \
-    lua_pushstring(L,k); \
-    lua_pushinteger(L,v); \
-    lua_rawset(L,-3); \
-}while(0)
 
 
 #define MODULE_MT   "coop.coro"
