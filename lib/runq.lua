@@ -59,16 +59,18 @@ end
 --- consume
 -- @return qlen
 function RunQ:consume()
-    if self.queue.len > 0 then
+    local nqueue = #self.queue;
+
+    if nqueue > 0 then
         local queue = self.queue;
         local used = self.used;
         local callee;
 
         -- consume the current queued callees
-        for _ = 1, queue.len do
+        for _ = 1, nqueue do
             callee = queue:pop();
             if not callee then
-                return queue.len;
+                return #queue;
             end
 
             -- remove from used table
@@ -76,7 +78,7 @@ function RunQ:consume()
             callee:call();
         end
 
-        return queue.len;
+        return #queue;
     end
 
     return 0;
@@ -86,7 +88,7 @@ end
 --- len
 -- @return nqueue
 function RunQ:len()
-    return self.queue.len;
+    return #self.queue;
 end
 
 

@@ -78,14 +78,14 @@ function Callee:dispose( ok, err )
         self.timer = nil;
     -- revoke signal events
     elseif self.sigset then
-        for i = 1, self.sigset.len do
+        for i = 1, #self.sigset do
             event:revoke( self.sigset:pop() );
         end
         self.sigset = nil;
     end
 
     -- revoke io events
-    if self.pool.len > 0 then
+    if #self.pool > 0 then
         local ioev = self.pool:pop();
 
         repeat
@@ -109,7 +109,7 @@ function Callee:dispose( ok, err )
     self.coop.pool:push( self );
 
     -- dispose child routines
-    if self.node.len > 0 then
+    if #self.node > 0 then
         local runq = self.coop.runq;
         local child = self.node:pop();
 
@@ -150,7 +150,7 @@ end
 
 --- await
 function Callee:await()
-    if self.node.len > 0 then
+    if #self.node > 0 then
         self.wait = true;
         return yield();
     end
@@ -171,7 +171,7 @@ function Callee:ioable( evs, asa, fd, deadline )
     if item then
         local ok;
 
-        ioev = item.data;
+        ioev = item:data();
         ok, err = ioev:watch();
         if not ok then
             evs[fd] = nil;
@@ -284,7 +284,7 @@ function Callee:sigwait( deadline, ... )
             -- got error
             if err then
                 -- revoke signal events
-                for j = 1, sigset.len do
+                for j = 1, #sigset do
                     event:revoke( sigset:pop() );
                 end
 
@@ -298,7 +298,7 @@ function Callee:sigwait( deadline, ... )
     end
 
     -- no need to wait signal if empty
-    if sigset.len == 0 then
+    if #sigset == 0 then
         return EV_NOOP;
     end
 
@@ -309,7 +309,7 @@ function Callee:sigwait( deadline, ... )
     self.sigset = nil;
 
     -- revoke signal events
-    for i = 1, sigset.len do
+    for i = 1, #sigset do
         event:revoke( sigset:pop() );
     end
 

@@ -11,7 +11,7 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "deque >= 0.1.0",
+    "deque >= 0.3.0",
     "sentry >= 0.5.0",
 }
 build = {
