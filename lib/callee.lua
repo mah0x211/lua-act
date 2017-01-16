@@ -70,7 +70,7 @@ end
 --- dispose
 function Callee:dispose( ok, err )
     local event = self.coop.event;
-    local root = self.root;
+    local ref = self.ref;
 
     -- revoke timer event
     if self.timer then
@@ -105,7 +105,6 @@ function Callee:dispose( ok, err )
     end
 
     self.term = nil;
-    self.root = nil;
     self.coop.pool:push( self );
 
     -- dispose child routines
@@ -125,9 +124,16 @@ function Callee:dispose( ok, err )
     end
 
     -- call root node
-    if root and root.wait then
-        root.wait = nil;
-        root:call( ok, self.co:getres() );
+    if ref then
+        local root = self.root;
+
+        self.root = nil;
+        self.ref = nil;
+        root.node:remove( ref );
+        if root.wait then
+            root.wait = nil;
+            root:call( ok, self.co:getres() );
+        end
     end
 end
 
@@ -336,9 +342,9 @@ function Callee:init( coop, fn, ctx, ... )
     end
 
     -- set relationship
-    if self.coop.callee then
-        self.root = self.coop.callee;
-        self.root.node:push( self );
+    if coop.callee then
+        self.root = coop.callee;
+        self.ref = self.root.node:push( self );
     end
 end
 
@@ -376,7 +382,7 @@ local function new( coop, fn, ctx, ... )
     -- set relationship
     if coop.callee then
         callee.root = coop.callee;
-        callee.root.node:push( callee );
+        callee.ref = callee.root.node:push( callee );
     end
 
     return callee;
