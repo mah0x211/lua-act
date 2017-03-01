@@ -28,6 +28,8 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
 // lua
 #include <lua.h>
 #include <lauxlib.h>
@@ -37,11 +39,45 @@
 #define MODULE_MT   "coop.coro"
 
 
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/mach_time.h>
+
+static uint64_t coro_getnsec( void )
+{
+    static mach_timebase_info_data_t tbinfo = { 0 };
+
+    if( tbinfo.denom == 0 ){
+        (void)mach_timebase_info( &tbinfo );
+    }
+
+    return mach_absolute_time() * tbinfo.numer / tbinfo.denom;
+}
+
+#else
+
+static uint64_t coro_getnsec( void )
+{
+    struct timespec ts = {0};
+
+#if defined(CLOCK_MONOTONIC_COARSE)
+    clock_gettime( CLOCK_MONOTONIC_COARSE, &ts )
+#else
+    clock_gettime( CLOCK_MONOTONIC, &ts )
+#endif
+
+    return (uint64_t)ts.tv_sec * 1000000000 + (uint64_t)ts.tv_nsec;
+}
+
+#endif
+
+
 typedef struct {
     int ref_fn;
     int ref_co;
     int ref_arg;
     int ref_res;
+    uint64_t elapsed;
     lua_State *co;
     lua_State *arg;
     lua_State *res;
@@ -97,12 +133,15 @@ SET_ENTRYFN:
         }
     }
 
+    coro->elapsed = coro_getnsec();
     // run thread
 #if LUA_VERSION_NUM >= 502
     status = lua_resume( coro->co, L, argc );
 #else
     status = lua_resume( coro->co, argc );
 #endif
+    coro->elapsed = coro_getnsec() - coro->elapsed;
+
     lua_settop( L, 0 );
 
     switch( status )
@@ -207,6 +246,16 @@ static int init_lua( lua_State *L )
 }
 
 
+static int elapsed_lua( lua_State *L )
+{
+    coro_t *coro = luaL_checkudata( L, 1, MODULE_MT );
+
+    lua_pushinteger( L, coro->elapsed );
+
+    return 1;
+}
+
+
 static int tostring_lua( lua_State *L )
 {
     lua_pushfstring( L, MODULE_MT ": %p", lua_touserdata( L, 1 ) );
@@ -283,6 +332,7 @@ LUALIB_API int luaopen_coop_coro( lua_State *L )
         { NULL, NULL }
     };
     struct luaL_Reg method[] = {
+        { "elapsed", elapsed_lua },
         { "init", init_lua },
         { "setarg", setarg_lua },
         { "getres", getres_lua },
