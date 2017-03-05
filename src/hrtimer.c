@@ -112,6 +112,24 @@ static int new_lua( lua_State *L )
 }
 
 
+static int msleep_lua( lua_State *L )
+{
+    lua_Integer msec = lauxh_optinteger( L, 1, 0 );
+
+    if( msec < 1 || hrt_nanosleep( msec * 1000000ULL ) == 0 ){
+        lua_pushboolean( L, 1 );
+        return 1;
+    }
+
+    // got error
+    lua_pushboolean( L, 0 );
+    lua_pushstring( L, strerror( errno ) );
+
+    return 2;
+}
+
+
+
 LUALIB_API int luaopen_coop_hrtimer( lua_State *L )
 {
     struct luaL_Reg mmethod[] = {
@@ -147,6 +165,7 @@ LUALIB_API int luaopen_coop_hrtimer( lua_State *L )
     // add new function
     lua_newtable( L );
     lauxh_pushfn2tbl( L, "new", new_lua );
+    lauxh_pushfn2tbl( L, "msleep", msleep_lua );
 
     return 1;
 }
