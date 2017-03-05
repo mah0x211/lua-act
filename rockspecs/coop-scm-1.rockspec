@@ -13,6 +13,7 @@ dependencies = {
     "lua >= 5.1",
     "luarocks-fetch-gitrec >= 0.2",
     "deque >= 0.3.1",
+    "minheap >= 0.1.1",
     "sentry >= 0.5.0",
 }
 build = {

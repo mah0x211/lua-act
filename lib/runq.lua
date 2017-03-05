@@ -28,7 +28,13 @@
 
 --- file scope variables
 local Deque = require('deque');
+local MinHeap = require('minheap');
+local Aux = require('coop.aux');
+local isUInt = Aux.isUInt;
+local isFunction = Aux.isFunction;
 local setmetatable = setmetatable;
+--- constants
+local OP_RUNQ = Aux.OP_RUNQ;
 
 
 -- class RunQ
@@ -37,58 +43,117 @@ local RunQ = {};
 
 --- push
 -- @param callee
-function RunQ:push( callee )
-    if not self.used[callee] then
-        self.used[callee] = self.queue:unshift( callee );
+-- @return ok
+-- @return err
+function RunQ:push( callee, deadline )
+    local ref = self.ref;
+
+    if not callee or not isFunction( callee.call ) then
+        return false, 'callee must have a call method';
+    elseif deadline == nil then
+        deadline = 0;
+    elseif not isUInt( deadline ) then
+        return false, 'deadline must be unsigned integer';
     end
+
+    if not ref[callee] then
+        local queue = ref[deadline];
+        local qelm, err;
+
+        if not queue then
+            queue, err = Deque.new();
+            if not queue then
+                return false, err;
+            end
+
+            qelm, err = queue:unshift( callee );
+            if not qelm then
+                return false, err;
+            end
+
+            ref[deadline] = queue;
+            ref[queue] = self.heap:push( deadline, queue );
+        else
+            qelm, err = queue:unshift( callee );
+            if not qelm then
+                return false, err;
+            end
+        end
+
+        ref[callee] = qelm;
+        ref[qelm] = queue;
+
+        return true;
+    end
+
+    return false, 'callee is already registered';
 end
 
 
 --- remove
 -- @param callee
 function RunQ:remove( callee )
-    local item = self.used[callee];
+    local ref = self.ref;
+    local qelm = ref[callee];
 
-    if item then
-        self.used[callee] = nil;
-        self.queue:remove( item );
+    if qelm then
+        local queue = ref[qelm];
+
+        ref[callee] = nil;
+        ref[qelm] = nil;
+        queue:remove( qelm );
+        if #queue == 0 then
+            local helm = ref[queue];
+
+            ref[queue] = nil;
+            ref[helm.num] = nil;
+            self.heap:del( helm.idx );
+        end
     end
 end
 
 
 --- consume
--- @return qlen
-function RunQ:consume()
-    local nqueue = #self.queue;
+-- @param msec
+-- @return msec
+function RunQ:consume( msec )
+    local helm = self.heap:pop();
 
-    if nqueue > 0 then
-        local queue = self.queue;
-        local used = self.used;
-        local callee;
+    if helm then
+        local queue = helm.val;
+        local nqueue = #queue;
+        local ref = self.ref;
+
+        ref[queue] = nil;
+        ref[helm.num] = nil;
 
         -- consume the current queued callees
         for _ = 1, nqueue do
-            callee = queue:pop();
+            local callee = queue:pop();
+
             if not callee then
-                return #queue;
+                break;
             end
 
             -- remove from used table
-            used[callee] = nil;
-            callee:call();
+            ref[ref[callee]] = nil;
+            ref[callee] = nil;
+            callee:call( OP_RUNQ );
         end
 
-        return #queue;
+        helm = self.heap:peek();
+
+        return helm and helm.num or msec;
     end
 
-    return 0;
+    return msec;
 end
 
 
 --- len
 -- @return nqueue
 function RunQ:len()
-    return #self.queue;
+    return self.heap.len;
 end
 
 
@@ -96,8 +161,8 @@ end
 -- @return runq
 local function new()
     return setmetatable({
-        queue = Deque.new(),
-        used = setmetatable({},{ __mode = 'k' })
+        heap = MinHeap.new(),
+        ref = {},
     },{
         __index = RunQ
     });
