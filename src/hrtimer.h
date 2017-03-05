@@ -35,7 +35,7 @@
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 
-static uint64_t hrt_getnsec( void )
+static inline uint64_t hrt_getnsec( void )
 {
     static mach_timebase_info_data_t tbinfo = { 0 };
 
@@ -48,7 +48,7 @@ static uint64_t hrt_getnsec( void )
 
 #else
 
-static uint64_t hrt_getnsec( void )
+static inline uint64_t hrt_getnsec( void )
 {
     struct timespec ts = {0};
 
@@ -62,5 +62,16 @@ static uint64_t hrt_getnsec( void )
 }
 
 #endif
+
+
+static inline int hrt_nanosleep( uint64_t nsec )
+{
+    struct timespec req = {
+        .tv_sec = nsec / UINT64_C(1000000000),
+        .tv_nsec = nsec % UINT64_C(1000000000)
+    };
+
+    return nanosleep( &req, NULL );
+}
 
 #endif

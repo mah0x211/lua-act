@@ -45,6 +45,24 @@ typedef struct {
 } hrtimer_t;
 
 
+static int sleep_lua( lua_State *L )
+{
+    hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
+    uint64_t nsec = hrt_getnsec();
+
+    if( nsec > h->nsec || hrt_nanosleep( h->nsec - nsec ) == 0 ){
+        lua_pushboolean( L, 1 );
+        return 1;
+    }
+
+    // got error
+    lua_pushboolean( L, 1 );
+    lua_pushstring( L, strerror( errno ) );
+
+    return 1;
+}
+
+
 static int remain_lua( lua_State *L )
 {
     hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
@@ -103,6 +121,7 @@ LUALIB_API int luaopen_coop_hrtimer( lua_State *L )
     struct luaL_Reg method[] = {
         { "init", init_lua },
         { "remain", remain_lua },
+        { "sleep", sleep_lua },
         { NULL, NULL }
     };
     struct luaL_Reg *ptr = mmethod;
