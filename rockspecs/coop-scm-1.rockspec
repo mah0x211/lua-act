@@ -25,6 +25,10 @@ build = {
         ['coop.coro'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/coro.c" }
+        },
+        ['coop.hrtimer'] = {
+            incdirs = { "deps/lauxhlib" },
+            sources = { "src/hrtimer.c" }
         }
     }
 }
