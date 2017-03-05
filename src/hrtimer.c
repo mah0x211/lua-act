@@ -45,11 +45,12 @@ typedef struct {
 } hrtimer_t;
 
 
-static int elapsed_lua( lua_State *L )
+static int remain_lua( lua_State *L )
 {
     hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
+    uint64_t nsec = hrt_getnsec();
 
-    lua_pushinteger( L, hrt_getnsec() - h->nsec );
+    lua_pushinteger( L, ( nsec < h->nsec ) ? h->nsec - nsec : -1 );
 
     return 1;
 }
@@ -58,8 +59,9 @@ static int elapsed_lua( lua_State *L )
 static int init_lua( lua_State *L )
 {
     hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
+    lua_Integer msec = lauxh_checkinteger( L, 2 );
 
-    h->nsec = hrt_getnsec();
+    h->nsec = hrt_getnsec() + (uint64_t)msec * 1000000ULL;
 
     return 0;
 }
@@ -74,11 +76,13 @@ static int tostring_lua( lua_State *L )
 
 static int new_lua( lua_State *L )
 {
+    lua_Integer msec = lauxh_optinteger( L, 1, 0 );
     hrtimer_t *h = lua_newuserdata( L, sizeof( hrtimer_t ) );
 
     if( h ){
-        h->nsec = hrt_getnsec();
+        h->nsec = hrt_getnsec() + (uint64_t)msec * 1000000ULL;
         lauxh_setmetatable( L, MODULE_MT );
+
         return 1;
     }
 
@@ -98,7 +102,7 @@ LUALIB_API int luaopen_coop_hrtimer( lua_State *L )
     };
     struct luaL_Reg method[] = {
         { "init", init_lua },
-        { "elapsed", elapsed_lua },
+        { "remain", remain_lua },
         { NULL, NULL }
     };
     struct luaL_Reg *ptr = mmethod;
