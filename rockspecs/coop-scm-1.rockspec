@@ -19,6 +19,7 @@ build = {
     type = "builtin",
     modules = {
         coop = "coop.lua",
+        ['coop.aux'] = "lib/aux.lua",
         ['coop.callee'] = "lib/callee.lua",
         ['coop.event'] = "lib/event.lua",
         ['coop.runq'] = "lib/runq.lua",
