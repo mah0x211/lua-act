@@ -28,11 +28,14 @@
 
 --- file scope variables
 local Deque = require('deque');
+local HRTimer = require('coop.hrtimer');
 local RunQ = require('coop.runq');
 local Event = require('coop.event');
 local Callee = require('coop.callee');
 local setmetatable = setmetatable;
 local yield = coroutine.yield;
+--- oncstants
+local OP_RUNQ = require('coop.aux').OP_RUNQ;
 
 
 --- spawn
@@ -43,14 +46,13 @@ local yield = coroutine.yield;
 -- @param err
 local function spawn( coop, fn, ctx, ... )
     local callee = coop.pool:pop();
+    local ok, err;
 
     -- use pooled callee
     if callee then
         callee:init( coop, fn, ctx, ... );
     -- create new callee
     else
-        local err;
-
         callee, err = Callee.new( coop, fn, ctx, ... );
         if err then
             return false, err;
@@ -58,7 +60,10 @@ local function spawn( coop, fn, ctx, ... )
     end
 
     -- push to runq
-    coop.runq:push( callee );
+    ok, err = coop.runq:push( callee );
+    if not ok then
+        return false, err;
+    end
 
     return true;
 end
@@ -97,13 +102,21 @@ end
 
 
 --- later
+-- @return ok
+-- @return err
 function Coop:later()
     local callee = self.callee;
 
     if callee then
-        -- push to runq
-        self.runq:push( callee );
-        return yield();
+        local ok, err = self.runq:push( callee );
+
+        if not ok then
+            return false, err;
+        elseif yield() == OP_RUNQ then
+            return true;
+        end
+
+        error( 'invalid implements' );
     end
 
     error( 'cannot call later() from outside of vm', 2 );
@@ -144,8 +157,8 @@ end
 
 --- sleep
 -- @param deadline
--- @param status
--- @param err
+-- @return ok
+-- @return err
 function Coop:sleep( deadline )
     local callee = self.callee;
 
@@ -208,8 +221,8 @@ end
 --- run
 -- @param fn
 -- @param ctx
--- @param ok
--- @param err
+-- @return ok
+-- @return err
 local function run( fn, ctx )
     -- create event
     local event, err = Event.new();
@@ -228,12 +241,28 @@ local function run( fn, ctx )
 
         ok, err = spawn( coop, fn, ctx );
         if ok then
-            while event:len() > 0 or runq:len() > 0 do
-                local sec = runq:consume() == 0 and -1 or 500;
+            local hrtimer = HRTimer.new();
+            local msec = -1;
 
-                err = event:consume( sec );
-                -- got critical error
-                if err then
+            while true do
+                local msec = -1;
+
+                if runq:len() > 0 and hrtimer:remain() < 0 then
+                    msec = runq:consume(-1);
+                    if msec > 0 then
+                        hrtimer:init( msec );
+                    end
+                end
+
+                if event:len() > 0 then
+                    err = event:consume( msec );
+                    -- got critical error
+                    if err then
+                        break;
+                    end
+                elseif runq:len() > 0 then
+                    hrtimer:sleep();
+                else
                     break;
                 end
             end

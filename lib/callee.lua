@@ -27,12 +27,17 @@
 --]]
 --- file scope variables
 local Deque = require('deque');
+local Aux = require('coop.aux');
 local Coro = require('coop.coro');
+local msleep = require('coop.hrtimer').msleep;
+local isUInt = Aux.isUInt;
 local yield = coroutine.yield;
 local setmetatable = setmetatable;
 local pcall = pcall;
 local unpack = unpack or table.unpack;
 -- constants
+local OP_EVENT = Aux.OP_EVENT;
+local OP_RUNQ = Aux.OP_RUNQ;
 -- local CO_OK = Coro.OK;
 -- local CO_YIELD = Coro.YIELD;
 -- local ERRRUN = Coro.ERRRUN;
@@ -69,15 +74,14 @@ end
 
 --- dispose
 function Callee:dispose( ok, err )
+    local runq = self.coop.runq;
     local event = self.coop.event;
     local ref = self.ref;
 
-    -- revoke timer event
-    if self.timer then
-        event:revoke( self.timer );
-        self.timer = nil;
+    runq:remove( self );
+
     -- revoke signal events
-    elseif self.sigset then
+    if self.sigset then
         for i = 1, #self.sigset do
             event:revoke( self.sigset:pop() );
         end
@@ -109,7 +113,6 @@ function Callee:dispose( ok, err )
 
     -- dispose child routines
     if #self.node > 0 then
-        local runq = self.coop.runq;
         local child = self.node:pop();
 
         repeat
@@ -244,30 +247,32 @@ end
 
 --- sleep
 -- @param deadline
--- @param status
--- @param err
+-- @return ok
+-- @return err
 function Callee:sleep( deadline )
-    local event = self.coop.event;
-    local timer, ev, hup, err;
+    -- use runq
+    if self.coop.event:len() > 0 then
+        local ok, err = self.coop.runq:push( self, deadline );
 
-    -- register timer event
-    timer, err = event:timer( self, deadline, true );
-    if err then
-        return EV_ERR, err;
+        if not ok then
+            return false, err;
+        elseif yield() == OP_RUNQ then
+            return true;
+        end
+
+        error( 'invalid implements' );
+
+    -- return immediately
+    elseif deadline == nil then
+        return true;
+    -- use msleep
+    elseif not isUInt( deadline ) then
+        return false, 'deadline must be unsigned integer';
+    elseif msleep( deadline ) then
+        return true;
     end
 
-    self.timer = timer;
-    ev, hup = yield();
-    self.timer = nil;
-
-    if ev == timer then
-        return hup and EV_HUP or EV_OK;
-    end
-
-    -- revoke timer event
-    event:revoke( timer );
-
-    error( 'invalid implements' );
+    return false, 'syserror';
 end
 
 
