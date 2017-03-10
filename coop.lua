@@ -173,8 +173,9 @@ end
 --- sigwait
 -- @param deadline
 -- @param ...
--- @param status
--- @param err
+-- @return signo
+-- @return err
+-- @return timeout
 function Coop:sigwait( deadline, ... )
     local callee = self.callee;
 
@@ -189,8 +190,9 @@ end
 --- readable
 -- @param fd
 -- @param deadline
--- @return status
+-- @return ok
 -- @return err
+-- @return timeout
 function Coop:readable( fd, deadline )
     local callee = self.callee;
 
@@ -205,8 +207,9 @@ end
 --- writable
 -- @param fd
 -- @param deadline
--- @return status
+-- @return ok
 -- @return err
+-- @return timeout
 function Coop:writable( fd, deadline )
     local callee = self.callee;
 

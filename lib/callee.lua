@@ -168,10 +168,12 @@ end
 
 --- ioable
 -- @param evs
+-- @param asa
 -- @param fd
 -- @param deadline
--- @return status
+-- @return ok
 -- @return err
+-- @return timeout
 function Callee:ioable( evs, asa, fd, deadline )
     local event = self.coop.event;
     local item = evs[fd];
@@ -187,7 +189,7 @@ function Callee:ioable( evs, asa, fd, deadline )
             evs[fd] = nil;
             self.pool:remove( item );
             event:revoke( ev );
-            return EV_ERR, err;
+            return false, err;
         end
     -- register io(readable or writable) event
     else
@@ -195,7 +197,8 @@ function Callee:ioable( evs, asa, fd, deadline )
 
         ev, err = event[asa]( event, self, fd );
         if err then
-            return EV_ERR, err;
+
+            return false, err;
         end
 
         item = self.pool:push( ev );
@@ -211,11 +214,11 @@ function Callee:ioable( evs, asa, fd, deadline )
             evs[fd] = nil;
             self.pool:remove( item );
             event:revoke( ev );
-            return EV_HUP;
+        else
+            ev:unwatch();
         end
 
-        ev:unwatch();
-        return EV_OK;
+        return true;
     end
 
     -- revoke io event
@@ -232,8 +235,9 @@ end
 --- readable
 -- @param fd
 -- @param deadline
--- @return status
+-- @return ok
 -- @return err
+-- @return timeout
 function Callee:readable( fd, deadline )
     return self:ioable( self.revs, 'readable', fd, deadline );
 end
@@ -242,8 +246,9 @@ end
 --- writable
 -- @param fd
 -- @param deadline
--- @return status
+-- @return ok
 -- @return err
+-- @return timeout
 function Callee:writable( fd, deadline )
     return self:ioable( self.wevs, 'writable', fd, deadline );
 end
@@ -283,8 +288,9 @@ end
 --- sigwait
 -- @param deadline
 -- @param ...
--- @param status
--- @param err
+-- @return signo
+-- @return err
+-- @return timeout
 function Callee:sigwait( deadline, ... )
     local event = self.coop.event;
     local sigset, sigmap;
@@ -301,7 +307,7 @@ function Callee:sigwait( deadline, ... )
                 event:revoke( sigset:pop() );
             end
 
-            return EV_ERR, err;
+            return nil, err;
         end
 
         -- maintain registered event
@@ -311,7 +317,7 @@ function Callee:sigwait( deadline, ... )
 
     -- no need to wait signal if empty
     if #sigset == 0 then
-        return EV_NOOP;
+        return nil;
     -- wait registered signals
     else
         local op, signo;
