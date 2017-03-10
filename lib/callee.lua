@@ -175,42 +175,46 @@ end
 function Callee:ioable( evs, asa, fd, deadline )
     local event = self.coop.event;
     local item = evs[fd];
-    local ioev, ev, hup, err;
+    local op, ev, disabled;
+
 
     if item then
-        local ok;
+        local ok, err;
 
-        ioev = item:data();
-        ok, err = ioev:watch();
+        ev = item:data();
+        ok, err = ev:watch();
         if not ok then
             evs[fd] = nil;
             self.pool:remove( item );
-            event:revoke( ioev );
+            event:revoke( ev );
             return EV_ERR, err;
         end
     -- register io(readable or writable) event
     else
-        ioev, err = event[asa]( event, self, fd );
+        local err;
+
+        ev, err = event[asa]( event, self, fd );
         if err then
             return EV_ERR, err;
         end
-        item = self.pool:push( ioev );
+
+        item = self.pool:push( ev );
         evs[fd] = item;
     end
 
     -- wait until event fired
-    ev, hup = yield();
+    op, fdno, disabled = yield();
 
     -- got io event
-    if ev == ioev then
-        if hup then
+    if op == OP_EVENT and fdno == fd then
+        if disabled then
             evs[fd] = nil;
             self.pool:remove( item );
-            event:revoke( ioev );
+            event:revoke( ev );
             return EV_HUP;
         end
 
-        ioev:unwatch();
+        ev:unwatch();
         return EV_OK;
     end
 
@@ -218,7 +222,7 @@ function Callee:ioable( evs, asa, fd, deadline )
     -- unwatch io event
     evs[fd] = nil;
     self.pool:remove( item );
-    event:revoke( ioev );
+    event:revoke( ev );
 
     error( 'invalid implements' );
 end
@@ -283,49 +287,47 @@ end
 -- @param err
 function Callee:sigwait( deadline, ... )
     local event = self.coop.event;
-    local sigs = {...};
-    local sigset = Deque.new();
-    local sigmap = {};
-    local ev, hup, signo, err;
+    local sigset, sigmap;
 
+    sigset = Deque.new();
+    sigmap = {};
     -- register signal events
-    for i = 1, select( '#', ... ) do
-        if sigs[i] then
-            ev, err = event:signal( self, sigs[i], true );
-            -- got error
-            if err then
-                -- revoke signal events
-                for j = 1, #sigset do
-                    event:revoke( sigset:pop() );
-                end
+    for _, signo in pairs({...}) do
+        local ev, err = event:signal( self, signo, true );
 
-                return EV_ERR, err;
+        if err then
+            -- revoke signal events
+            for j = 1, #sigset do
+                event:revoke( sigset:pop() );
             end
 
-            -- maintain registered event
-            sigset:push( ev );
-            sigmap[ev] = true;
+            return EV_ERR, err;
         end
+
+        -- maintain registered event
+        sigset:push( ev );
+        sigmap[signo] = true;
     end
 
     -- no need to wait signal if empty
     if #sigset == 0 then
         return EV_NOOP;
-    end
-
     -- wait registered signals
-    self.sigset = sigset;
-    ev, hup = yield();
-    signo = ev:ident();
-    self.sigset = nil;
+    else
+        local op, signo;
 
-    -- revoke signal events
-    for i = 1, #sigset do
-        event:revoke( sigset:pop() );
-    end
+        self.sigset = sigset;
+        op, signo, hup = yield();
+        self.sigset = nil;
+        -- revoke signal events
+        for i = 1, #sigset do
+            event:revoke( sigset:pop() );
+        end
 
-    if sigmap[ev] then
-        return signo;
+
+        if op == OP_EVENT and sigmap[signo] then
+            return signo;
+        end
     end
 
     error( 'invalid implements' );

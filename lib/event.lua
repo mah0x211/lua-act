@@ -29,6 +29,7 @@
 --- file scope variables
 local Deque = require('deque');
 local Sentry = require('sentry');
+local OP_EVENT = require('coop.aux').OP_EVENT;
 local setmetatable = setmetatable;
 
 
@@ -137,7 +138,7 @@ function Event:consume( sec )
 
             while ev do
                 -- resume
-                callee:call( ev, disabled );
+                callee:call( OP_EVENT, ev:ident(), disabled );
                 -- get next event
                 ev, _, _, callee, disabled = loop:getevent();
             end
