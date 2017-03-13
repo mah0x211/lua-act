@@ -59,15 +59,15 @@ local Callee = {};
 --- __call
 function Callee:call( ... )
     local co = self.co;
-    local ok, err;
+    local done, err;
 
     self.coop.callee = self;
     -- call with passed arguments
-    ok, err = co( ... );
+    done, err = co( ... );
     self.coop.callee = false;
 
-    if ok or self.term then
-        self:dispose( ok or self.term, err );
+    if done or self.term then
+        self:dispose( done or self.term, err );
     end
 end
 

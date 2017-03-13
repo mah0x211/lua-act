@@ -121,13 +121,13 @@ end
 
 
 --- consume
--- @param sec
+-- @param msec
 -- @return err
-function Event:consume( sec )
+function Event:consume( msec )
     if #self.loop > 0 then
         local loop = self.loop;
         -- wait events
-        local nev, err = loop:wait( sec );
+        local nev, err = loop:wait( msec );
 
         -- got critical error
         if err then
