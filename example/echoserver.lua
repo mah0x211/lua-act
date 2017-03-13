@@ -43,12 +43,12 @@ local function send( sock, c, msg )
     else
         local total = 0;
         local fd = sock:fd();
-        local rc;
+        local ok;
 
         repeat
             total = total + len;
-            rc, err = c:writable( fd );
-            if rc == Coop.EV_OK then
+            ok, err = c:writable( fd );
+            if ok then
                 len, err, again = sock:flushq();
             else
                 return false, err;
@@ -66,10 +66,10 @@ local function recv( sock, c )
     if not again then
         return msg, err;
     else
-        local rc;
+        local ok;
 
-        rc, err = c:readable( sock:fd(), 1000 );
-        if rc == Coop.EV_OK then
+        ok, err = c:readable( sock:fd() );
+        if ok then
             return sock:recv();
         end
 
@@ -84,14 +84,14 @@ local function accept( sock, c )
     if not again then
         return client, err;
     else
-        local rc;
+        local ok;
 
         repeat
-            rc, err = c:readable( sock:fd() );
-            if rc == Coop.EV_OK then
+            ok, err = c:readable( sock:fd() );
+            if ok then
                 client, err, again = sock:accept();
             else
-                print( 'accept wait()', rc, err );
+                print( 'accept wait()', ok, err );
                 return nil, err;
             end
         until not again;
@@ -161,7 +161,8 @@ local function main( c )
 
     assert( c:spawn( handleServer, server ) );
     signal.blockAll();
-    print( 'sigwait', c:sigwait( -1, signal.SIGINT ) );
+    print( 'sigwait', c:sigwait( nil, signal.SIGINT ) );
+    -- assert( c:await() )
 
     print( 'end server' );
 end
