@@ -175,10 +175,19 @@ end
 -- @return err
 -- @return timeout
 function Callee:ioable( evs, asa, fd, deadline )
+    local runq = self.coop.runq;
     local event = self.coop.event;
     local item = evs[fd];
     local op, ev, disabled;
 
+    -- register to runq
+    if deadline then
+        local ok, err = runq:push( self, deadline );
+
+        if not ok then
+            return false, err;
+        end
+    end
 
     if item then
         local ok, err;
@@ -186,9 +195,14 @@ function Callee:ioable( evs, asa, fd, deadline )
         ev = item:data();
         ok, err = ev:watch();
         if not ok then
+            if deadline then
+                runq:remove( self );
+            end
+
             evs[fd] = nil;
             self.pool:remove( item );
             event:revoke( ev );
+
             return false, err;
         end
     -- register io(readable or writable) event
@@ -197,6 +211,9 @@ function Callee:ioable( evs, asa, fd, deadline )
 
         ev, err = event[asa]( event, self, fd );
         if err then
+            if deadline then
+                runq:remove( self );
+            end
 
             return false, err;
         end
@@ -207,9 +224,13 @@ function Callee:ioable( evs, asa, fd, deadline )
 
     -- wait until event fired
     op, fdno, disabled = yield();
-
     -- got io event
     if op == OP_EVENT and fdno == fd then
+        -- remove from runq
+        if deadline then
+            runq:remove( self );
+        end
+
         if disabled then
             evs[fd] = nil;
             self.pool:remove( item );
@@ -219,6 +240,13 @@ function Callee:ioable( evs, asa, fd, deadline )
         end
 
         return true;
+    -- timed out
+    elseif op == OP_RUNQ then
+        ev:unwatch();
+        return false, nil, true;
+    -- remove from runq
+    elseif deadline then
+        runq:remove( self );
     end
 
     -- revoke io event
@@ -292,8 +320,18 @@ end
 -- @return err
 -- @return timeout
 function Callee:sigwait( deadline, ... )
+    local runq = self.coop.runq;
     local event = self.coop.event;
     local sigset, sigmap;
+
+    -- register to runq
+    if deadline then
+        local ok, err = runq:push( self, deadline );
+
+        if not ok then
+            return nil, err;
+        end
+    end
 
     sigset = Deque.new();
     sigmap = {};
@@ -330,9 +368,14 @@ function Callee:sigwait( deadline, ... )
             event:revoke( sigset:pop() );
         end
 
-
         if op == OP_EVENT and sigmap[signo] then
             return signo;
+        -- timed out
+        elseif op == OP_RUNQ then
+            return nil, nil, true;
+        -- remove from runq
+        elseif deadline then
+            runq:remove( self );
         end
     end
 
