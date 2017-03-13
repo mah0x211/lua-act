@@ -44,12 +44,6 @@ local OP_RUNQ = Aux.OP_RUNQ;
 -- local ERRSYNTAX = Coro.ERRSYNTAX;
 -- local ERRMEM = Coro.ERRMEM;
 -- local ERRERR = Coro.ERRERR;
--- event-status
-local EV_ERR = -3;
-local EV_HUP = -2;
-local EV_NOOP = -1;
-local EV_OK = 0;
-local EV_TIMEOUT = 1;
 
 
 --- class Callee
@@ -446,11 +440,6 @@ end
 
 
 return {
-    new = new,
-    EV_ERR = EV_ERR,
-    EV_HUP = EV_HUP,
-    EV_NOOP = EV_NOOP,
-    EV_OK = EV_OK,
-    EV_TIMEOUT = EV_TIMEOUT
+    new = new
 };
 

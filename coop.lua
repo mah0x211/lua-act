@@ -278,9 +278,5 @@ end
 
 -- exports
 return {
-    run = run,
-    EV_ERR = Callee.EV_ERR,
-    EV_HUP = Callee.EV_HUP,
-    EV_OK = Callee.EV_OK,
-    EV_TIMEOUT = Callee.EV_TIMEOUT
+    run = run
 };
