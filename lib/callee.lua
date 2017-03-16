@@ -21,15 +21,15 @@
   THE SOFTWARE.
 
   lib/callee.lua
-  lua-coop
+  lua-synops
   Created by Masatoshi Teruya on 16/12/26.
 
 --]]
 --- file scope variables
 local Deque = require('deque');
-local Aux = require('coop.aux');
-local Coro = require('coop.coro');
-local msleep = require('coop.hrtimer').msleep;
+local Aux = require('synops.aux');
+local Coro = require('synops.coro');
+local msleep = require('synops.hrtimer').msleep;
 local isUInt = Aux.isUInt;
 local yield = coroutine.yield;
 local setmetatable = setmetatable;
@@ -55,10 +55,10 @@ function Callee:call( ... )
     local co = self.co;
     local done, err;
 
-    self.coop.callee = self;
+    self.synops.callee = self;
     -- call with passed arguments
     done, err = co( ... );
-    self.coop.callee = false;
+    self.synops.callee = false;
 
     if done or self.term then
         self:dispose( done or self.term, err );
@@ -68,9 +68,8 @@ end
 
 --- dispose
 function Callee:dispose( ok, err )
-    local runq = self.coop.runq;
-    local event = self.coop.event;
-    local ref = self.ref;
+    local runq = self.synops.runq;
+    local event = self.synops.event;
 
     runq:remove( self );
 
@@ -103,7 +102,7 @@ function Callee:dispose( ok, err )
     end
 
     self.term = nil;
-    self.coop.pool:push( self );
+    self.synops.pool:push( self );
 
     -- dispose child routines
     if #self.node > 0 then
@@ -121,8 +120,9 @@ function Callee:dispose( ok, err )
     end
 
     -- call root node
-    if ref then
+    if self.root then
         local root = self.root;
+        local ref = self.ref;
 
         self.root = nil;
         self.ref = nil;
@@ -169,10 +169,10 @@ end
 -- @return err
 -- @return timeout
 function Callee:ioable( evs, asa, fd, deadline )
-    local runq = self.coop.runq;
-    local event = self.coop.event;
+    local runq = self.synops.runq;
+    local event = self.synops.event;
     local item = evs[fd];
-    local op, ev, disabled;
+    local op, ev, fdno, disabled;
 
     -- register to runq
     if deadline then
@@ -282,8 +282,8 @@ end
 -- @return err
 function Callee:sleep( deadline )
     -- use runq
-    if self.coop.event:len() > 0 then
-        local ok, err = self.coop.runq:push( self, deadline );
+    if self.synops.event:len() > 0 then
+        local ok, err = self.synops.runq:push( self, deadline );
 
         if not ok then
             return false, err;
@@ -314,8 +314,8 @@ end
 -- @return err
 -- @return timeout
 function Callee:sigwait( deadline, ... )
-    local runq = self.coop.runq;
-    local event = self.coop.event;
+    local runq = self.synops.runq;
+    local event = self.synops.event;
     local sigset, sigmap;
 
     -- register to runq
@@ -355,7 +355,7 @@ function Callee:sigwait( deadline, ... )
         local op, signo;
 
         self.sigset = sigset;
-        op, signo, hup = yield();
+        op, signo = yield();
         self.sigset = nil;
         -- revoke signal events
         for i = 1, #sigset do
@@ -378,41 +378,41 @@ end
 
 
 --- init
--- @param coop
+-- @param synops
 -- @param fn
 -- @param ctx
 -- @param ...
 -- @return ok
 -- @return err
-function Callee:init( coop, fn, ctx, ... )
+function Callee:init( synops, fn, ctx, ... )
     if ctx then
-        self.co:init( fn, ctx, coop, ... );
+        self.co:init( fn, ctx, synops, ... );
     else
-        self.co:init( fn, coop, ... );
+        self.co:init( fn, synops, ... );
     end
 
     -- set relationship
-    if coop.callee then
-        self.root = coop.callee;
+    if synops.callee then
+        self.root = synops.callee;
         self.ref = self.root.node:push( self );
     end
 end
 
 
 --- new
--- @param coop
+-- @param synops
 -- @param fn
 -- @param ctx
 -- @param ...
 -- @return callee
 -- @return err
-local function new( coop, fn, ctx, ... )
+local function new( synops, fn, ctx, ... )
     local co, callee, err;
 
     if ctx then
-        co, err = Coro.new( fn, ctx, coop, ...  );
+        co, err = Coro.new( fn, ctx, synops, ...  );
     else
-        co, err = Coro.new( fn, coop, ...  );
+        co, err = Coro.new( fn, synops, ...  );
     end
 
     if err then
@@ -420,7 +420,7 @@ local function new( coop, fn, ctx, ... )
     end
 
     callee = setmetatable({
-        coop = coop,
+        synops = synops,
         co = co,
         node = Deque.new(),
         pool = Deque.new(),
@@ -430,8 +430,8 @@ local function new( coop, fn, ctx, ... )
         __index = Callee
     });
     -- set relationship
-    if coop.callee then
-        callee.root = coop.callee;
+    if synops.callee then
+        callee.root = synops.callee;
         callee.ref = callee.root.node:push( callee );
     end
 

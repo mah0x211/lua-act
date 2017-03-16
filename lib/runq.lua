@@ -21,7 +21,7 @@
   THE SOFTWARE.
 
   lib/runq.lua
-  lua-coop
+  lua-synops
   Created by Masatoshi Teruya on 16/12/24.
 
 --]]
@@ -29,7 +29,7 @@
 --- file scope variables
 local Deque = require('deque');
 local MinHeap = require('minheap');
-local Aux = require('coop.aux');
+local Aux = require('synops.aux');
 local isUInt = Aux.isUInt;
 local isFunction = Aux.isFunction;
 local setmetatable = setmetatable;

@@ -1,7 +1,7 @@
-lua-coop
+lua-synops
 ===
 
-coroutine based cooperative multitasking module.
+coroutine based synchronously non-blocking operations module.
 
 **NOTE: Do not use this module. this module is under heavy development.**
 
@@ -10,6 +10,7 @@ coroutine based cooperative multitasking module.
 ## Dependencies
 
 - deque: <https://github.com/mah0x211/lua-deque>
+- minheap: <https://github.com/mah0x211/lua-minheap>
 - sentry: <https://github.com/mah0x211/lua-sentry>
 
 

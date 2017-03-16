@@ -20,13 +20,13 @@
  *  DEALINGS IN THE SOFTWARE.
  *
  *  hrtimer.h
- *  lua-coop
+ *  lua-synops
  *  Created by Masatoshi Teruya on 17/03/05.
  *
  */
 
-#ifndef coop_hrtimer_h
-#define coop_hrtimer_h
+#ifndef synops_hrtimer_h
+#define synops_hrtimer_h
 
 #include <stdint.h>
 #include <time.h>

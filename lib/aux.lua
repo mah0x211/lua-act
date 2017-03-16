@@ -21,7 +21,7 @@
   THE SOFTWARE.
 
   lib/aux.lua
-  lua-coop
+  lua-synops
   Created by Masatoshi Teruya on 17/03/04.
 
 --]]
@@ -54,7 +54,7 @@ end
 
 return {
     OP_EVENT = OP_EVENT,
-    OP_TIMEOUT = OP_TIMEOUT,
+    OP_RUNQ = OP_RUNQ,
     isUInt = isUInt,
     isFunction = isFunction
 };

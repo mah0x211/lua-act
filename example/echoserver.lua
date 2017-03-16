@@ -21,7 +21,7 @@
   THE SOFTWARE.
 
   example/echoserver.lua
-  lua-coop
+  lua-synops
 
   Created by Masatoshi Teruya on 16/12/24.
 
@@ -29,7 +29,7 @@
 local inspect = require('util').inspect;
 local signal = require('signal')
 local InetServer = require('net.stream.inet').server;
-local Coop = require('coop');
+local Synops = require('synops');
 -- constants
 local HOST = '127.0.0.1';
 local PORT = '5000';
@@ -169,6 +169,6 @@ end
 
 
 do
-    print( assert( Coop.run( main ) ) );
+    print( assert( Synops.run( main ) ) );
     print('done')
 end

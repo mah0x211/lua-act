@@ -20,7 +20,7 @@
  *  DEALINGS IN THE SOFTWARE.
  *
  *  coro.c
- *  lua-coop
+ *  lua-synops
  *  Created by Masatoshi Teruya on 17/03/05.
  *
  */
@@ -37,7 +37,7 @@
 #include "hrtimer.h"
 
 
-#define MODULE_MT   "coop.hrtimer"
+#define MODULE_MT   "synops.hrtimer"
 
 
 typedef struct {
@@ -130,7 +130,7 @@ static int msleep_lua( lua_State *L )
 
 
 
-LUALIB_API int luaopen_coop_hrtimer( lua_State *L )
+LUALIB_API int luaopen_synops_hrtimer( lua_State *L )
 {
     struct luaL_Reg mmethod[] = {
         { "__tostring", tostring_lua },

@@ -20,7 +20,7 @@
  *  DEALINGS IN THE SOFTWARE.
  *
  *  coro.c
- *  lua-coop
+ *  lua-synops
  *  Created by Masatoshi Teruya on 17/01/08.
  *
  */
@@ -35,7 +35,7 @@
 #include "lauxhlib.h"
 
 
-#define MODULE_MT   "coop.coro"
+#define MODULE_MT   "synops.coro"
 
 
 typedef struct {
@@ -276,7 +276,7 @@ static int new_lua( lua_State *L )
 }
 
 
-LUALIB_API int luaopen_coop_coro( lua_State *L )
+LUALIB_API int luaopen_synops_coro( lua_State *L )
 {
     struct luaL_Reg mmethod[] = {
         { "__gc", gc_lua },

@@ -1,11 +1,11 @@
-package = "coop"
+package = "synops"
 version = "scm-1"
 source = {
-    url = "gitrec://github.com/mah0x211/lua-coop.git"
+    url = "gitrec://github.com/mah0x211/lua-synops.git"
 }
 description = {
-    summary = "coroutine based cooperative multitasking module",
-    homepage = "https://github.com/mah0x211/lua-coop",
+    summary = "coroutine based synchronously non-blocking operations module",
+    homepage = "https://github.com/mah0x211/lua-synops",
     license = "MIT/X11",
     maintainer = "Masatoshi Teruya"
 }
@@ -19,16 +19,16 @@ dependencies = {
 build = {
     type = "builtin",
     modules = {
-        coop = "coop.lua",
-        ['coop.aux'] = "lib/aux.lua",
-        ['coop.callee'] = "lib/callee.lua",
-        ['coop.event'] = "lib/event.lua",
-        ['coop.runq'] = "lib/runq.lua",
-        ['coop.coro'] = {
+        synops = "synops.lua",
+        ['synops.aux'] = "lib/aux.lua",
+        ['synops.callee'] = "lib/callee.lua",
+        ['synops.event'] = "lib/event.lua",
+        ['synops.runq'] = "lib/runq.lua",
+        ['synops.coro'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/coro.c" }
         },
-        ['coop.hrtimer'] = {
+        ['synops.hrtimer'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
         }

@@ -20,22 +20,22 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
 
-  coop.lua
-  lua-coop
+  synops.lua
+  lua-synops
   Created by Masatoshi Teruya on 16/12/25.
 
 --]]
 
 --- file scope variables
 local Deque = require('deque');
-local HRTimer = require('coop.hrtimer');
-local RunQ = require('coop.runq');
-local Event = require('coop.event');
-local Callee = require('coop.callee');
+local HRTimer = require('synops.hrtimer');
+local RunQ = require('synops.runq');
+local Event = require('synops.event');
+local Callee = require('synops.callee');
 local setmetatable = setmetatable;
 local yield = coroutine.yield;
 --- oncstants
-local OP_RUNQ = require('coop.aux').OP_RUNQ;
+local OP_RUNQ = require('synops.aux').OP_RUNQ;
 
 
 --- spawn
@@ -44,23 +44,23 @@ local OP_RUNQ = require('coop.aux').OP_RUNQ;
 -- @param ...
 -- @param ok
 -- @param err
-local function spawn( coop, fn, ctx, ... )
-    local callee = coop.pool:pop();
+local function spawn( synops, fn, ctx, ... )
+    local callee = synops.pool:pop();
     local ok, err;
 
     -- use pooled callee
     if callee then
-        callee:init( coop, fn, ctx, ... );
+        callee:init( synops, fn, ctx, ... );
     -- create new callee
     else
-        callee, err = Callee.new( coop, fn, ctx, ... );
+        callee, err = Callee.new( synops, fn, ctx, ... );
         if err then
             return false, err;
         end
     end
 
     -- push to runq
-    ok, err = coop.runq:push( callee );
+    ok, err = synops.runq:push( callee );
     if not ok then
         return false, err;
     end
@@ -69,8 +69,8 @@ local function spawn( coop, fn, ctx, ... )
 end
 
 
---- class Coop
-local Coop = {};
+--- class Synops
+local Synops = {};
 
 
 --- spawn
@@ -79,7 +79,7 @@ local Coop = {};
 -- @param ...
 -- @param ok
 -- @param err
-function Coop:spawn( fn, ctx, ... )
+function Synops:spawn( fn, ctx, ... )
     if self.callee then
         return spawn( self, fn, ctx, ... );
     end
@@ -90,7 +90,7 @@ end
 
 --- exit
 -- @param ...
-function Coop:exit( ... )
+function Synops:exit( ... )
     local callee = self.callee;
 
     if callee then
@@ -104,7 +104,7 @@ end
 --- later
 -- @return ok
 -- @return err
-function Coop:later()
+function Synops:later()
     local callee = self.callee;
 
     if callee then
@@ -126,7 +126,7 @@ end
 --- atexit
 -- @param fn
 -- @param ...
-function Coop:atexit( fn, ... )
+function Synops:atexit( fn, ... )
     local callee = self.callee;
 
     if callee then
@@ -144,7 +144,7 @@ end
 --- await
 -- @return ok
 -- @return ...
-function Coop:await()
+function Synops:await()
     local callee = self.callee;
 
     if callee then
@@ -159,7 +159,7 @@ end
 -- @param deadline
 -- @return ok
 -- @return err
-function Coop:sleep( deadline )
+function Synops:sleep( deadline )
     local callee = self.callee;
 
     if callee then
@@ -176,7 +176,7 @@ end
 -- @return signo
 -- @return err
 -- @return timeout
-function Coop:sigwait( deadline, ... )
+function Synops:sigwait( deadline, ... )
     local callee = self.callee;
 
     if callee then
@@ -193,7 +193,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Coop:readable( fd, deadline )
+function Synops:readable( fd, deadline )
     local callee = self.callee;
 
     if callee then
@@ -210,7 +210,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Coop:writable( fd, deadline )
+function Synops:writable( fd, deadline )
     local callee = self.callee;
 
     if callee then
@@ -232,20 +232,19 @@ local function run( fn, ctx )
 
     if event then
         local runq = RunQ.new();
-        local coop = setmetatable({
+        local synops = setmetatable({
             callee = false,
             event = event,
             runq = runq,
             pool = Deque.new()
         },{
-            __index = Coop
+            __index = Synops
         });
         local ok;
 
-        ok, err = spawn( coop, fn, ctx );
+        ok, err = spawn( synops, fn, ctx );
         if ok then
             local hrtimer = HRTimer.new();
-            local msec = -1;
 
             while true do
                 local msec = -1;
