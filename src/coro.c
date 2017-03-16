@@ -65,8 +65,9 @@ CREATE_NEWTHREAD:
         // failed to create new thread
         if( !( coro->co = lua_newthread( L ) ) ){
             lua_pushstring( coro->res, strerror( errno ) );
+            lua_pushboolean( L, 1 );
             lua_pushinteger( L, LUA_ERRMEM );
-            return 1;
+            return 2;
         }
 
         // retain thread
