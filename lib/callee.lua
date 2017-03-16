@@ -53,21 +53,23 @@ local Callee = {};
 --- __call
 function Callee:call( ... )
     local co = self.co;
-    local done, err;
+    local done, status;
 
     self.synops.callee = self;
     -- call with passed arguments
-    done, err = co( ... );
+    done, status = co( ... );
     self.synops.callee = false;
 
-    if done or self.term then
-        self:dispose( done or self.term, err );
+    if done then
+        self:dispose( not status and true or false );
+    elseif self.term then
+        self:dispose( true );
     end
 end
 
 
 --- dispose
-function Callee:dispose( ok, err )
+function Callee:dispose( ok, ... )
     local runq = self.synops.runq;
     local event = self.synops.event;
 
@@ -115,10 +117,6 @@ function Callee:dispose( ok, err )
         until child == nil;
     end
 
-    if err then
-        print( self.co:getres() );
-    end
-
     -- call root node
     if self.root then
         local root = self.root;
@@ -152,6 +150,8 @@ end
 
 
 --- await
+-- @return ok
+-- @return ...
 function Callee:await()
     if #self.node > 0 then
         self.wait = true;
