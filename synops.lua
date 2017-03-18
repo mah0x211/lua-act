@@ -229,7 +229,7 @@ end
 -- @return ok
 -- @return err
 function Synops.run( fn, ... )
-    local event, runq, synops, hrtimer, ok, err;
+    local event, runq, hrtimer, ok, err;
 
     if SYNOPS_CTX then
         return false, 'synosp run already';

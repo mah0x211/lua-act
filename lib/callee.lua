@@ -80,7 +80,7 @@ function Callee:dispose( ok )
 
     -- revoke signal events
     if self.sigset then
-        for i = 1, #self.sigset do
+        for _ = 1, #self.sigset do
             event:revoke( self.sigset:pop() );
         end
         self.sigset = nil;
@@ -345,7 +345,7 @@ function Callee:sigwait( deadline, ... )
 
         if err then
             -- revoke signal events
-            for j = 1, #sigset do
+            for _ = 1, #sigset do
                 event:revoke( sigset:pop() );
             end
 
@@ -368,7 +368,7 @@ function Callee:sigwait( deadline, ... )
         op, signo = yield();
         self.sigset = nil;
         -- revoke signal events
-        for i = 1, #sigset do
+        for _ = 1, #sigset do
             event:revoke( sigset:pop() );
         end
 
