@@ -35,7 +35,7 @@ local HOST = '127.0.0.1';
 local PORT = '5000';
 
 
-local function send( sock, c, msg )
+local function send( sock, msg )
     local len, err, again = sock:sendq( msg );
 
     if not again then
@@ -47,7 +47,7 @@ local function send( sock, c, msg )
 
         repeat
             total = total + len;
-            ok, err = c:writable( fd );
+            ok, err = Synops.writable( fd );
             if ok then
                 len, err, again = sock:flushq();
             else
@@ -60,7 +60,7 @@ local function send( sock, c, msg )
 end
 
 
-local function recv( sock, c )
+local function recv( sock )
     local msg, err, again = sock:recv();
 
     if not again then
@@ -68,7 +68,7 @@ local function recv( sock, c )
     else
         local ok;
 
-        ok, err = c:readable( sock:fd() );
+        ok, err = Synops.readable( sock:fd() );
         if ok then
             return sock:recv();
         end
@@ -78,7 +78,7 @@ local function recv( sock, c )
 end
 
 
-local function accept( sock, c )
+local function accept( sock )
     local client, err, again = sock:accept();
 
     if not again then
@@ -87,7 +87,7 @@ local function accept( sock, c )
         local ok;
 
         repeat
-            ok, err = c:readable( sock:fd() );
+            ok, err = Synops.readable( sock:fd() );
             if ok then
                 client, err, again = sock:accept();
             else
@@ -101,18 +101,18 @@ local function accept( sock, c )
 end
 
 
-local function handleClient( client, c )
+local function handleClient( client )
     local err;
 
-    c:atexit( client.close, client );
+    Synops.atexit( client.close, client );
 
     while true do
         local msg, ok;
 
-        msg, err = recv( client, c );
+        msg, err = recv( client );
         if not msg then break end
 
-        ok, err = send( client, c, msg );
+        ok, err = send( client, msg );
         if not ok then break end
     end
 
@@ -122,22 +122,22 @@ local function handleClient( client, c )
 end
 
 
-local function handleServer( server, c )
-    c:atexit( server.close, server );
+local function handleServer( server )
+    Synops.atexit( server.close, server );
 
     repeat
-        local client, err = accept( server, c );
+        local client, err = accept( server );
 
         -- got client
         if client then
             -- print( 'accept', client:fd() )
-            assert( c:spawn( handleClient, client ) );
+            assert( Synops.spawn( handleClient, client ) );
         end
     until err;
 end
 
 
-local function main( c )
+local function main()
     -- create server
     local server, err = InetServer.new({
         host = HOST;
@@ -158,10 +158,9 @@ local function main( c )
 
     -- start server
     print( 'start server: ', HOST, PORT, server:fd() );
-
-    assert( c:spawn( handleServer, server ) );
+    assert( Synops.spawn( handleServer, server ) );
     signal.blockAll();
-    print( 'sigwait', c:sigwait( nil, signal.SIGINT ) );
+    print( 'sigwait', Synops.sigwait( nil, signal.SIGINT ) );
     -- assert( c:await() )
 
     print( 'end server' );
@@ -169,6 +168,6 @@ end
 
 
 do
-    print( assert( Synops.run( main ) ) );
+    print( 'run', assert( Synops.run( main ) ) );
     print('done')
 end
