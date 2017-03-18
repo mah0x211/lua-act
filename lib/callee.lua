@@ -175,6 +175,8 @@ function Callee:await()
         self.wait = true;
         return yield();
     end
+
+    return true;
 end
 
 
