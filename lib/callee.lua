@@ -35,6 +35,7 @@ local yield = coroutine.yield;
 local setmetatable = setmetatable;
 local pcall = pcall;
 local unpack = unpack or table.unpack;
+local concat = table.concat;
 -- constants
 local OP_EVENT = Aux.OP_EVENT;
 local OP_RUNQ = Aux.OP_RUNQ;
@@ -69,7 +70,7 @@ end
 
 
 --- dispose
-function Callee:dispose( ok, ... )
+function Callee:dispose( ok )
     local runq = self.synops.runq;
     local event = self.synops.event;
 
@@ -112,7 +113,9 @@ function Callee:dispose( ok, ... )
 
         repeat
             runq:remove( child );
-            child:dispose();
+            child.root = nil;
+            child.ref = nil;
+            child:dispose( true );
             child = self.node:pop();
         until child == nil;
     end
@@ -128,7 +131,11 @@ function Callee:dispose( ok, ... )
         if root.wait then
             root.wait = nil;
             root:call( ok, self.co:getres() );
+        elseif not ok then
+            error( concat( { self.co:getres() }, '\n' ) );
         end
+    elseif not ok then
+        error( concat( { self.co:getres() }, '\n' ) );
     end
 end
 
