@@ -102,7 +102,7 @@ function RunQ:remove( callee )
         ref[callee] = nil;
         ref[qelm] = nil;
         queue:remove( qelm );
-        if #queue == 0 then
+        if #queue == 0 and ref[queue] then
             local helm = ref[queue];
 
             ref[queue] = nil;
