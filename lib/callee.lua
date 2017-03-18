@@ -170,6 +170,22 @@ function Callee:await()
 end
 
 
+--- later
+-- @return ok
+-- @return err
+function Callee:later()
+    local ok, err = self.synops.runq:push( self );
+
+    if not ok then
+        return false, err;
+    elseif yield() == OP_RUNQ then
+        return true;
+    end
+
+    error( 'invalid implements' );
+end
+
+
 --- ioable
 -- @param evs
 -- @param asa

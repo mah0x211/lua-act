@@ -33,9 +33,7 @@ local RunQ = require('synops.runq');
 local Event = require('synops.event');
 local Callee = require('synops.callee');
 local setmetatable = setmetatable;
-local yield = coroutine.yield;
 --- constants
-local OP_RUNQ = require('synops.aux').OP_RUNQ;
 local SYNOPS_CTX;
 
 
@@ -110,15 +108,7 @@ function Synops.later()
     local callee = Callee.acquire();
 
     if callee then
-        local ok, err = SYNOPS_CTX.runq:push( callee );
-
-        if not ok then
-            return false, err;
-        elseif yield() == OP_RUNQ then
-            return true;
-        end
-
-        error( 'invalid implements' );
+        return callee:later();
     end
 
     error( 'cannot call later() from outside of execution context', 2 );
