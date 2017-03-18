@@ -118,18 +118,16 @@ end
 --- atexit
 -- @param fn
 -- @param ...
+-- @return ok
+-- @return err
 function Synops.atexit( fn, ... )
     local callee = Callee.acquire();
 
     if callee then
-        if type( fn ) ~= 'function' then
-            error( 'fn must be function', 2 );
-        end
-
-        callee:atexit( fn, ... );
-    else
-        error( 'cannot call atexit() at outside of execution context', 2 );
+        return callee:atexit( fn, ... );
     end
+
+    error( 'cannot call atexit() at outside of execution context', 2 );
 end
 
 

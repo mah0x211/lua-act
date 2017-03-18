@@ -153,9 +153,17 @@ end
 --- atexit
 -- @param fn
 -- @param ...
+-- @return ok
+-- @return err
 function Callee:atexit( fn, ... )
+    if type( fn ) ~= 'function' then
+        return false, 'fn must be function';
+    end
+
     --- TODO: probably, should be implemented in C to improve performance
     self.exitfn = { fn, ... };
+
+    return true;
 end
 
 
