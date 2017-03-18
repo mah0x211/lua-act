@@ -1,6 +1,6 @@
 --[[
 
-  test/run_spec.lua
+  test/synops_run_spec.lua
   lua-synops
   Created by Masatoshi Teruya on 17/03/18.
 
