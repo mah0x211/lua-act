@@ -308,7 +308,7 @@ end
 -- @return err
 function Callee:sleep( deadline )
     -- use runq
-    if self.synops.event:len() > 0 then
+    if self.synops.event:len() > 0 or self.synops.runq:len() > 0 then
         local ok, err = self.synops.runq:push( self, deadline );
 
         if not ok then
