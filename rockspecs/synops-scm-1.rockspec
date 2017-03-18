@@ -18,6 +18,11 @@ dependencies = {
 }
 build = {
     type = "builtin",
+    install = {
+        bin = {
+            synops = "bin/synops.lua"
+        }
+    },
     modules = {
         synops = "synops.lua",
         ['synops.aux'] = "lib/aux.lua",
