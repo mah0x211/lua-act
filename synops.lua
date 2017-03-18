@@ -225,7 +225,7 @@ function Synops.run( fn, ... )
     assert( type( fn ) == 'function', 'fn must be function' );
 
     if SYNOPS_CTX then
-        return false, 'synosp run already';
+        return false, 'synops run already';
     end
 
     -- create event
