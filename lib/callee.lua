@@ -45,6 +45,8 @@ local OP_RUNQ = Aux.OP_RUNQ;
 -- local ERRSYNTAX = Coro.ERRSYNTAX;
 -- local ERRMEM = Coro.ERRMEM;
 -- local ERRERR = Coro.ERRERR;
+--- static variables
+local CURRENT_CALLEE;
 
 
 --- class Callee
@@ -56,10 +58,10 @@ function Callee:call( ... )
     local co = self.co;
     local done, status;
 
-    self.synops.callee = self;
+    CURRENT_CALLEE = self;
     -- call with passed arguments
     done, status = co( ... );
-    self.synops.callee = false;
+    CURRENT_CALLEE = false;
 
     if done then
         self:dispose( not status and true or false );
@@ -152,6 +154,7 @@ end
 -- @param fn
 -- @param ...
 function Callee:atexit( fn, ... )
+    --- TODO: probably, should be implemented in C to improve performance
     self.exitfn = { fn, ... };
 end
 
@@ -385,22 +388,15 @@ end
 
 
 --- init
--- @param synops
 -- @param fn
--- @param ctx
 -- @param ...
 -- @return ok
 -- @return err
-function Callee:init( synops, fn, ctx, ... )
-    if ctx then
-        self.co:init( fn, ctx, synops, ... );
-    else
-        self.co:init( fn, synops, ... );
-    end
-
+function Callee:init( fn, ... )
+    self.co:init( fn, ... );
     -- set relationship
-    if synops.callee then
-        self.root = synops.callee;
+    if CURRENT_CALLEE then
+        self.root = CURRENT_CALLEE;
         self.ref = self.root.node:push( self );
     end
 end
@@ -409,18 +405,12 @@ end
 --- new
 -- @param synops
 -- @param fn
--- @param ctx
 -- @param ...
 -- @return callee
 -- @return err
-local function new( synops, fn, ctx, ... )
-    local co, callee, err;
-
-    if ctx then
-        co, err = Coro.new( fn, ctx, synops, ...  );
-    else
-        co, err = Coro.new( fn, synops, ...  );
-    end
+local function new( synops, fn, ... )
+    local co, err = Coro.new( fn, ...  );
+    local callee;
 
     if err then
         return nil, err;
@@ -437,8 +427,8 @@ local function new( synops, fn, ctx, ... )
         __index = Callee
     });
     -- set relationship
-    if synops.callee then
-        callee.root = synops.callee;
+    if CURRENT_CALLEE then
+        callee.root = CURRENT_CALLEE;
         callee.ref = callee.root.node:push( callee );
     end
 
@@ -446,7 +436,15 @@ local function new( synops, fn, ctx, ... )
 end
 
 
+--- acquire
+-- @return callee
+local function acquire()
+    return CURRENT_CALLEE;
+end
+
+
 return {
-    new = new
+    new = new,
+    acquire = acquire
 };
 

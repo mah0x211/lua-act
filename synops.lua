@@ -34,33 +34,33 @@ local Event = require('synops.event');
 local Callee = require('synops.callee');
 local setmetatable = setmetatable;
 local yield = coroutine.yield;
---- oncstants
+--- constants
 local OP_RUNQ = require('synops.aux').OP_RUNQ;
+local SYNOPS_CTX;
 
 
 --- spawn
 -- @param fn
--- @param ctx
 -- @param ...
 -- @param ok
 -- @param err
-local function spawn( synops, fn, ctx, ... )
-    local callee = synops.pool:pop();
+local function spawn( fn, ... )
+    local callee = SYNOPS_CTX.pool:pop();
     local ok, err;
 
     -- use pooled callee
     if callee then
-        callee:init( synops, fn, ctx, ... );
+        callee:init( fn, ... );
     -- create new callee
     else
-        callee, err = Callee.new( synops, fn, ctx, ... );
+        callee, err = Callee.new( SYNOPS_CTX, fn, ... );
         if err then
             return false, err;
         end
     end
 
     -- push to runq
-    ok, err = synops.runq:push( callee );
+    ok, err = SYNOPS_CTX.runq:push( callee );
     if not ok then
         return false, err;
     end
@@ -79,36 +79,38 @@ local Synops = {};
 -- @param ...
 -- @param ok
 -- @param err
-function Synops:spawn( fn, ctx, ... )
-    if self.callee then
-        return spawn( self, fn, ctx, ... );
+function Synops.spawn( fn, ... )
+    local callee = Callee.acquire();
+
+    if callee then
+        return spawn( fn, ... );
     end
 
-    error( 'cannot call spawn() from outside of vm', 2 );
+    error( 'cannot call spawn() from outside of execution context', 2 );
 end
 
 
 --- exit
 -- @param ...
-function Synops:exit( ... )
-    local callee = self.callee;
+function Synops.exit( ... )
+    local callee = Callee.acquire();
 
     if callee then
         callee:exit( ... );
     end
 
-    error( 'cannot call exit() at outside of vm', 2 );
+    error( 'cannot call exit() at outside of execution context', 2 );
 end
 
 
 --- later
 -- @return ok
 -- @return err
-function Synops:later()
-    local callee = self.callee;
+function Synops.later()
+    local callee = Callee.acquire();
 
     if callee then
-        local ok, err = self.runq:push( callee );
+        local ok, err = SYNOPS_CTX.runq:push( callee );
 
         if not ok then
             return false, err;
@@ -119,15 +121,15 @@ function Synops:later()
         error( 'invalid implements' );
     end
 
-    error( 'cannot call later() from outside of vm', 2 );
+    error( 'cannot call later() from outside of execution context', 2 );
 end
 
 
 --- atexit
 -- @param fn
 -- @param ...
-function Synops:atexit( fn, ... )
-    local callee = self.callee;
+function Synops.atexit( fn, ... )
+    local callee = Callee.acquire();
 
     if callee then
         if type( fn ) ~= 'function' then
@@ -136,7 +138,7 @@ function Synops:atexit( fn, ... )
 
         callee:atexit( fn, ... );
     else
-        error( 'cannot call atexit() at outside of vm', 2 );
+        error( 'cannot call atexit() at outside of execution context', 2 );
     end
 end
 
@@ -144,14 +146,14 @@ end
 --- await
 -- @return ok
 -- @return ...
-function Synops:await()
-    local callee = self.callee;
+function Synops.await()
+    local callee = Callee.acquire();
 
     if callee then
         return callee:await();
     end
 
-    error( 'cannot call await() at outside of vm', 2 );
+    error( 'cannot call await() at outside of execution context', 2 );
 end
 
 
@@ -159,14 +161,14 @@ end
 -- @param deadline
 -- @return ok
 -- @return err
-function Synops:sleep( deadline )
-    local callee = self.callee;
+function Synops.sleep( deadline )
+    local callee = Callee.acquire();
 
     if callee then
         return callee:sleep( deadline );
     end
 
-    error( 'cannot call sleep() from outside of vm', 2 );
+    error( 'cannot call sleep() from outside of execution context', 2 );
 end
 
 
@@ -176,14 +178,14 @@ end
 -- @return signo
 -- @return err
 -- @return timeout
-function Synops:sigwait( deadline, ... )
-    local callee = self.callee;
+function Synops.sigwait( deadline, ... )
+    local callee = Callee.acquire();
 
     if callee then
         return callee:sigwait( deadline, ... );
     end
 
-    error( 'cannot call sleep() from outside of vm', 2 );
+    error( 'cannot call sleep() from outside of execution context', 2 );
 end
 
 
@@ -193,14 +195,14 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops:readable( fd, deadline )
-    local callee = self.callee;
+function Synops.readable( fd, deadline )
+    local callee = Callee.acquire();
 
     if callee then
         return callee:readable( fd, deadline );
     end
 
-    error( 'cannot call readable() from outside of vm', 2 );
+    error( 'cannot call readable() from outside of execution context', 2 );
 end
 
 
@@ -210,72 +212,84 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops:writable( fd, deadline )
-    local callee = self.callee;
+function Synops.writable( fd, deadline )
+    local callee = Callee.acquire();
 
     if callee then
         return callee:writable( fd, deadline );
     end
 
-    error( 'cannot call writable() from outside of vm', 2 );
+    error( 'cannot call writable() from outside of execution context', 2 );
 end
 
 
 --- run
 -- @param fn
--- @param ctx
+-- @param ...
 -- @return ok
 -- @return err
-local function run( fn, ctx )
+function Synops.run( fn, ... )
+    local event, runq, synops, hrtimer, ok, err;
+
+    if SYNOPS_CTX then
+        return false, 'synosp run already';
+    end
+
     -- create event
-    local event, err = Event.new();
+    event, err = Event.new();
+    if err then
+        return false, err;
+    end
 
-    if event then
-        local runq = RunQ.new();
-        local synops = setmetatable({
-            callee = false,
-            event = event,
-            runq = runq,
-            pool = Deque.new()
-        },{
-            __index = Synops
-        });
-        local ok;
+    -- create synops context
+    runq = RunQ.new();
+    SYNOPS_CTX = setmetatable({
+        event = event,
+        runq = runq,
+        pool = Deque.new()
+    },{
+        __newindex = function()
+            error( 'attempt to protected value', 2 );
+        end
+    });
 
-        ok, err = spawn( synops, fn, ctx );
-        if ok then
-            local hrtimer = HRTimer.new();
+    -- create main coroutine
+    ok, err = spawn( fn, ... );
+    if not ok then
+        SYNOPS_CTX = nil;
+        return false, err;
+    end
 
-            while true do
-                local msec = -1;
+    -- run synops scheduler
+    hrtimer = HRTimer.new();
+    while true do
+        local msec = -1;
 
-                if runq:len() > 0 and hrtimer:remain() < 0 then
-                    msec = runq:consume(-1);
-                    if msec > 0 then
-                        hrtimer:init( msec );
-                    end
-                end
-
-                if event:len() > 0 then
-                    err = event:consume( msec );
-                    -- got critical error
-                    if err then
-                        break;
-                    end
-                elseif runq:len() > 0 then
-                    hrtimer:sleep();
-                else
-                    break;
-                end
+        if runq:len() > 0 and hrtimer:remain() < 0 then
+            msec = runq:consume(-1);
+            if msec > 0 then
+                hrtimer:init( msec );
             end
         end
+
+        if event:len() > 0 then
+            err = event:consume( msec );
+            -- got critical error
+            if err then
+                break;
+            end
+        elseif runq:len() > 0 then
+            hrtimer:sleep();
+        else
+            break;
+        end
     end
+
+    SYNOPS_CTX = nil;
 
     return not err, err;
 end
 
 
 -- exports
-return {
-    run = run
-};
+return Synops;
