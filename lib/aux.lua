@@ -29,6 +29,7 @@
 --- file scope variables
 local type = type;
 local floor = math.floor;
+local tblconcat = table.concat;
 --- constants
 local INFINITE = math.huge;
 local OP_EVENT = 0;
@@ -52,11 +53,31 @@ local function isFunction( fn )
 end
 
 
+--- concat
+-- @param tbl
+-- @param sep
+-- @param i
+-- @param j
+-- @return str
+local function concat( tbl, sep, i, j )
+    for pos = i or 1, j or #tbl do
+        local arg = tbl[pos];
+
+        if type( arg ) ~= 'string' then
+            tbl[pos] = tostring( arg );
+        end
+    end
+
+    return tblconcat( tbl, sep, i, j );
+end
+
+
 return {
     OP_EVENT = OP_EVENT,
     OP_RUNQ = OP_RUNQ,
     isUInt = isUInt,
-    isFunction = isFunction
+    isFunction = isFunction,
+    concat = concat
 };
 
 

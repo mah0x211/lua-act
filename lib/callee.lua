@@ -31,11 +31,11 @@ local Aux = require('synops.aux');
 local Coro = require('synops.coro');
 local msleep = require('synops.hrtimer').msleep;
 local isUInt = Aux.isUInt;
+local concat = Aux.concat;
 local yield = coroutine.yield;
 local setmetatable = setmetatable;
 local pcall = pcall;
 local unpack = unpack or table.unpack;
-local concat = table.concat;
 -- constants
 local OP_EVENT = Aux.OP_EVENT;
 local OP_RUNQ = Aux.OP_RUNQ;
