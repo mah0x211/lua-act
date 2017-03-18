@@ -221,6 +221,9 @@ end
 function Synops.run( fn, ... )
     local event, runq, hrtimer, ok, err;
 
+    -- check first argument
+    assert( type( fn ) == 'function', 'fn must be function' );
+
     if SYNOPS_CTX then
         return false, 'synosp run already';
     end
