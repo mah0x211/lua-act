@@ -213,12 +213,12 @@ function Synops.writable( fd, deadline )
 end
 
 
---- run
+--- runloop
 -- @param fn
 -- @param ...
 -- @return ok
 -- @return err
-function Synops.run( fn, ... )
+local function runloop( fn, ... )
     local event, runq, hrtimer, ok, err;
 
     -- check first argument
@@ -249,7 +249,6 @@ function Synops.run( fn, ... )
     -- create main coroutine
     ok, err = spawn( fn, ... );
     if not ok then
-        SYNOPS_CTX = nil;
         return false, err;
     end
 
@@ -269,18 +268,31 @@ function Synops.run( fn, ... )
             err = event:consume( msec );
             -- got critical error
             if err then
-                break;
+                return false, err;
             end
         elseif runq:len() > 0 then
             hrtimer:sleep();
         else
-            break;
+            return true;
         end
     end
+end
+
+
+--- run
+-- @param fn
+-- @param ...
+-- @return ok
+-- @return err
+function Synops.run( fn, ... )
+    local ok, rv, err = pcall( runloop, fn, ... );
 
     SYNOPS_CTX = nil;
+    if ok then
+        return rv, err;
+    end
 
-    return not err, err;
+    return false, rv;
 end
 
 
