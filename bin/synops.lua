@@ -43,7 +43,11 @@ if not arg[1] then
 end
 
 local fn = assert( loadfile( arg[1] ) );
+local ok, err = SynopsRun( fn, select( 2, ... ) );
 
-assert( SynopsRun( fn, select( 2, ... ) ) );
+if not ok then
+    print( err );
+    os.exit(-1);
+end
 
 
