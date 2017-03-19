@@ -26,6 +26,10 @@ build = {
     modules = {
         synops = "synops.lua",
         ['synops.aux'] = "lib/aux.lua",
+        ['synops.aux.fileno'] = {
+            incdirs = { "deps/lauxhlib" },
+            sources = { "src/aux_fileno.c" }
+        },
         ['synops.callee'] = "lib/callee.lua",
         ['synops.event'] = "lib/event.lua",
         ['synops.runq'] = "lib/runq.lua",
