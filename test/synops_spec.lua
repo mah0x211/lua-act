@@ -165,21 +165,135 @@ describe('test synops module:', function()
             assert.is_not_true( pcall( synops.atexit, function()end ) )
         end)
 
+
         it('fail with a non-function argument', function()
             assert.is_not_true( synops.run(function()
                 assert( synops.atexit( 1 ) )
             end))
         end)
 
-        it('success', function()
+
+        it('should call function', function()
             local executed = false
 
             assert.is_true( synops.run(function()
-                assert( synops.atexit(function() executed = true end) )
+                assert( synops.atexit(function( a, b )
+                    assert( a == 'foo' )
+                    assert( b == 'bar' )
+                    executed = true
+                end, 'foo', 'bar' ))
             end))
 
-            assert( executed, 'child coroutine did not executed' )
+            assert( executed, 'could not executed' )
         end)
+
+
+        it('should call functions in reverse order of registration', function()
+            local executed = {}
+            local count = 3
+
+            assert.is_true( synops.run(function()
+                assert( synops.atexit(function()
+                    executed[#executed+1] = count
+                    count = count - 1
+                end))
+                assert( synops.atexit(function()
+                    executed[#executed+1] = count
+                    count = count - 1
+                end))
+                assert( synops.atexit(function()
+                    executed[#executed+1] = count
+                    count = count - 1
+                end))
+            end))
+
+            assert( count == 0, 'could not executed' )
+            count = 3
+            for i = 1, #executed do
+                assert(
+                    executed[i] == count,
+                    'could not executed in reverse order of registration'
+                )
+                count = count - 1
+            end
+        end)
+
+
+        it('should pass a previous error message', function()
+            local executed = false
+
+            assert.is_true( synops.run(function()
+                assert( synops.atexit(function( a, b, err )
+                    assert( a == 'foo' )
+                    assert( b == 'bar' )
+                    assert( err:find('hello') )
+                    executed = true
+                end, 'foo', 'bar' ))
+
+                assert( synops.atexit(function()
+                    error( 'hello' )
+                end))
+            end))
+
+            assert( executed, 'could not executed' )
+        end)
+
+
+        it('should return atexit error', function()
+            assert.is_true( synops.run(function()
+                local ok, err, trace
+
+                synops.spawn(function()
+                    assert( synops.atexit(function() error( 'world' ) end))
+
+                    return 'hello'
+                end)
+
+                ok, err, trace = synops.await()
+                assert( ok == false )
+                assert( err:find('world') )
+                assert( trace:find('traceback') )
+            end))
+        end)
+
+
+        it('should return the return values of main function', function()
+            assert.is_true( synops.run(function()
+                local ok, a, b
+
+                synops.spawn(function()
+                    assert( synops.atexit(function( ... ) return ... end))
+
+                    return 'hello', 'world'
+                end)
+
+                ok, a, b = synops.await()
+                assert( ok == true )
+                assert( a == 'hello' )
+                assert( b == 'world' )
+            end))
+        end)
+
+
+        it('should recover the error of main function', function()
+            assert.is_true( synops.run(function()
+                local ok, err, trace
+
+                synops.spawn(function()
+                    assert( synops.atexit(function( a, b, ... )
+                        return ...
+                    end, 'foo', 'bar' ))
+
+                    error( 'hello' )
+                end)
+
+                ok, err, trace = synops.await()
+                assert( ok == true )
+                assert( err:find('hello') )
+                assert( trace:find('traceback') )
+            end))
+        end)
+
     end)
 
 
@@ -197,16 +311,16 @@ describe('test synops module:', function()
                 synops.spawn(function() return error('error occurred') end)
 
                 ok, val = synops.await()
-                assert( ok, 'failed to synops.await' )
-                assert( val == 'hello', 'failed to synops.await' )
+                assert( ok )
+                assert( val == 'hello' )
 
                 ok, val = synops.await()
-                assert( ok, 'failed to synops.await' )
-                assert( val == 'world', 'failed to synops.await' )
+                assert( ok )
+                assert( val == 'world' )
 
                 ok, val = synops.await()
-                assert( not ok, 'failed to synops.await' )
-                assert( val == 'error occurred', 'failed to synops.await' )
+                assert( not ok )
+                assert( val == 'error occurred' )
             end))
         end)
     end)
