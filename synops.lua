@@ -38,29 +38,32 @@ local SYNOPS_CTX;
 
 
 --- spawn
+-- @param atexit
 -- @param fn
 -- @param ...
 -- @param ok
 -- @param err
-local function spawn( fn, ... )
+local function spawn( atexit, fn, ... )
     local callee = SYNOPS_CTX.pool:pop();
     local ok, err;
 
     -- use pooled callee
     if callee then
-        callee:init( fn, ... );
+        callee:init( atexit, fn, ... );
     -- create new callee
     else
-        callee, err = Callee.new( SYNOPS_CTX, fn, ... );
+        callee, err = Callee.new( SYNOPS_CTX, atexit, fn, ... );
         if err then
             return false, err;
         end
     end
 
-    -- push to runq
-    ok, err = SYNOPS_CTX.runq:push( callee );
-    if not ok then
-        return false, err;
+    -- push to runq if not atexit
+    if not atexit then
+        ok, err = SYNOPS_CTX.runq:push( callee );
+        if not ok then
+            return false, err;
+        end
     end
 
     return true;
@@ -81,7 +84,7 @@ function Synops.spawn( fn, ... )
     local callee = Callee.acquire();
 
     if callee then
-        return spawn( fn, ... );
+        return spawn( false, fn, ... );
     end
 
     error( 'cannot call spawn() from outside of execution context', 2 );
@@ -124,7 +127,7 @@ function Synops.atexit( fn, ... )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:atexit( fn, ... );
+        return spawn( true, fn, ... );
     end
 
     error( 'cannot call atexit() at outside of execution context', 2 );
@@ -245,7 +248,7 @@ local function runloop( fn, ... )
     });
 
     -- create main coroutine
-    ok, err = spawn( fn, ... );
+    ok, err = spawn( false, fn, ... );
     if not ok then
         return false, err;
     end

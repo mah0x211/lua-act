@@ -34,8 +34,6 @@ local isUInt = Aux.isUInt;
 local concat = Aux.concat;
 local yield = coroutine.yield;
 local setmetatable = setmetatable;
-local pcall = pcall;
-local unpack = unpack or table.unpack;
 -- constants
 local OP_EVENT = Aux.OP_EVENT;
 local OP_RUNQ = Aux.OP_RUNQ;
@@ -100,12 +98,6 @@ function Callee:dispose( ok )
         until ioev == nil;
     end
 
-    -- run exit function
-    if self.exitfn then
-        pcall( unpack( self.exitfn ) );
-        self.exitfn = nil;
-    end
-
     self.term = nil;
     self.synops.pool:push( self );
 
@@ -132,7 +124,13 @@ function Callee:dispose( ok )
         root.node:remove( ref );
         if root.wait then
             root.wait = nil;
-            root:call( ok, self.co:getres() );
+            -- should not return ok value if atexit function
+            if root.atexit then
+                root.atexit = nil;
+                root:call( self.co:getres() );
+            else
+                root:call( ok, self.co:getres() );
+            end
         elseif not ok then
             error( concat( { self.co:getres() }, '\n' ) );
         end
@@ -147,23 +145,6 @@ end
 function Callee:exit( ... )
     self.term = true;
     return yield( ... );
-end
-
-
---- atexit
--- @param fn
--- @param ...
--- @return ok
--- @return err
-function Callee:atexit( fn, ... )
-    if type( fn ) ~= 'function' then
-        return false, 'fn must be function';
-    end
-
-    --- TODO: probably, should be implemented in C to improve performance
-    self.exitfn = { fn, ... };
-
-    return true;
 end
 
 
@@ -413,29 +394,68 @@ function Callee:sigwait( deadline, ... )
 end
 
 
+--- torelate
+-- @param self
+-- @param atexit
+local function torelate( self, atexit )
+    if CURRENT_CALLEE then
+        local root = CURRENT_CALLEE;
+
+        -- TODO: must be refactor
+        -- set as a parent
+        if atexit then
+            local current = root;
+
+            -- atexit node always await child node
+            self.wait = true;
+            self.atexit = true;
+
+            root = root.root;
+            -- change root node of current callee
+            if root then
+                -- remove current reference from root
+                root.node:remove( current.ref );
+
+                self.root = root;
+                self.ref = root.node:push( self );
+
+                current.root = self;
+                current.ref = self.node:push( current );
+            else
+                current.root = self;
+                current.ref = self.node:push( current );
+            end
+        -- set as a child
+        else
+            self.root = root;
+            self.ref = root.node:push( self );
+        end
+    elseif atexit then
+        error( 'invalid implements' );
+    end
+end
+
+
 --- init
+-- @param atexit
 -- @param fn
 -- @param ...
--- @return ok
--- @return err
-function Callee:init( fn, ... )
-    self.co:init( fn, ... );
+function Callee:init( atexit, fn, ... )
+    self.co:init( atexit, fn, ... );
     -- set relationship
-    if CURRENT_CALLEE then
-        self.root = CURRENT_CALLEE;
-        self.ref = self.root.node:push( self );
-    end
+    torelate( self, atexit );
 end
 
 
 --- new
 -- @param synops
+-- @param atexit
 -- @param fn
 -- @param ...
 -- @return callee
 -- @return err
-local function new( synops, fn, ... )
-    local co, err = Coro.new( fn, ...  );
+local function new( synops, atexit, fn, ... )
+    local co, err = Coro.new( atexit, fn, ...  );
     local callee;
 
     if err then
@@ -453,10 +473,7 @@ local function new( synops, fn, ... )
         __index = Callee
     });
     -- set relationship
-    if CURRENT_CALLEE then
-        callee.root = CURRENT_CALLEE;
-        callee.ref = callee.root.node:push( callee );
-    end
+    torelate( callee, atexit );
 
     return callee;
 end

@@ -39,6 +39,7 @@
 
 
 typedef struct {
+    int append;
     int ref_fn;
     int ref_co;
     int ref_arg;
@@ -84,6 +85,17 @@ SET_ENTRYFN:
                 lauxh_pushref( coro->co, coro->ref_fn );
                 argc = lua_gettop( coro->arg );
                 lua_xmove( coro->arg, coro->co, argc );
+                // allow append first arguments
+                if( coro->append )
+                {
+                    int narg = lua_gettop( L ) - 1;
+
+                    coro->append = 0;
+                    if( narg ){
+                        argc += narg;
+                        lua_xmove( L, coro->co, narg );
+                    }
+                }
             break;
 
             // push arguments
@@ -174,13 +186,15 @@ static int init_lua( lua_State *L )
 {
     int argc = lua_gettop( L );
     coro_t *coro = luaL_checkudata( L, 1, MODULE_MT );
+    int append = lauxh_checkboolean( L, 2 );
 
-    luaL_checktype( L, 2, LUA_TFUNCTION );
-    if( argc > 2 ){
-        lua_xmove( L, coro->arg, argc - 2 );
+    luaL_checktype( L, 3, LUA_TFUNCTION );
+    if( argc > 3 ){
+        lua_xmove( L, coro->arg, argc - 3 );
     }
     lauxh_unref( L, coro->ref_fn );
     coro->ref_fn = lauxh_ref( L );
+    coro->append = append;
 
     // remove current thread if yielded coroutine
     if( coro->co && lua_status( coro->co ) == LUA_YIELD ){
@@ -215,11 +229,12 @@ static int gc_lua( lua_State *L )
 static int new_lua( lua_State *L )
 {
     int argc = lua_gettop( L );
+    int append = lauxh_checkboolean( L, 1 );
     lua_State *co = NULL;
     lua_State *arg = NULL;
     lua_State *res = NULL;
 
-    luaL_checktype( L, 1, LUA_TFUNCTION );
+    luaL_checktype( L, 2, LUA_TFUNCTION );
     if( ( co = lua_newthread( L ) ) &&
         ( arg = lua_newthread( L ) ) &&
         ( res = lua_newthread( L ) ) )
@@ -230,13 +245,14 @@ static int new_lua( lua_State *L )
         int ref_fn = LUA_NOREF;
         coro_t *coro = NULL;
 
-        if( argc > 1 ){
-            lua_xmove( L, arg, argc - 1 );
+        if( argc > 2 ){
+            lua_xmove( L, arg, argc - 2 );
         }
         ref_fn = lauxh_ref( L );
 
         if( ( coro = lua_newuserdata( L, sizeof( coro_t ) ) ) ){
             *coro = (coro_t){
+                .append = append,
                 .ref_fn = ref_fn,
                 .ref_co = ref_co,
                 .ref_arg = ref_arg,
