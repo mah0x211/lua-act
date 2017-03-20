@@ -131,26 +131,8 @@ SET_ENTRYFN:
             lua_xmove( coro->co, coro->res, 1 );
             lua_pushboolean( L, 1 );
             lua_pushinteger( L, status );
-
             // create traceback
-#if LUA_VERSION_NUM >= 502
-            // push stack trace to res thread
-            luaL_traceback( coro->res, coro->co, NULL, 0 );
-#else
-            // get debug module
-            lua_getfield( coro->co, LUA_GLOBALSINDEX, "debug" );
-            if( lua_istable( coro->co, -1 ) )
-            {
-                // get traceback function
-                lua_getfield( coro->co, -1, "traceback" );
-                if( lua_isfunction( coro->co, -1 ) ){
-                    // call
-                    lua_call( coro->co, 0, 1 );
-                    // push stack trace to res thread
-                    lua_xmove( coro->co, coro->res, 1 );
-                }
-            }
-#endif
+            lauxh_traceback( coro->res, coro->co, NULL, 0 );
 
             // remove current thread
             coro->co = NULL;
