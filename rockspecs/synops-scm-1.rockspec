@@ -31,15 +31,15 @@ build = {
             sources = { "src/aux_fileno.c" }
         },
         ['synops.callee'] = "lib/callee.lua",
-        ['synops.event'] = "lib/event.lua",
-        ['synops.runq'] = "lib/runq.lua",
         ['synops.coro'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/coro.c" }
         },
+        ['synops.event'] = "lib/event.lua",
         ['synops.hrtimer'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
-        }
+        },
+        ['synops.runq'] = "lib/runq.lua"
     }
 }
