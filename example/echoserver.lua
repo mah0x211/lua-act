@@ -35,27 +35,31 @@ local HOST = '127.0.0.1';
 local PORT = '5000';
 
 
-local function send( sock, msg )
-    local len, err, again = sock:sendq( msg );
+
+local function send( sock, str, deadline )
+    local len, err, again = sock:send( str );
 
     if not again then
         return len, err;
     else
-        local total = 0;
         local fd = sock:fd();
-        local ok;
+        local total = 0;
+        local ok, timeout;
 
         repeat
             total = total + len;
-            ok, err = Synops.writable( fd );
-            if ok then
-                len, err, again = sock:flushq();
-            else
-                return false, err;
-            end
-        until not again;
 
-        return len and total + len, err;
+            if len > 0 then
+                str = str:sub( len + 1 );
+            end
+
+            ok, err, timeout = Synops.writable( fd, deadline );
+            if ok then
+                len, err, again = sock:send( str );
+            end
+        until not again or timeout == true;
+
+        return len and total + len, err, timeout;
     end
 end
 
@@ -113,7 +117,7 @@ local function handleClient( client )
         if not msg then break end
 
         ok, err = send( client, msg );
-        if not ok then break end
+        if err then break end
     end
 
     if err then
