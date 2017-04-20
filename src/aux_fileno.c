@@ -34,7 +34,7 @@
 #include "lauxhlib.h"
 
 
-static int filno_lua( lua_State *L )
+static int fileno_lua( lua_State *L )
 {
     FILE *f = lauxh_checkfile( L, 1 );
 
@@ -46,7 +46,7 @@ static int filno_lua( lua_State *L )
 
 LUALIB_API int luaopen_synops_aux_fileno( lua_State *L )
 {
-    lua_pushcfunction( L, filno_lua );
+    lua_pushcfunction( L, fileno_lua );
 
     return 1;
 }
