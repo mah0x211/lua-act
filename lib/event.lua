@@ -63,6 +63,9 @@ function Event:register( callee, asa, val, oneshot, edge )
         return nil, err;
     end
 
+    -- retain reference of event object in use
+    self.used[ev] = true;
+
     return ev;
 end
 
@@ -70,6 +73,8 @@ end
 --- revoke
 -- @param ev
 function Event:revoke( ev )
+    -- release reference of event explicitly
+    self.used[ev] = nil;
     ev:revert();
     -- push to event pool
     self.pool:push( ev );
@@ -154,6 +159,27 @@ function Event:len()
 end
 
 
+--- renew
+-- @return ok
+-- @return err
+function Event:renew()
+    local ok, err = self.loop:renew();
+
+    if not ok then
+        return false, err;
+    end
+
+    -- re-create new pool (dispose pooled events)
+    pool = Deque.new();
+    -- renew used events
+    for ev in pairs( self.used ) do
+        assert( ev:renew() )
+    end
+
+    return true
+end
+
+
 --- new
 -- @return events
 -- @return err
@@ -166,7 +192,10 @@ local function new()
 
     return setmetatable({
         loop = loop,
-        pool = Deque.new()
+        pool = Deque.new(),
+        used = setmetatable({},{
+            __mode = 'k'
+        })
     },{
         __index = Event
     });
