@@ -14,7 +14,7 @@ dependencies = {
     "luarocks-fetch-gitrec >= 0.2",
     "deque >= 0.3.3",
     "minheap >= 0.1.1",
-    "sentry >= 0.6.1",
+    "sentry >= 0.8.0",
 }
 build = {
     type = "builtin",

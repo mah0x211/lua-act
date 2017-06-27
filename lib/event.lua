@@ -134,13 +134,13 @@ function Event:consume( msec )
             return err;
         -- consuming events
         elseif nev > 0 then
-            local ev, _, _, callee, disabled = loop:getevent();
+            local ev, callee, disabled = loop:getevent();
 
             while ev do
                 -- resume
                 callee:call( OP_EVENT, ev:ident(), disabled );
                 -- get next event
-                ev, _, _, callee, disabled = loop:getevent();
+                ev, callee, disabled = loop:getevent();
             end
         end
     end
