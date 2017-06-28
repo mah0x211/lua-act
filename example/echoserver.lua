@@ -183,7 +183,7 @@ local function main()
 
     signal.blockAll();
     for i = 1, NPROC do
-        pid, err = Synops.fork( worker, server );
+        pid, err = Synops.fork();
         if err then
             print( err );
         -- worker process
