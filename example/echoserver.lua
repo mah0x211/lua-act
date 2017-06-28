@@ -33,7 +33,14 @@ local Synops = require('synops');
 -- constants
 local HOST = '127.0.0.1';
 local PORT = '5000';
+local NPROC = tonumber(...);
 
+-- check argument
+if type( NPROC ) ~= 'number' or NPROC < 0 then
+    NPROC = 1;
+elseif NPROC > 10 then
+    NPROC = 10;
+end
 
 
 local function send( sock, str, deadline )
@@ -82,29 +89,6 @@ local function recv( sock )
 end
 
 
-local function accept( sock )
-    local client, err, again = sock:accept();
-
-    if not again then
-        return client, err;
-    else
-        local ok;
-
-        repeat
-            ok, err = Synops.readable( sock:fd() );
-            if ok then
-                client, err, again = sock:accept();
-            else
-                print( 'accept wait()', ok, err );
-                return nil, err;
-            end
-        until not again;
-
-        return client, err;
-    end
-end
-
-
 local function handleClient( client )
     local err;
 
@@ -126,18 +110,59 @@ local function handleClient( client )
 end
 
 
+
+local function accept( sock )
+    local client, err, again = sock:accept();
+
+    if not again then
+        return client, err;
+    else
+        local ok;
+
+        repeat
+            ok, err = Synops.readable( sock:fd() );
+            if ok then
+                client, err, again = sock:accept();
+            else
+                print('Synops.readable() failure', ok, err, sock:fd())
+                return nil, err;
+            end
+        until not again;
+
+        return client, err;
+    end
+end
+
+
 local function handleServer( server )
     Synops.atexit( server.close, server );
 
-    repeat
+    while true do
         local client, err = accept( server );
 
         -- got client
         if client then
             -- print( 'accept', client:fd() )
             assert( Synops.spawn( handleClient, client ) );
+        else
+            print('failed to accept', err);
+            break;
         end
-    until err;
+    end
+end
+
+
+local function worker( server )
+    err = server:listen( BACKLOG );
+    if err then
+        server:close();
+        error( err );
+    end
+
+    print( 'start worker: ', HOST, PORT, server:fd() );
+    -- spawn server handler
+    assert( Synops.spawn( handleServer, server ) );
+    print( 'end worker', Synops.sigwait( nil, signal.SIGUSR1 ) );
 end
 
 
@@ -149,29 +174,30 @@ local function main()
         reuseaddr = true,
         nonblock = true,
     });
+    local pids = {};
+    local pid;
 
     if err then
         error( err );
     end
 
-    err = server:listen( BACKLOG );
-    if err then
-        server:close();
-        error( err );
+    signal.blockAll();
+    for i = 1, NPROC do
+        pid, err = Synops.fork( worker, server );
+        if err then
+            print( err );
+        -- worker process
+        elseif pid == 0 then
+            return worker( server );
+        end
+
+        pids[#pids + 1] = pid;
     end
 
     -- start server
-    print( 'start server: ', HOST, PORT, server:fd() );
-    assert( Synops.spawn( handleServer, server ) );
-    signal.blockAll();
-    print( 'sigwait', Synops.sigwait( nil, signal.SIGINT ) );
-    -- assert( c:await() )
-
+    print( Synops.sigwait( nil, signal.SIGINT ) );
+    signal.killpg( 0, signal.SIGUSR1 );
     print( 'end server' );
 end
 
-
-do
-    print( 'run', assert( Synops.run( main ) ) );
-    print('done')
-end
+assert( Synops.run( main ) );
