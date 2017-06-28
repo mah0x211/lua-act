@@ -28,6 +28,7 @@
 
 --- file scope variables
 local Deque = require('deque');
+local fork = require('process').fork;
 local HRTimer = require('synops.hrtimer');
 local RunQ = require('synops.runq');
 local Event = require('synops.event');
@@ -72,6 +73,28 @@ end
 
 --- class Synops
 local Synops = {};
+
+
+--- fork
+-- @return pid
+-- @return err
+-- @return again
+function Synops.fork()
+    if Callee.acquire() then
+        local pid, err, again = fork();
+
+        if not pid then
+            return nil, err, again;
+        -- child process must be rebuilding event properties
+        elseif pid == 0 then
+            SYNOPS_CTX.event:renew();
+        end
+
+        return pid;
+    end
+
+    error( 'cannot call fork() from outside of execution context', 2 );
+end
 
 
 --- spawn
