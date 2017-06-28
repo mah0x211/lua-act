@@ -76,10 +76,9 @@ local Synops = {};
 
 --- spawn
 -- @param fn
--- @param ctx
 -- @param ...
--- @param ok
--- @param err
+-- @return ok
+-- @return err
 function Synops.spawn( fn, ... )
     local callee = Callee.acquire();
 
