@@ -103,9 +103,7 @@ end
 -- @return ok
 -- @return err
 function Synops.spawn( fn, ... )
-    local callee = Callee.acquire();
-
-    if callee then
+    if Callee.acquire() then
         return spawn( false, fn, ... );
     end
 
@@ -146,9 +144,7 @@ end
 -- @return ok
 -- @return err
 function Synops.atexit( fn, ... )
-    local callee = Callee.acquire();
-
-    if callee then
+    if Callee.acquire() then
         return spawn( true, fn, ... );
     end
 
