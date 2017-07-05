@@ -42,8 +42,8 @@ local SYNOPS_CTX;
 -- @param atexit
 -- @param fn
 -- @param ...
--- @param ok
--- @param err
+-- @return ok
+-- @return err
 local function spawn( atexit, fn, ... )
     local callee = SYNOPS_CTX.pool:pop();
     local ok, err;
