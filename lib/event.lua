@@ -170,7 +170,7 @@ function Event:renew()
     end
 
     -- re-create new pool (dispose pooled events)
-    pool = Deque.new();
+    self.pool = Deque.new();
     -- renew used events
     for ev in pairs( self.used ) do
         assert( ev:renew() )
