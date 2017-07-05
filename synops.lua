@@ -75,6 +75,13 @@ end
 local Synops = {};
 
 
+--- pollable
+-- @return ok
+function Synops.pollable()
+    return Callee.acquire() and true or false;
+end
+
+
 --- fork
 -- @return pid
 -- @return err
