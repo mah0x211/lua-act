@@ -283,10 +283,13 @@ local function runloop( fn, ... )
     while true do
         local msec = -1;
 
-        if runq:len() > 0 and hrtimer:remain() < 0 then
-            msec = runq:consume(-1);
-            if msec > 0 then
-                hrtimer:init( msec );
+        if runq:len() > 0 then
+            msec = hrtimer:remain();
+            if msec < 0 then
+                msec = runq:consume(-1);
+                if msec > 0 then
+                    hrtimer:init( msec );
+                end
             end
         end
 
