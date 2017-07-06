@@ -68,7 +68,9 @@ static int remain_lua( lua_State *L )
     hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
     uint64_t nsec = hrt_getnsec();
 
-    lua_pushinteger( L, ( nsec < h->nsec ) ? h->nsec - nsec : -1 );
+    lua_pushinteger(
+        L, ( nsec < h->nsec ) ? ( h->nsec - nsec ) / 1000000ULL : -1
+    );
 
     return 1;
 }
