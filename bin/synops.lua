@@ -42,6 +42,15 @@ if not arg[1] then
     os.exit(0);
 end
 
+-- export APIs to global except Synops.run
+for k, v in pairs( Synops ) do
+    if type( k ) == 'string' and k ~= 'run' and
+       type( v ) == 'function' then
+        _G[k] = v;
+    end
+end
+
+
 local fn = assert( loadfile( arg[1] ) );
 local ok, err = SynopsRun( fn, select( 2, ... ) );
 
