@@ -283,6 +283,7 @@ local function runloop( fn, ... )
     while true do
         local msec = -1;
 
+        -- consume runq if timer time elapsed
         if runq:len() > 0 then
             msec = hrtimer:remain();
             if msec < 0 then
@@ -293,12 +294,14 @@ local function runloop( fn, ... )
             end
         end
 
+        -- consume events
         if event:len() > 0 then
             err = event:consume( msec );
             -- got critical error
             if err then
                 return false, err;
             end
+        -- sleep until timer time elapsed
         elseif runq:len() > 0 then
             hrtimer:sleep();
         else

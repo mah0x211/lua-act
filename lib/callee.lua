@@ -101,14 +101,17 @@ function Callee:dispose( ok )
     self.term = nil;
     self.synops.pool:push( self );
 
-    -- dispose child routines
+    -- dispose child coroutines
     if #self.node > 0 then
         local child = self.node:pop();
 
         repeat
+            -- remove from runq
             runq:remove( child );
+            -- release references
             child.root = nil;
             child.ref = nil;
+            -- call dispose method
             child:dispose( true );
             child = self.node:pop();
         until child == nil;
@@ -119,9 +122,12 @@ function Callee:dispose( ok )
         local root = self.root;
         local ref = self.ref;
 
+        -- release references
         self.root = nil;
         self.ref = nil;
+        -- detouch from from root node
         root.node:remove( ref );
+        -- root node waiting for child results
         if root.wait then
             root.wait = nil;
             -- should not return ok value if atexit function
