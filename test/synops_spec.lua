@@ -320,7 +320,7 @@ describe('test synops module:', function()
 
                 ok, val = synops.await()
                 assert( not ok )
-                assert( val == 'error occurred' )
+                assert( val:find('error occurred') )
             end))
         end)
     end)
@@ -561,7 +561,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.later()
-                assert( signal.kill( 0, signal.SIGUSR1 ) )
+                assert( signal.kill( signal.SIGUSR1 ) )
 
                 ok = synops.await()
                 assert( ok == true )
