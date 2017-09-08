@@ -12,7 +12,6 @@ description = {
 dependencies = {
     "lua >= 5.1",
     "luarocks-fetch-gitrec >= 0.2",
-    "deque >= 0.4.0",
     "minheap >= 0.1.1",
     "process >= 1.6.1",
     "sentry >= 0.8.0",
@@ -41,6 +40,17 @@ build = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
         },
-        ['synops.runq'] = "lib/runq.lua"
+        ['synops.runq'] = "lib/runq.lua",
+        -- Temporary Measures
+        -- To avoid module namespace collisions, building the dependent modules
+        -- by this rockspec.
+        deque = {
+            incdirs = {
+                "deps/lauxhlib"
+            },
+            sources = {
+                "deps/lua-deque/src/deque.c"
+            }
+        },
     }
 }
