@@ -196,8 +196,8 @@ static int init_lua( lua_State *L )
     coro->ref_fn = lauxh_ref( L );
     coro->append = append;
 
-    // remove current thread if yielded coroutine
-    if( coro->co && lua_status( coro->co ) == LUA_YIELD ){
+    // remove current thread if not terminated
+    if( coro->co && lua_status( coro->co ) != 0 ){
         coro->co = NULL;
         coro->ref_co = lauxh_unref( L, coro->ref_co );
     }
