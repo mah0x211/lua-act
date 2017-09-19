@@ -70,6 +70,7 @@ end
 
 
 --- dispose
+-- @param ok
 function Callee:dispose( ok )
     local runq = self.synops.runq;
     local event = self.synops.event;
@@ -85,36 +86,29 @@ function Callee:dispose( ok )
     end
 
     -- revoke io events
-    if #self.pool > 0 then
+    for _ = 1, #self.pool do
         local ioev = self.pool:pop();
+        local fd = ioev:ident();
 
-        repeat
-            local fd = ioev:ident();
-
-            self.revs[fd] = nil;
-            self.wevs[fd] = nil;
-            event:revoke( ioev );
-            ioev = self.pool:pop();
-        until ioev == nil;
+        self.revs[fd] = nil;
+        self.wevs[fd] = nil;
+        event:revoke( ioev );
     end
 
     self.term = nil;
     self.synops.pool:push( self );
 
     -- dispose child coroutines
-    if #self.node > 0 then
+    for _ = 1, #self.node do
         local child = self.node:pop();
 
-        repeat
-            -- remove from runq
-            runq:remove( child );
-            -- release references
-            child.root = nil;
-            child.ref = nil;
-            -- call dispose method
-            child:dispose( true );
-            child = self.node:pop();
-        until child == nil;
+        -- remove from runq
+        runq:remove( child );
+        -- release references
+        child.root = nil;
+        child.ref = nil;
+        -- call dispose method
+        child:dispose( true );
     end
 
     -- call root node
