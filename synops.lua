@@ -239,6 +239,19 @@ function Synops.writable( fd, deadline )
 end
 
 
+--- getcid
+-- @return cid
+function Synops.getcid()
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee.cid;
+    end
+
+    error( 'cannot call getcid() at outside of execution context', 2 );
+end
+
+
 --- runloop
 -- @param fn
 -- @param ...
