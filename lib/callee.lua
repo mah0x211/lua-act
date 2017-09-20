@@ -472,6 +472,9 @@ local function new( synops, atexit, fn, ... )
     }, {
         __index = Callee
     });
+    -- set callee-id
+    -- remove 'table: ' prefix
+    callee.cid = tostring( callee ):sub(10);
     -- set relationship
     torelate( callee, atexit );
 
