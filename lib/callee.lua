@@ -173,6 +173,7 @@ function Callee:later()
         return true;
     end
 
+    -- normally unreachable
     error( 'invalid implements' );
 end
 
@@ -266,6 +267,7 @@ function Callee:ioable( evs, asa, fd, deadline )
     self.pool:remove( item );
     event:revoke( ev );
 
+    -- normally unreachable
     error( 'invalid implements' );
 end
 
@@ -308,6 +310,7 @@ function Callee:sleep( deadline )
             return true;
         end
 
+        -- normally unreachable
         error( 'invalid implements' );
 
     -- return immediately
@@ -335,7 +338,7 @@ function Callee:sigwait( deadline, ... )
     local event = self.synops.event;
     local sigset, sigmap;
 
-    -- register to runq
+    -- register to runq with deadline
     if deadline then
         local ok, err = runq:push( self, deadline );
 
@@ -379,6 +382,7 @@ function Callee:sigwait( deadline, ... )
             event:revoke( sigset:pop() );
         end
 
+        -- got signal event
         if op == OP_EVENT and sigmap[signo] then
             return signo;
         -- timed out
@@ -388,9 +392,10 @@ function Callee:sigwait( deadline, ... )
         elseif deadline then
             runq:remove( self );
         end
-    end
 
-    error( 'invalid implements' );
+        -- normally unreachable
+        error( 'invalid implements' );
+    end
 end
 
 
