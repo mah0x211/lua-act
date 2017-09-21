@@ -6,9 +6,7 @@
 
 --]]
 --- file scope variables
-local socket = require('posix.sys.socket')
-local unistd = require('posix.unistd')
-local fcntl = require('posix.fcntl')
+local llsocket = require('llsocket')
 local signal = require('signal')
 local system = require('system')
 local synops = require('synops')
@@ -16,47 +14,18 @@ local synops = require('synops')
 
 signal.blockAll()
 
-local function shutdown( fd )
-    assert( socket.shutdown( fd, socket.SHUT_RDWR ) )
-end
-
-local function shutdown_rd( fd )
-    assert( socket.shutdown( fd, socket.SHUT_RD ) )
-end
-
-local function shutdown_wr( fd )
-    assert( socket.shutdown( fd, socket.SHUT_WR ) )
-end
-
-local function close( fd )
-    unistd.close( fd )
-end
-
-local function recv( fd )
-    return socket.recv( fd, 100 )
-end
-
-local function send( fd, msg )
-    return socket.send( fd, msg )
-end
 
 local function socketpair( bufsiz )
-    local reader, writer = assert( socket.socketpair(
-        socket.AF_UNIX, socket.SOCK_STREAM, 0
+    local socks = assert( llsocket.socket.pair(
+        llsocket.SOCK_STREAM, true
     ))
-    assert( fcntl.fcntl( reader, fcntl.O_NONBLOCK, 1 ) )
-    assert( fcntl.fcntl( writer, fcntl.O_NONBLOCK, 1 ) )
 
     if bufsiz then
-        assert( socket.setsockopt(
-            reader, socket.SOL_SOCKET, socket.SO_RCVBUF, bufsiz
-        ))
-        assert( socket.setsockopt(
-            writer, socket.SOL_SOCKET, socket.SO_SNDBUF, bufsiz
-        ))
+        assert( socks[1]:rcvbuf( bufsiz ) )
+        assert( socks[2]:sndbuf( bufsiz ) )
     end
 
-    return reader, writer
+    return socks[1], socks[2]
 end
 
 
@@ -362,7 +331,7 @@ describe('test synops module:', function()
         it('fail by timeout', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair()
-                local ok, err, timeout = synops.readable( reader, 50 )
+                local ok, err, timeout = synops.readable( reader:fd(), 50 )
 
                 assert( ok == false )
                 assert( timeout == true )
@@ -373,24 +342,26 @@ describe('test synops module:', function()
         it('fail on shutdown', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair()
-                local ok, msg
+                local ok, msg, err, again
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader, 50 )
+                    local ok, err, timeout = synops.readable( reader:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
 
-                    return recv( reader )
+                    return reader:recv()
                 end)
 
                 synops.later()
-                shutdown( reader )
+                reader:shutdown( llsocket.SHUT_RDWR )
 
-                ok, msg = synops.await()
+                ok, msg, err, again = synops.await()
                 assert( ok )
-                assert( msg == '' )
+                assert( msg == nil )
+                assert( err == nil )
+                assert( again == nil )
             end))
         end)
 
@@ -401,16 +372,16 @@ describe('test synops module:', function()
                 local ok, msg
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader, 50 )
+                    local ok, err, timeout = synops.readable( reader:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
-                    return recv( reader )
+                    return reader:recv()
                 end)
 
                 synops.later()
-                send( writer, 'hello world!' )
+                writer:send( 'hello world!' )
 
                 ok, msg = synops.await()
                 assert( ok )
@@ -438,17 +409,25 @@ describe('test synops module:', function()
         it('fail by timeout', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair( 5 )
+                local buflen = writer:sndbuf()
+                local chunk = buflen / 99 + 1
+                local msg = {}
                 local ok
 
+                for i = 1, chunk do
+                    msg[i] = ('%099d'):format(0)
+                end
+                msg = table.concat( msg )
+
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer, 50 )
+                    local ok, err, timeout = synops.writable( writer:fd(), 50 )
 
                     assert( ok == false )
                     assert( err == nil )
                     assert( timeout == true )
                 end)
 
-                send( writer, 'hello' )
+                writer:send( msg )
                 synops.later()
 
                 ok = synops.await()
@@ -460,26 +439,27 @@ describe('test synops module:', function()
         it('fail on shutdown', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair( 5 )
-                local ok, len, err
+                local ok, len, err, again
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer, 50 )
+                    local ok, err, timeout = synops.writable( writer:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
 
-                    return send( writer, 'hello' )
+                    return writer:send( 'hello' )
                 end)
 
-                send( writer, 'hello' )
+                writer:send( 'hello' )
                 synops.later()
-                shutdown( writer )
+                writer:shutdown( llsocket.SHUT_RDWR )
 
-                ok, len, err = synops.await()
+                ok, len, err, again = synops.await()
                 assert( ok )
                 assert( len == nil )
-                assert( err ~= nil )
+                assert( err == nil )
+                assert( again == nil )
             end))
         end)
 
@@ -490,18 +470,18 @@ describe('test synops module:', function()
                 local ok, len
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer, 50 )
+                    local ok, err, timeout = synops.writable( writer:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
 
-                    return send( writer, 'hello' )
+                    return writer:send( 'hello' )
                 end)
 
-                send( writer, 'hello' )
+                writer:send( 'hello' )
                 synops.later()
-                assert( recv( reader, 100 ) == 'hello' )
+                assert( reader:recv() == 'hello' )
 
                 ok, len = synops.await()
                 assert( ok )
