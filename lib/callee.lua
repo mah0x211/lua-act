@@ -26,6 +26,7 @@
 
 --]]
 --- file scope variables
+local Argv = require('argv');
 local Deque = require('deque');
 local Aux = require('synops.aux');
 local Coro = require('synops.coro');
@@ -44,6 +45,9 @@ local OP_RUNQ = Aux.OP_RUNQ;
 -- local ERRMEM = Coro.ERRMEM;
 -- local ERRERR = Coro.ERRERR;
 --- static variables
+local SUSPENDED = setmetatable({},{
+    __mode = 'v'
+});
 local CURRENT_CALLEE;
 
 
@@ -161,6 +165,41 @@ function Callee:await()
     end
 
     return true;
+end
+
+
+--- suspend
+-- @param deadline
+-- @return ok
+-- @return ...
+-- @return timeout
+function Callee:suspend( deadline )
+    if deadline ~= nil then
+        local runq = self.synops.runq;
+        local ok, err = runq:push( self, deadline );
+
+        if not ok then
+            return false, err;
+        end
+
+        -- wait until resumed by resume method
+        SUSPENDED[self.cid] = self;
+        if yield() == OP_RUNQ then
+            -- timed out
+            if SUSPENDED[self.cid] then
+                SUSPENDED[self.cid] = nil;
+                runq:remove( self );
+                return false, nil, true;
+            end
+
+            return true, self.argv:select();
+        end
+
+        -- normally unreachable
+        error( 'invalid implements' );
+    end
+
+    return false, nil, true;
 end
 
 
@@ -473,6 +512,7 @@ local function new( synops, atexit, fn, ... )
     callee = setmetatable({
         synops = synops,
         co = co,
+        argv = Argv.new(),
         node = Deque.new(),
         pool = Deque.new(),
         revs = {},
