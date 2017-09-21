@@ -43,6 +43,7 @@ local RunQ = {};
 
 --- push
 -- @param callee
+-- @param deadline
 -- @return ok
 -- @return err
 function RunQ:push( callee, deadline )
@@ -56,10 +57,12 @@ function RunQ:push( callee, deadline )
         return false, 'deadline must be unsigned integer';
     end
 
+    -- register callee
     if not ref[callee] then
         local queue = ref[deadline];
         local qelm, err;
 
+        -- create new queue associated for deadline
         if not queue then
             queue, err = Deque.new();
             if not queue then
