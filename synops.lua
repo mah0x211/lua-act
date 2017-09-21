@@ -173,6 +173,35 @@ function Synops.await()
 end
 
 
+--- suspend
+-- @param deadline
+-- @return ok
+-- @return ...
+-- @return timeout
+function Synops.suspend( deadline )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:suspend( deadline );
+    end
+
+    error( 'cannot call suspend() at outside of execution context', 2 );
+end
+
+
+--- resume
+-- @param cid
+-- @param ...
+-- @return ok
+function Synops.resume( cid, ... )
+    if Callee.acquire() then
+        return Callee.resume( cid, ... );
+    end
+
+    error( 'cannot call resume() at outside of execution context', 2 );
+end
+
+
 --- sleep
 -- @param deadline
 -- @return ok
