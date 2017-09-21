@@ -144,7 +144,10 @@ end
 -- @param ...
 function Callee:exit( ... )
     self.term = true;
-    return yield( ... );
+    yield( ... );
+
+    -- normally unreachable
+    error( 'invalid implements' );
 end
 
 
