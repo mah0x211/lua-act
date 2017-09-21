@@ -569,6 +569,59 @@ describe('test synops module:', function()
         end)
     end)
 
+
+    describe('test synops.suspend -', function()
+        it('fail on called from outside of execution context', function()
+            assert.is_not_true( pcall( synops.suspend ) )
+        end)
+
+        it('timed out', function()
+            assert.is_true( synops.run(function()
+                local ok, val, timeout = synops.suspend()
+
+                assert( ok == false )
+                assert( val == nil )
+                assert( timeout == true )
+
+                ok, val, timeout = synops.suspend(100)
+
+                assert( ok == false )
+                assert( val == nil )
+                assert( timeout == true )
+            end))
+        end)
+    end)
+
+
+    describe('test synops.resume -', function()
+        it('fail on called from outside of execution context', function()
+            assert.is_not_true( pcall( synops.resume ) )
+        end)
+
+        it('fail on called with invalid cid', function()
+            assert.is_true( synops.run(function()
+                local ok = synops.resume('abc')
+
+                assert( ok == false )
+            end))
+        end)
+
+        it('success', function()
+            assert.is_true( synops.run(function()
+                local ok, val, timeout;
+
+                synops.spawn(function( cid )
+                    assert( synops.resume( cid, 'hello' ) )
+                end, synops.getcid())
+
+                ok, val, timeout = synops.suspend(1000)
+                assert( ok == true )
+                assert( val == 'hello' )
+                assert( not timeout )
+            end))
+        end)
+    end)
+
 end)
 
 
