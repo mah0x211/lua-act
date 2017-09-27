@@ -177,32 +177,31 @@ end
 -- @return ...
 -- @return timeout
 function Callee:suspend( deadline )
+    local cid = self.cid;
+
     if deadline ~= nil then
-        local runq = self.synops.runq;
-        local ok, err = runq:push( self, deadline );
+        local ok, err = self.synops.runq:push( self, deadline );
 
         if not ok then
             return false, err;
         end
-
-        -- wait until resumed by resume method
-        SUSPENDED[self.cid] = self;
-        if yield() == OP_RUNQ then
-            -- timed out
-            if SUSPENDED[self.cid] then
-                SUSPENDED[self.cid] = nil;
-                runq:remove( self );
-                return false, nil, true;
-            end
-
-            return true, self.argv:select();
-        end
-
-        -- normally unreachable
-        error( 'invalid implements' );
     end
 
-    return false, nil, true;
+    -- wait until resumed by resume method
+    SUSPENDED[cid] = self;
+    if yield() == OP_RUNQ then
+        -- timed out
+        if SUSPENDED[cid] then
+            SUSPENDED[cid] = nil;
+            self.synops.runq:remove( self );
+            return false, nil, true;
+        end
+
+        return true, self.argv:select();
+    end
+
+    -- normally unreachable
+    error( 'invalid implements' );
 end
 
 
