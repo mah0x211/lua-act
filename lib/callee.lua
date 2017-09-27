@@ -80,6 +80,9 @@ function Callee:dispose( ok )
     local event = self.synops.event;
 
     runq:remove( self );
+    -- remove state properties
+    self.term = nil;
+    SUSPENDED[self.cid] = nil;
 
     -- revoke signal events
     if self.sigset then
@@ -98,9 +101,6 @@ function Callee:dispose( ok )
         self.wevs[fd] = nil;
         event:revoke( ioev );
     end
-
-    self.term = nil;
-    self.synops.pool:push( self );
 
     -- dispose child coroutines
     for _ = 1, #self.node do
@@ -141,6 +141,9 @@ function Callee:dispose( ok )
     elseif not ok then
         error( concat( { self.co:getres() }, '\n' ) );
     end
+
+    -- add to pool for reuse
+    self.synops.pool:push( self );
 end
 
 
