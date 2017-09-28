@@ -48,6 +48,8 @@ local OP_RUNQ = Aux.OP_RUNQ;
 local SUSPENDED = setmetatable({},{
     __mode = 'v'
 });
+local RSYNQ = {};
+local WSYNQ = {};
 local CURRENT_CALLEE;
 
 
@@ -71,6 +73,28 @@ local function resume( cid, ... )
     end
 
     return false;
+end
+
+
+--- resumeq
+-- @param runq
+-- @param cidq
+local function resumeq( runq, cidq )
+    -- first index is used for holding a fd
+    if cidq[2] then
+        for i = 2, #cidq do
+            local cid = cidq[i];
+            local callee = SUSPENDED[cid];
+
+            -- found a suspended callee
+            if callee then
+                SUSPENDED[cid] = nil;
+                -- resume via runq
+                runq:remove( callee );
+                runq:push( callee );
+            end
+        end
+    end
 end
 
 
@@ -102,11 +126,28 @@ end
 function Callee:dispose( ok )
     local runq = self.synops.runq;
     local event = self.synops.event;
+    local synq;
 
     runq:remove( self );
     -- remove state properties
     self.term = nil;
     SUSPENDED[self.cid] = nil;
+
+    -- resume all suspended callee for readable
+    synq = self.synq.readable;
+    if synq then
+        self.synq.readable = nil;
+        RSYNQ[synq[1]] = nil;
+        resumeq( runq, synq );
+    end
+
+    -- resume all suspended callee for writable
+    synq = self.synq.writable;
+    if synq then
+        self.synq.writable = nil;
+        WSYNQ[synq[1]] = nil;
+        resumeq( runq, synq );
+    end
 
     -- revoke signal events
     if self.sigset then
@@ -246,8 +287,55 @@ function Callee:later()
 end
 
 
+--- iosync
+-- @param self
+-- @param cidq
+-- @param deadline
+-- @return ok
+-- @return err
+-- @return timeout
+local function iosync( self, cidq, deadline )
+    -- other callee is waiting
+    if cidq then
+        local idx = #cidq + 1;
+        local ok, err, timeout;
+
+        cidq[idx] = self.cid;
+        ok, err, timeout = self:suspend( deadline );
+        cidq[idx] = false;
+
+        return ok, err, timeout;
+    end
+
+    return true;
+end
+
+
+--- readsync
+-- @param fd
+-- @param deadline
+-- @return ok
+-- @return err
+-- @return timeout
+function Callee:readsync( fd, deadline )
+    return iosync( self, RSYNQ[fd], deadline );
+end
+
+
+--- writesync
+-- @param fd
+-- @param deadline
+-- @return ok
+-- @return err
+-- @return timeout
+function Callee:writesync( fd, deadline )
+    return iosync( self, WSYNQ[fd], deadline );
+end
+
+
 --- ioable
 -- @param self
+-- @param synq
 -- @param evs
 -- @param asa
 -- @param fd
@@ -255,7 +343,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-local function ioable( self, evs, asa, fd, deadline )
+local function ioable( self, synq, evs, asa, fd, deadline )
     local runq = self.synops.runq;
     local event = self.synops.event;
     local item = evs[fd];
@@ -303,8 +391,18 @@ local function ioable( self, evs, asa, fd, deadline )
         evs[fd] = item;
     end
 
+    -- create sync queue
+    synq[fd] = { fd };
+    self.synq[asa] = synq[fd];
+
     -- wait until event fired
     op, fdno, disabled = yield();
+
+    -- resume all suspended callee
+    self.synq[asa] = nil;
+    resumeq( runq, synq[fd] );
+    synq[fd] = nil;
+
     -- got io event
     if op == OP_EVENT and fdno == fd then
         -- remove from runq
@@ -348,7 +446,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:readable( fd, deadline )
-    return ioable( self, self.revs, 'readable', fd, deadline );
+    return ioable( self, RSYNQ, self.revs, 'readable', fd, deadline );
 end
 
 
@@ -359,7 +457,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:writable( fd, deadline )
-    return ioable( self, self.wevs, 'writable', fd, deadline );
+    return ioable( self, WSYNQ, self.wevs, 'writable', fd, deadline );
 end
 
 
@@ -541,6 +639,7 @@ local function new( synops, atexit, fn, ... )
         argv = Argv.new(),
         node = Deque.new(),
         pool = Deque.new(),
+        synq = {},
         revs = {},
         wevs = {}
     }, {
