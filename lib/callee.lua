@@ -51,6 +51,30 @@ local SUSPENDED = setmetatable({},{
 local CURRENT_CALLEE;
 
 
+
+--- resume
+-- @param cid
+-- @param ...
+-- @return ok
+local function resume( cid, ... )
+    local callee = SUSPENDED[cid];
+
+    -- found a suspended callee
+    if callee then
+        SUSPENDED[cid] = nil;
+        callee.argv:set( 0, ... );
+        -- resume via runq
+        callee.synops.runq:remove( callee );
+        callee.synops.runq:push( callee );
+
+        return true;
+    end
+
+    return false;
+end
+
+
+
 --- class Callee
 local Callee = {};
 
@@ -536,28 +560,6 @@ end
 -- @return callee
 local function acquire()
     return CURRENT_CALLEE;
-end
-
-
---- resume
--- @param cid
--- @param ...
--- @return ok
-local function resume( cid, ... )
-    local callee = SUSPENDED[cid];
-
-    -- found a suspended callee
-    if callee then
-        SUSPENDED[cid] = nil;
-        callee.argv:set( 0, ... );
-        -- resume via runq
-        callee.synops.runq:remove( callee );
-        callee.synops.runq:push( callee );
-
-        return true;
-    end
-
-    return false;
 end
 
 
