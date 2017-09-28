@@ -271,14 +271,15 @@ end
 --- readable
 -- @param fd
 -- @param deadline
+-- @param sync
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.readable( fd, deadline )
+function Synops.readable( fd, deadline, sync )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readable( fd, deadline );
+        return callee:readable( fd, deadline, sync == true );
     end
 
     error( 'cannot call readable() from outside of execution context', 2 );
@@ -288,14 +289,15 @@ end
 --- writable
 -- @param fd
 -- @param deadline
+-- @param sync
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.writable( fd, deadline )
+function Synops.writable( fd, deadline, sync )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:writable( fd, deadline );
+        return callee:writable( fd, deadline, sync == true );
     end
 
     error( 'cannot call writable() from outside of execution context', 2 );
