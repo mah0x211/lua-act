@@ -247,6 +247,7 @@ end
 
 
 --- ioable
+-- @param self
 -- @param evs
 -- @param asa
 -- @param fd
@@ -254,7 +255,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:ioable( evs, asa, fd, deadline )
+local function ioable( self, evs, asa, fd, deadline )
     local runq = self.synops.runq;
     local event = self.synops.event;
     local item = evs[fd];
@@ -340,7 +341,6 @@ function Callee:ioable( evs, asa, fd, deadline )
 end
 
 
-
 --- readable
 -- @param fd
 -- @param deadline
@@ -348,7 +348,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:readable( fd, deadline )
-    return self:ioable( self.revs, 'readable', fd, deadline );
+    return ioable( self, self.revs, 'readable', fd, deadline );
 end
 
 
@@ -359,7 +359,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:writable( fd, deadline )
-    return self:ioable( self.wevs, 'writable', fd, deadline );
+    return ioable( self, self.wevs, 'writable', fd, deadline );
 end
 
 
