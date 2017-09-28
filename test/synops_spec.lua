@@ -613,7 +613,8 @@ describe('test synops module:', function()
                 local reader, writer = socketpair()
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader:fd(), 100 )
+                    local ok, err, timeout = synops.readable( reader:fd(), 100,
+                                                              true )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -696,7 +697,8 @@ describe('test synops module:', function()
                 msg = table.concat( msg )
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 100 )
+                    local ok, err, timeout = synops.writable( writer:fd(), 100,
+                                                              true )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -714,7 +716,6 @@ describe('test synops module:', function()
                 end)
 
                 writer:send( msg )
-                synops.later()
 
                 ok, msg = synops.await()
                 assert( ok == true )
@@ -740,7 +741,8 @@ describe('test synops module:', function()
                 msg = table.concat( msg )
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 50 )
+                    local ok, err, timeout = synops.writable( writer:fd(), 50,
+                                                              true )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -766,11 +768,11 @@ describe('test synops module:', function()
                 assert( rcv == msg )
 
                 ok, msg = synops.await()
-                assert( ok )
+                assert( ok == true )
                 assert( msg == 'writable ok' )
 
                 ok, msg = synops.await()
-                assert( ok )
+                assert( ok == true )
                 assert( msg == 'writesync ok' )
             end))
         end)
