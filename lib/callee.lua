@@ -81,18 +81,16 @@ end
 -- @param cidq
 local function resumeq( runq, cidq )
     -- first index is used for holding a fd
-    if cidq[2] then
-        for i = 2, #cidq do
-            local cid = cidq[i];
-            local callee = SUSPENDED[cid];
+    for i = 2, #cidq do
+        local cid = cidq[i];
+        local callee = SUSPENDED[cid];
 
-            -- found a suspended callee
-            if callee then
-                SUSPENDED[cid] = nil;
-                -- resume via runq
-                runq:remove( callee );
-                runq:push( callee );
-            end
+        -- found a suspended callee
+        if callee then
+            SUSPENDED[cid] = nil;
+            -- resume via runq
+            runq:remove( callee );
+            runq:push( callee );
         end
     end
 end
