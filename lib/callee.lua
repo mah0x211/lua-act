@@ -460,7 +460,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writable( fd, deadline )
+function Callee:writable( fd, deadline, sync )
     return ioable( self, self.wevs, 'writable', fd, deadline, sync and WSYNQ );
 end
 
