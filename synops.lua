@@ -234,6 +234,40 @@ function Synops.sigwait( deadline, ... )
 end
 
 
+--- readsync
+-- @param fd
+-- @param deadline
+-- @return ok
+-- @return err
+-- @return timeout
+function Synops.readsync( fd, deadline )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:readsync( fd, deadline );
+    end
+
+    error( 'cannot call readsync() from outside of execution context', 2 );
+end
+
+
+--- writesync
+-- @param fd
+-- @param deadline
+-- @return ok
+-- @return err
+-- @return timeout
+function Synops.writesync( fd, deadline )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:writesync( fd, deadline );
+    end
+
+    error( 'cannot call writesync() from outside of execution context', 2 );
+end
+
+
 --- readable
 -- @param fd
 -- @param deadline
