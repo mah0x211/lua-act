@@ -647,12 +647,13 @@ describe('test synops module:', function()
                 local ok, msg, again
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader:fd(), 50 )
+                    local ok, err, timeout = synops.readable( reader:fd(), 50,
+                                                              true )
 
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
-                    return reader:recv()
+                    return 'readable ok'
                 end)
 
                 synops.spawn(function()
@@ -661,6 +662,7 @@ describe('test synops module:', function()
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
+                    return 'readsync ok'
                 end)
 
                 synops.later()
@@ -668,10 +670,11 @@ describe('test synops module:', function()
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'hello world!' )
+                assert( msg == 'readable ok' )
 
-                ok = synops.await()
+                ok, msg = synops.await()
                 assert( ok == true )
+                assert( msg == 'readsync ok' )
             end))
         end)
     end)
@@ -774,6 +777,52 @@ describe('test synops module:', function()
                 ok, msg = synops.await()
                 assert( ok == true )
                 assert( msg == 'writesync ok' )
+            end))
+        end)
+
+
+        it('always success when sync option disabled', function()
+            assert.is_true( synops.run(function()
+                local reader, writer = socketpair()
+                local buflen = writer:sndbuf()
+                local chunk = buflen / 99 + 1
+                local msg = {}
+                local ok, rcv, len
+
+                for i = 1, chunk do
+                    msg[i] = ('%099d'):format(0)
+                end
+                msg = table.concat( msg )
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.writable( writer:fd(), 500 )
+
+                    assert( ok == false )
+                    assert( err == nil )
+                    assert( timeout == true )
+                    return 'writable ok'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.writesync( writer:fd(), 500 )
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+                    return 'writesync ok'
+                end)
+
+                len = writer:send( msg )
+                msg = msg:sub( 1, len )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'writesync ok' )
+
+                reader:recv(#msg)
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'writable ok' )
             end))
         end)
     end)
