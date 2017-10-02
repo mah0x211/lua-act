@@ -251,6 +251,18 @@ function Synops.readsync( fd, deadline )
 end
 
 
+--- readunsync
+function Synops.readunsync()
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:readunsync();
+    end
+
+    error( 'cannot call readunsync() from outside of execution context', 2 );
+end
+
+
 --- writesync
 -- @param fd
 -- @param deadline
@@ -265,6 +277,18 @@ function Synops.writesync( fd, deadline )
     end
 
     error( 'cannot call writesync() from outside of execution context', 2 );
+end
+
+
+--- writeunsync
+function Synops.writeunsync()
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:writeunsync();
+    end
+
+    error( 'cannot call writeunsync() from outside of execution context', 2 );
 end
 
 
