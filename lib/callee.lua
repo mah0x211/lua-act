@@ -131,18 +131,18 @@ function Callee:dispose( ok )
     self.term = nil;
     SUSPENDED[self.cid] = nil;
 
-    -- resume all suspended callee for readable
-    synq = self.synq.readable;
+    -- resume all suspended callee for readsync
+    synq = self.rsynq;
     if synq then
-        self.synq.readable = nil;
+        self.rsynq = nil;
         RSYNQ[synq[1]] = nil;
         resumeq( runq, synq );
     end
 
-    -- resume all suspended callee for writable
-    synq = self.synq.writable;
+    -- resume all suspended callee for writesync
+    synq = self.wsynq;
     if synq then
-        self.synq.writable = nil;
+        self.wsynq = nil;
         WSYNQ[synq[1]] = nil;
         resumeq( runq, synq );
     end
@@ -287,12 +287,16 @@ end
 
 --- iosync
 -- @param self
--- @param cidq
+-- @param synq
+-- @param asa
+-- @param fd
 -- @param deadline
 -- @return ok
 -- @return err
 -- @return timeout
-local function iosync( self, cidq, deadline )
+local function iosync( self, synq, asa, fd, deadline )
+    local cidq = synq[fd];
+
     -- other callee is waiting
     if cidq then
         local idx = #cidq + 1;
@@ -305,6 +309,10 @@ local function iosync( self, cidq, deadline )
         return ok, err, timeout;
     end
 
+    -- create read or write sync queue
+    synq[fd] = { fd };
+    self[asa] = synq[fd];
+
     return true;
 end
 
@@ -316,7 +324,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:readsync( fd, deadline )
-    return iosync( self, RSYNQ[fd], deadline );
+    return iosync( self, RSYNQ, 'rsynq', fd, deadline );
 end
 
 
@@ -327,7 +335,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:writesync( fd, deadline )
-    return iosync( self, WSYNQ[fd], deadline );
+    return iosync( self, WSYNQ, 'wsynq', fd, deadline );
 end
 
 
@@ -627,7 +635,6 @@ local function new( synops, atexit, fn, ... )
         argv = Argv.new(),
         node = Deque.new(),
         pool = Deque.new(),
-        synq = {},
         revs = {},
         wevs = {}
     }, {
