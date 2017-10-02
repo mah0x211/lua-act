@@ -234,61 +234,61 @@ function Synops.sigwait( deadline, ... )
 end
 
 
---- readsync
+--- readlock
 -- @param fd
 -- @param deadline
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.readsync( fd, deadline )
+function Synops.readlock( fd, deadline )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readsync( fd, deadline );
+        return callee:readlock( fd, deadline );
     end
 
-    error( 'cannot call readsync() from outside of execution context', 2 );
+    error( 'cannot call readlock() from outside of execution context', 2 );
 end
 
 
---- readunsync
-function Synops.readunsync()
+--- readunlock
+function Synops.readunlock()
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readunsync();
+        return callee:readunlock();
     end
 
-    error( 'cannot call readunsync() from outside of execution context', 2 );
+    error( 'cannot call readunlock() from outside of execution context', 2 );
 end
 
 
---- writesync
+--- writelock
 -- @param fd
 -- @param deadline
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.writesync( fd, deadline )
+function Synops.writelock( fd, deadline )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:writesync( fd, deadline );
+        return callee:writelock( fd, deadline );
     end
 
-    error( 'cannot call writesync() from outside of execution context', 2 );
+    error( 'cannot call writelock() from outside of execution context', 2 );
 end
 
 
---- writeunsync
-function Synops.writeunsync()
+--- writeunlock
+function Synops.writeunlock()
     local callee = Callee.acquire();
 
     if callee then
-        return callee:writeunsync();
+        return callee:writeunlock();
     end
 
-    error( 'cannot call writeunsync() from outside of execution context', 2 );
+    error( 'cannot call writeunlock() from outside of execution context', 2 );
 end
 
 

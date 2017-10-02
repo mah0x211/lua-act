@@ -48,8 +48,8 @@ local OP_RUNQ = Aux.OP_RUNQ;
 local SUSPENDED = setmetatable({},{
     __mode = 'v'
 });
-local RSYNQ = {};
-local WSYNQ = {};
+local RLOCKS = {};
+local WLOCKS = {};
 local CURRENT_CALLEE;
 
 
@@ -124,28 +124,15 @@ end
 function Callee:dispose( ok )
     local runq = self.synops.runq;
     local event = self.synops.event;
-    local synq;
 
     runq:remove( self );
     -- remove state properties
     self.term = nil;
     SUSPENDED[self.cid] = nil;
 
-    -- resume all suspended callee for readsync
-    synq = self.rsynq;
-    if synq then
-        self.rsynq = nil;
-        RSYNQ[synq[1]] = nil;
-        resumeq( runq, synq );
-    end
-
-    -- resume all suspended callee for writesync
-    synq = self.wsynq;
-    if synq then
-        self.wsynq = nil;
-        WSYNQ[synq[1]] = nil;
-        resumeq( runq, synq );
-    end
+    -- resume all suspended callee
+    self:readunlock();
+    self:writeunlock();
 
     -- revoke signal events
     if self.sigset then
@@ -285,48 +272,46 @@ function Callee:later()
 end
 
 
---- iounsync
+--- rwunlock
 -- @param self
--- @param synq
+-- @param locks
 -- @param asa
-local function iounsync( self, synq, asa )
+local function rwunlock( self, locks, asa )
     local cidq = self[asa];
 
-    -- resume all suspended sync callee
+    -- resume all suspended callee
     if cidq then
         self[asa] = nil;
         -- remove cidq maintained by fd
-        synq[cidq[1]] = nil;
+        locks[cidq[1]] = nil;
         resumeq( self.synops.runq, cidq );
     end
 end
 
 
---- readunsync
-function Callee:readunsync()
-    -- resume all suspended read sync callee
-    iounsync( self, RSYNQ, 'rsynq' );
+--- readunlock
+function Callee:readunlock()
+    rwunlock( self, RLOCKS, 'rlock' );
 end
 
 
---- writeunsync
-function Callee:writeunsync()
-    -- resume all suspended read sync callee
-    iounsync( self, WSYNQ, 'wsynq' );
+--- writeunlock
+function Callee:writeunlock()
+    rwunlock( self, WLOCKS, 'wlock' );
 end
 
 
---- iosync
+--- rwlock
 -- @param self
--- @param synq
+-- @param locks
 -- @param asa
 -- @param fd
 -- @param deadline
 -- @return ok
 -- @return err
 -- @return timeout
-local function iosync( self, synq, asa, fd, deadline )
-    local cidq = synq[fd];
+local function rwlock( self, locks, asa, fd, deadline )
+    local cidq = locks[fd];
 
     -- other callee is waiting
     if cidq then
@@ -340,33 +325,33 @@ local function iosync( self, synq, asa, fd, deadline )
         return ok, err, timeout;
     end
 
-    -- create read or write sync queue
-    synq[fd] = { fd };
-    self[asa] = synq[fd];
+    -- create read or write queue
+    locks[fd] = { fd };
+    self[asa] = locks[fd];
 
     return true;
 end
 
 
---- readsync
+--- readlock
 -- @param fd
 -- @param deadline
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:readsync( fd, deadline )
-    return iosync( self, RSYNQ, 'rsynq', fd, deadline );
+function Callee:readlock( fd, deadline )
+    return rwlock( self, RLOCKS, 'rlock', fd, deadline );
 end
 
 
---- writesync
+--- writelock
 -- @param fd
 -- @param deadline
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writesync( fd, deadline )
-    return iosync( self, WSYNQ, 'wsynq', fd, deadline );
+function Callee:writelock( fd, deadline )
+    return rwlock( self, WLOCKS, 'wlock', fd, deadline );
 end
 
 
