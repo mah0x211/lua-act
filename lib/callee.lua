@@ -285,6 +285,37 @@ function Callee:later()
 end
 
 
+--- iounsync
+-- @param self
+-- @param synq
+-- @param asa
+local function iounsync( self, synq, asa )
+    local cidq = self[asa];
+
+    -- resume all suspended sync callee
+    if cidq then
+        self[asa] = nil;
+        -- remove cidq maintained by fd
+        synq[cidq[1]] = nil;
+        resumeq( self.synops.runq, cidq );
+    end
+end
+
+
+--- readunsync
+function Callee:readunsync()
+    -- resume all suspended read sync callee
+    iounsync( self, RSYNQ, 'rsynq' );
+end
+
+
+--- writeunsync
+function Callee:writeunsync()
+    -- resume all suspended read sync callee
+    iounsync( self, WSYNQ, 'wsynq' );
+end
+
+
 --- iosync
 -- @param self
 -- @param synq
