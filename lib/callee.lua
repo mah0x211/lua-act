@@ -30,8 +30,6 @@ local Argv = require('argv');
 local Deque = require('deque');
 local Aux = require('synops.aux');
 local Coro = require('synops.coro');
-local msleep = require('synops.hrtimer').msleep;
-local isUInt = Aux.isUInt;
 local concat = Aux.concat;
 local yield = coroutine.yield;
 local setmetatable = setmetatable;
@@ -478,30 +476,16 @@ end
 -- @return ok
 -- @return err
 function Callee:sleep( deadline )
-    -- use runq
-    if self.synops.event:len() > 0 or self.synops.runq:len() > 0 then
-        local ok, err = self.synops.runq:push( self, deadline );
+    local ok, err = self.synops.runq:push( self, deadline );
 
-        if not ok then
-            return false, err;
-        elseif yield() == OP_RUNQ then
-            return true;
-        end
-
-        -- normally unreachable
-        error( 'invalid implements' );
-
-    -- return immediately
-    elseif deadline == nil then
-        return true;
-    -- use msleep
-    elseif not isUInt( deadline ) then
-        return false, 'deadline must be unsigned integer';
-    elseif msleep( deadline ) then
+    if not ok then
+        return false, err;
+    elseif yield() == OP_RUNQ then
         return true;
     end
 
-    return false, 'syserror';
+    -- normally unreachable
+    error( 'invalid implements' );
 end
 
 
