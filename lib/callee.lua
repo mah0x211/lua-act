@@ -337,11 +337,10 @@ end
 -- @param asa
 -- @param fd
 -- @param deadline
--- @param synq
 -- @return ok
 -- @return err
 -- @return timeout
-local function ioable( self, evs, asa, fd, deadline, synq )
+local function ioable( self, evs, asa, fd, deadline )
     local runq = self.synops.runq;
     local event = self.synops.event;
     local item = evs[fd];
@@ -389,21 +388,8 @@ local function ioable( self, evs, asa, fd, deadline, synq )
         evs[fd] = item;
     end
 
-    -- create sync queue
-    if synq then
-        synq[fd] = { fd };
-        self.synq[asa] = synq[fd];
-    end
-
     -- wait until event fired
     op, fdno, disabled = yield();
-
-    -- resume all suspended callee
-    if synq then
-        self.synq[asa] = nil;
-        resumeq( runq, synq[fd] );
-        synq[fd] = nil;
-    end
 
     -- got io event
     if op == OP_EVENT and fdno == fd then
@@ -444,24 +430,22 @@ end
 --- readable
 -- @param fd
 -- @param deadline
--- @param sync
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:readable( fd, deadline, sync )
-    return ioable( self, self.revs, 'readable', fd, deadline, sync and RSYNQ );
+function Callee:readable( fd, deadline )
+    return ioable( self, self.revs, 'readable', fd, deadline );
 end
 
 
 --- writable
 -- @param fd
 -- @param deadline
--- @param sync
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writable( fd, deadline, sync )
-    return ioable( self, self.wevs, 'writable', fd, deadline, sync and WSYNQ );
+function Callee:writable( fd, deadline )
+    return ioable( self, self.wevs, 'writable', fd, deadline );
 end
 
 
