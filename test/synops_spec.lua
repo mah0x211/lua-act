@@ -86,6 +86,60 @@ describe('test synops module:', function()
                 assert( elapsed < 10, 'overslept ' .. tostring( elapsed ) )
             end))
         end)
+
+        it('get up in order of shortest sleep time', function()
+            assert.is_true( synops.run(function()
+                local ok, msg
+
+                synops.spawn(function()
+                    local ok, err = synops.sleep(35)
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    return 'awake 35'
+                end)
+
+                synops.spawn(function()
+                    local ok, err = synops.sleep(10)
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    return 'awake 10'
+                end)
+
+                synops.spawn(function()
+                    local ok, err = synops.sleep(25)
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    return 'awake 25'
+                end)
+
+                synops.spawn(function()
+                    local ok, err = synops.sleep(5)
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    return 'awake 5'
+                end)
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'awake 5' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'awake 10' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'awake 25' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'awake 35' )
+            end))
+        end)
     end)
 
 
@@ -603,226 +657,108 @@ describe('test synops module:', function()
     end)
 
 
-    describe('test synops.readsync -', function()
+    describe('test synops.readlock -', function()
         it('fail on called from outside of execution context', function()
-            assert.is_not_true( pcall( synops.readsync ) )
-        end)
-
-        it('fail by timeout', function()
-            assert.is_true( synops.run(function()
-                local reader, writer = socketpair()
-
-                synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader:fd(), 100,
-                                                              true )
-
-                    assert( ok == false )
-                    assert( err == nil )
-                    assert( timeout == true )
-                    return 'readable timeout'
-                end)
-
-                synops.spawn(function()
-                    local ok, err, timeout = synops.readsync( reader:fd(), 50 )
-
-                    assert( ok == false )
-                    assert( err == nil )
-                    assert( timeout == true )
-                    return 'readsync timeout'
-                end)
-
-                ok, msg = synops.await()
-                assert( ok == true )
-                assert( msg == 'readsync timeout' )
-
-                ok, msg = synops.await()
-                assert( ok == true )
-                assert( msg == 'readable timeout' )
-            end))
+            assert.is_not_true( pcall( synops.readlock ) )
         end)
 
         it('success', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair()
-                local ok, msg, again
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader:fd(), 50,
-                                                              true )
+                    local ok, err, timeout = synops.readlock( reader:fd(), 30 )
 
+                    synops.sleep(30)
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
-                    return 'readable ok'
+                    return 'readlock ok 30'
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readsync( reader:fd(), 50 )
+                    local ok, err, timeout = synops.readlock( reader:fd(), 20 )
 
-                    assert( ok == true )
+                    assert( ok == false )
                     assert( err == nil )
-                    assert( timeout == nil )
-                    return 'readsync ok'
+                    assert( timeout == true )
+                    return 'readlock timeout 20'
                 end)
 
-                synops.later()
-                writer:send( 'hello world!' )
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( reader:fd(), 10 )
+
+                    assert( ok == false )
+                    assert( err == nil )
+                    assert( timeout == true )
+                    return 'readlock timeout 10'
+                end)
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'readable ok' )
+                assert( msg == 'readlock timeout 10' )
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'readsync ok' )
+                assert( msg == 'readlock timeout 20' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'readlock ok 30' )
             end))
         end)
     end)
 
 
 
-    describe('test synops.writesync -', function()
+    describe('test synops.writelock -', function()
         it('fail on called from outside of execution context', function()
-            assert.is_not_true( pcall( synops.writesync ) )
-        end)
-
-        it('fail by timeout', function()
-            assert.is_true( synops.run(function()
-                local reader, writer = socketpair( 5 )
-                local buflen = writer:sndbuf()
-                local chunk = buflen / 99 + 1
-                local msg = {}
-                local ok
-
-                for i = 1, chunk do
-                    msg[i] = ('%099d'):format(0)
-                end
-                msg = table.concat( msg )
-
-                synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 100,
-                                                              true )
-
-                    assert( ok == false )
-                    assert( err == nil )
-                    assert( timeout == true )
-                    return 'writable timeout'
-                end)
-
-                synops.spawn(function()
-                    local ok, err, timeout = synops.writesync( writer:fd(), 50 )
-
-                    assert( ok == false )
-                    assert( err == nil )
-                    assert( timeout == true )
-                    return 'writesync timeout'
-                end)
-
-                writer:send( msg )
-
-                ok, msg = synops.await()
-                assert( ok == true )
-                assert( msg == 'writesync timeout' )
-
-                ok, msg = synops.await()
-                assert( ok == true )
-                assert( msg == 'writable timeout' )
-            end))
+            assert.is_not_true( pcall( synops.writelock ) )
         end)
 
         it('success', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair()
-                local buflen = writer:sndbuf()
-                local chunk = buflen / 99 + 1
-                local msg = {}
-                local ok, rcv, len
-
-                for i = 1, chunk do
-                    msg[i] = ('%099d'):format(0)
-                end
-                msg = table.concat( msg )
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 50,
-                                                              true )
+                    local ok, err, timeout = synops.writelock( writer:fd(), 30 )
 
+                    synops.sleep(30)
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
-                    return 'writable ok'
+                    return 'writelock ok 30'
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writesync( writer:fd(), 50 )
-
-                    assert( ok == true )
-                    assert( err == nil )
-                    assert( timeout == nil )
-
-                    return 'writesync ok'
-                end)
-
-                len = writer:send( msg )
-                msg = msg:sub( 1, len )
-                synops.later()
-
-                rcv = reader:recv(#msg)
-                assert( rcv == msg )
-
-                ok, msg = synops.await()
-                assert( ok == true )
-                assert( msg == 'writable ok' )
-
-                ok, msg = synops.await()
-                assert( ok == true )
-                assert( msg == 'writesync ok' )
-            end))
-        end)
-
-
-        it('always success when sync option disabled', function()
-            assert.is_true( synops.run(function()
-                local reader, writer = socketpair()
-                local buflen = writer:sndbuf()
-                local chunk = buflen / 99 + 1
-                local msg = {}
-                local ok, rcv, len
-
-                for i = 1, chunk do
-                    msg[i] = ('%099d'):format(0)
-                end
-                msg = table.concat( msg )
-
-                synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 500 )
+                    local ok, err, timeout = synops.writelock( writer:fd(), 20 )
 
                     assert( ok == false )
                     assert( err == nil )
                     assert( timeout == true )
-                    return 'writable ok'
+                    return 'writelock timeout 20'
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writesync( writer:fd(), 500 )
+                    local ok, err, timeout = synops.writelock( writer:fd(), 10 )
 
-                    assert( ok == true )
+                    assert( ok == false )
                     assert( err == nil )
-                    assert( timeout == nil )
-                    return 'writesync ok'
+                    assert( timeout == true )
+                    return 'writelock timeout 10'
                 end)
 
-                len = writer:send( msg )
-                msg = msg:sub( 1, len )
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'writelock timeout 10' )
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'writesync ok' )
+                assert( msg == 'writelock timeout 20' )
 
-                reader:recv(#msg)
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'writable ok' )
+                assert( msg == 'writelock ok 30' )
             end))
         end)
     end)
