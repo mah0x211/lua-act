@@ -662,7 +662,7 @@ describe('test synops module:', function()
             assert.is_not_true( pcall( synops.readlock ) )
         end)
 
-        it('success', function()
+        it('wakes up in order of the shortest timeout', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair()
 
@@ -673,7 +673,7 @@ describe('test synops module:', function()
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
-                    return 'readlock ok 30'
+                    return 'lock ok 30'
                 end)
 
                 synops.spawn(function()
@@ -682,7 +682,7 @@ describe('test synops module:', function()
                     assert( ok == false )
                     assert( err == nil )
                     assert( timeout == true )
-                    return 'readlock timeout 20'
+                    return 'lock timeout 20'
                 end)
 
                 synops.spawn(function()
@@ -691,24 +691,126 @@ describe('test synops module:', function()
                     assert( ok == false )
                     assert( err == nil )
                     assert( timeout == true )
-                    return 'readlock timeout 10'
+                    return 'lock timeout 10'
                 end)
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'readlock timeout 10' )
+                assert( msg == 'lock timeout 10' )
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'readlock timeout 20' )
+                assert( msg == 'lock timeout 20' )
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'readlock ok 30' )
+                assert( msg == 'lock ok 30' )
+            end))
+        end)
+
+
+        it('wakes up in the order of calling the lock function', function()
+            assert.is_true( synops.run(function()
+                local reader, writer = socketpair()
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( reader:fd(), 30 )
+
+                    synops.sleep(5)
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+                    return 'lock ok 30'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( reader:fd(), 20 )
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+                    return 'lock ok 20'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( reader:fd(), 10 )
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+                    return 'lock ok 10'
+                end)
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock ok 30' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock ok 20' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock ok 10' )
+            end))
+        end)
+
+
+        it('can handle multiple locks at the same time', function()
+            assert.is_true( synops.run(function()
+                local reader1, writer1 = socketpair()
+                local reader2, writer2 = socketpair()
+
+                synops.spawn(function()
+                    local ok, err, timeout
+
+                    ok, err, timeout = synops.readlock( reader1:fd(), 30 )
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+
+                    ok, err, timeout = synops.readlock( reader2:fd(), 30 )
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+
+                    synops.sleep(30)
+
+                    return 'lock 1 and 2 ok 30'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( reader1:fd(), 20 )
+
+                    assert( ok == false )
+                    assert( err == nil )
+                    assert( timeout == true )
+                    return 'lock 1 timeout 20'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( reader2:fd(), 10 )
+
+                    assert( ok == false )
+                    assert( err == nil )
+                    assert( timeout == true )
+                    return 'lock 2 timeout 10'
+                end)
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock 2 timeout 10' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock 1 timeout 20' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock 1 and 2 ok 30' )
             end))
         end)
     end)
-
 
 
     describe('test synops.writelock -', function()
@@ -716,7 +818,7 @@ describe('test synops module:', function()
             assert.is_not_true( pcall( synops.writelock ) )
         end)
 
-        it('success', function()
+        it('wakes up in order of the shortest timeout', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair()
 
@@ -727,7 +829,7 @@ describe('test synops module:', function()
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
-                    return 'writelock ok 30'
+                    return 'lock ok 30'
                 end)
 
                 synops.spawn(function()
@@ -736,7 +838,7 @@ describe('test synops module:', function()
                     assert( ok == false )
                     assert( err == nil )
                     assert( timeout == true )
-                    return 'writelock timeout 20'
+                    return 'lock timeout 20'
                 end)
 
                 synops.spawn(function()
@@ -745,20 +847,121 @@ describe('test synops module:', function()
                     assert( ok == false )
                     assert( err == nil )
                     assert( timeout == true )
-                    return 'writelock timeout 10'
+                    return 'lock timeout 10'
                 end)
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'writelock timeout 10' )
+                assert( msg == 'lock timeout 10' )
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'writelock timeout 20' )
+                assert( msg == 'lock timeout 20' )
 
                 ok, msg = synops.await()
                 assert( ok == true )
-                assert( msg == 'writelock ok 30' )
+                assert( msg == 'lock ok 30' )
+            end))
+        end)
+
+        it('wakes up in the order of calling the lock function', function()
+            assert.is_true( synops.run(function()
+                local reader, writer = socketpair()
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( writer:fd(), 30 )
+
+                    synops.sleep(5)
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+                    return 'lock ok 30'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( writer:fd(), 20 )
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+                    return 'lock ok 20'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( writer:fd(), 10 )
+
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+                    return 'lock ok 10'
+                end)
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock ok 30' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock ok 20' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock ok 10' )
+            end))
+        end)
+
+        it('can handle multiple locks at the same time', function()
+            assert.is_true( synops.run(function()
+                local reader1, writer1 = socketpair()
+                local reader2, writer2 = socketpair()
+
+                synops.spawn(function()
+                    local ok, err, timeout
+
+                    ok, err, timeout = synops.readlock( writer1:fd(), 30 )
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+
+                    ok, err, timeout = synops.readlock( writer2:fd(), 30 )
+                    assert( ok == true )
+                    assert( err == nil )
+                    assert( timeout == nil )
+
+                    synops.sleep(30)
+
+                    return 'lock 1 and 2 ok 30'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( writer1:fd(), 20 )
+
+                    assert( ok == false )
+                    assert( err == nil )
+                    assert( timeout == true )
+                    return 'lock 1 timeout 20'
+                end)
+
+                synops.spawn(function()
+                    local ok, err, timeout = synops.readlock( writer2:fd(), 10 )
+
+                    assert( ok == false )
+                    assert( err == nil )
+                    assert( timeout == true )
+                    return 'lock 2 timeout 10'
+                end)
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock 2 timeout 10' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock 1 timeout 20' )
+
+                ok, msg = synops.await()
+                assert( ok == true )
+                assert( msg == 'lock 1 and 2 ok 30' )
             end))
         end)
     end)
