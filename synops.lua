@@ -252,11 +252,12 @@ end
 
 
 --- readunlock
-function Synops.readunlock()
+-- @param fd
+function Synops.readunlock( fd )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readunlock();
+        return callee:readunlock( fd );
     end
 
     error( 'cannot call readunlock() from outside of execution context', 2 );
@@ -281,11 +282,12 @@ end
 
 
 --- writeunlock
-function Synops.writeunlock()
+-- @param fd
+function Synops.writeunlock( fd )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:writeunlock();
+        return callee:writeunlock( fd );
     end
 
     error( 'cannot call writeunlock() from outside of execution context', 2 );
