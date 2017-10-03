@@ -31,6 +31,7 @@ local Deque = require('deque');
 local Aux = require('synops.aux');
 local Coro = require('synops.coro');
 local concat = Aux.concat;
+local isUInt = Aux.isUInt;
 local yield = coroutine.yield;
 local setmetatable = setmetatable;
 -- constants
@@ -79,7 +80,7 @@ end
 -- @param cidq
 local function resumeq( runq, cidq )
     -- first index is used for holding a fd
-    for i = 2, #cidq do
+    for i = 1, #cidq do
         local cid = cidq[i];
         local callee = SUSPENDED[cid];
 
@@ -129,8 +130,20 @@ function Callee:dispose( ok )
     SUSPENDED[self.cid] = nil;
 
     -- resume all suspended callee
-    self:readunlock();
-    self:writeunlock();
+    for fd, cidq in pairs( self.rlock ) do
+        -- remove cidq maintained by fd
+        RLOCKS[fd] = nil;
+        resumeq( runq, cidq );
+    end
+    self.rlock = {};
+
+    -- resume all suspended callee
+    for fd, cidq in pairs( self.wlock ) do
+        -- remove cidq maintained by fd
+        WLOCKS[fd] = nil;
+        resumeq( runq, cidq );
+    end
+    self.wlock = {};
 
     -- revoke signal events
     if self.sigset then
@@ -274,28 +287,31 @@ end
 -- @param self
 -- @param locks
 -- @param asa
-local function rwunlock( self, locks, asa )
-    local cidq = self[asa];
+-- @param fd
+local function rwunlock( self, locks, asa, fd )
+    local cidq = self[asa][fd];
 
     -- resume all suspended callee
     if cidq then
-        self[asa] = nil;
+        self[asa][fd] = nil;
         -- remove cidq maintained by fd
-        locks[cidq[1]] = nil;
+        locks[fd] = nil;
         resumeq( self.synops.runq, cidq );
     end
 end
 
 
 --- readunlock
-function Callee:readunlock()
-    rwunlock( self, RLOCKS, 'rlock' );
+-- @param fd
+function Callee:readunlock( fd )
+    rwunlock( self, RLOCKS, 'rlock', fd );
 end
 
 
 --- writeunlock
-function Callee:writeunlock()
-    rwunlock( self, WLOCKS, 'wlock' );
+-- @param fd
+function Callee:writeunlock( fd )
+    rwunlock( self, WLOCKS, 'wlock', fd );
 end
 
 
@@ -309,23 +325,26 @@ end
 -- @return err
 -- @return timeout
 local function rwlock( self, locks, asa, fd, deadline )
-    local cidq = locks[fd];
+    assert( isUInt( fd ), 'fd must be unsigned integer' );
+    if not self[asa][fd] then
+        local cidq = locks[fd];
 
-    -- other callee is waiting
-    if cidq then
-        local idx = #cidq + 1;
-        local ok, err, timeout;
+        -- other callee is waiting
+        if cidq then
+            local idx = #cidq + 1;
+            local ok, err, timeout;
 
-        cidq[idx] = self.cid;
-        ok, err, timeout = self:suspend( deadline );
-        cidq[idx] = false;
+            cidq[idx] = self.cid;
+            ok, err, timeout = self:suspend( deadline );
+            cidq[idx] = false;
 
-        return ok, err, timeout;
+            return ok, err, timeout;
+        end
+
+        -- create read or write queue
+        locks[fd] = {};
+        self[asa][fd] = locks[fd];
     end
-
-    -- create read or write queue
-    locks[fd] = { fd };
-    self[asa] = locks[fd];
 
     return true;
 end
@@ -635,6 +654,8 @@ local function new( synops, atexit, fn, ... )
         argv = Argv.new(),
         node = Deque.new(),
         pool = Deque.new(),
+        rlock = {},
+        wlock = {},
         revs = {},
         wevs = {}
     }, {
