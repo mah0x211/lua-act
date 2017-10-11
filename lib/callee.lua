@@ -34,6 +34,8 @@ local concat = Aux.concat;
 local isUInt = Aux.isUInt;
 local yield = coroutine.yield;
 local setmetatable = setmetatable;
+local tostring = tostring;
+local strsub = string.sub;
 -- constants
 local OP_EVENT = Aux.OP_EVENT;
 local OP_RUNQ = Aux.OP_RUNQ;
@@ -663,7 +665,7 @@ local function new( synops, atexit, fn, ... )
     });
     -- set callee-id
     -- remove 'table: ' prefix
-    callee.cid = tostring( callee ):sub(10);
+    callee.cid = strsub( tostring( callee ), 10 );
     -- set relationship
     torelate( callee, atexit );
 

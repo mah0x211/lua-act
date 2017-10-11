@@ -30,6 +30,7 @@
 local type = type;
 local floor = math.floor;
 local tblconcat = table.concat;
+local tostring = tostring;
 --- constants
 local INFINITE = math.huge;
 local OP_EVENT = 0;
