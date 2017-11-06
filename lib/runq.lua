@@ -144,12 +144,19 @@ function RunQ:consume( msec )
             callee:call( OP_RUNQ );
         end
 
-        helm = self.heap:peek();
-
-        return helm and helm.num or msec;
+        return self:deadline( msec );
     end
 
     return msec;
+end
+
+
+--- deadline
+-- @return deadline
+function RunQ:deadline( deadline )
+    local helm = self.heap:peek();
+
+    return helm and helm.num or deadline;
 end
 
 
