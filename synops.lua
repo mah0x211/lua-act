@@ -403,6 +403,12 @@ local function runloop( fn, ... )
             if err then
                 return false, err;
             end
+
+            -- update timer
+            msec = runq:deadline(-1);
+            if msec > 0 then
+                hrtimer:init( msec );
+            end
         -- sleep until timer time elapsed
         elseif runq:len() > 0 then
             hrtimer:sleep();
