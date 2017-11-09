@@ -25,7 +25,8 @@
   Created by Masatoshi Teruya on 16/12/25.
 
 --]]
-
+--- ignore SIGPIPE
+require('nosigpipe');
 --- file scope variables
 local Deque = require('deque');
 local fork = require('process').fork;

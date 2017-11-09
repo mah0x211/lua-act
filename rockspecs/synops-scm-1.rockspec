@@ -14,6 +14,7 @@ dependencies = {
     "luarocks-fetch-gitrec >= 0.2",
     "argv >= 0.2.0",
     "minheap >= 0.1.1",
+    "nosigpipe >= 0.1.0",
     "process >= 1.6.1",
     "sentry >= 0.8.0",
 }
