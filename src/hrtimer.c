@@ -48,9 +48,9 @@ typedef struct {
 static int sleep_lua( lua_State *L )
 {
     hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
-    uint64_t nsec = hrt_getnsec();
+    uint64_t now = hrt_getnsec();
 
-    if( nsec > h->nsec || hrt_nanosleep( h->nsec - nsec ) == 0 ){
+    if( now > h->nsec || hrt_nanosleep( h->nsec - now ) == 0 ){
         lua_pushboolean( L, 1 );
         return 1;
     }
@@ -66,11 +66,15 @@ static int sleep_lua( lua_State *L )
 static int remain_lua( lua_State *L )
 {
     hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
-    uint64_t nsec = hrt_getnsec();
+    uint64_t now = hrt_getnsec();
 
-    lua_pushinteger(
-        L, ( nsec < h->nsec ) ? ( h->nsec - nsec ) / 1000000ULL : -1
-    );
+    // return a remaining msec
+    if( now < h->nsec ){
+        lua_pushinteger( L, ( h->nsec - now ) / 1000000ULL );
+    }
+    else {
+        lua_pushinteger( L, -1 );
+    }
 
     return 1;
 }
@@ -81,7 +85,7 @@ static int init_lua( lua_State *L )
     hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
     lua_Integer msec = lauxh_checkinteger( L, 2 );
 
-    h->nsec = hrt_getnsec() + (uint64_t)msec * 1000000ULL;
+    h->nsec = ( msec < 1 ) ? 0 : hrt_getnsec() + (uint64_t)msec * 1000000ULL;
 
     return 0;
 }
@@ -100,7 +104,7 @@ static int new_lua( lua_State *L )
     hrtimer_t *h = lua_newuserdata( L, sizeof( hrtimer_t ) );
 
     if( h ){
-        h->nsec = hrt_getnsec() + (uint64_t)msec * 1000000ULL;
+        h->nsec = ( msec < 1 ) ? 0 : hrt_getnsec() + (uint64_t)msec * 1000000ULL;
         lauxh_setmetatable( L, MODULE_MT );
 
         return 1;

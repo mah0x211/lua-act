@@ -243,6 +243,7 @@ function Callee:suspend( deadline )
     local cid = self.cid;
 
     if deadline ~= nil then
+        -- suspend until reached to deadline
         local ok, err = self.synops.runq:push( self, deadline );
 
         if not ok then
@@ -253,13 +254,14 @@ function Callee:suspend( deadline )
     -- wait until resumed by resume method
     SUSPENDED[cid] = self;
     if yield() == OP_RUNQ then
-        -- timed out
+        -- resumed by time-out if self exists in suspend list
         if SUSPENDED[cid] then
             SUSPENDED[cid] = nil;
             self.synops.runq:remove( self );
             return false, nil, true;
         end
 
+        -- resumed
         return true, self.argv:select();
     end
 
