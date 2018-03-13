@@ -43,26 +43,26 @@ local RunQ = {};
 
 --- push
 -- @param callee
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
-function RunQ:push( callee, deadline )
+function RunQ:push( callee, msec )
     local ref = self.ref;
 
     if not callee or not isFunction( callee.call ) then
         return false, 'callee must have a call method';
-    elseif deadline == nil then
-        deadline = 0;
-    elseif not isUInt( deadline ) then
-        return false, 'deadline must be unsigned integer';
+    elseif msec == nil then
+        msec = 0;
+    elseif not isUInt( msec ) then
+        return false, 'msec must be unsigned integer';
     end
 
     -- register callee
     if not ref[callee] then
-        local queue = ref[deadline];
+        local queue = ref[msec];
         local qelm, err;
 
-        -- create new queue associated for deadline
+        -- create new queue associated for msec
         if not queue then
             queue, err = Deque.new();
             if not queue then
@@ -74,8 +74,8 @@ function RunQ:push( callee, deadline )
                 return false, err;
             end
 
-            ref[deadline] = queue;
-            ref[queue] = self.heap:push( deadline, queue );
+            ref[msec] = queue;
+            ref[queue] = self.heap:push( msec, queue );
         else
             qelm, err = queue:unshift( callee );
             if not qelm then

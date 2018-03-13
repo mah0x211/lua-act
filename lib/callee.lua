@@ -235,16 +235,16 @@ end
 
 
 --- suspend
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return ...
 -- @return timeout
-function Callee:suspend( deadline )
+function Callee:suspend( msec )
     local cid = self.cid;
 
-    if deadline ~= nil then
-        -- suspend until reached to deadline
-        local ok, err = self.synops.runq:push( self, deadline );
+    if msec ~= nil then
+        -- suspend until reached to msec
+        local ok, err = self.synops.runq:push( self, msec );
 
         if not ok then
             return false, err;
@@ -324,11 +324,11 @@ end
 -- @param locks
 -- @param asa
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-local function rwlock( self, locks, asa, fd, deadline )
+local function rwlock( self, locks, asa, fd, msec )
     assert( isUInt( fd ), 'fd must be unsigned integer' );
     if not self[asa][fd] then
         local cidq = locks[fd];
@@ -339,7 +339,7 @@ local function rwlock( self, locks, asa, fd, deadline )
             local ok, err, timeout;
 
             cidq[idx] = self.cid;
-            ok, err, timeout = self:suspend( deadline );
+            ok, err, timeout = self:suspend( msec );
             cidq[idx] = false;
 
             return ok, err, timeout;
@@ -356,23 +356,23 @@ end
 
 --- readlock
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:readlock( fd, deadline )
-    return rwlock( self, RLOCKS, 'rlock', fd, deadline );
+function Callee:readlock( fd, msec )
+    return rwlock( self, RLOCKS, 'rlock', fd, msec );
 end
 
 
 --- writelock
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writelock( fd, deadline )
-    return rwlock( self, WLOCKS, 'wlock', fd, deadline );
+function Callee:writelock( fd, msec )
+    return rwlock( self, WLOCKS, 'wlock', fd, msec );
 end
 
 
@@ -381,19 +381,19 @@ end
 -- @param evs
 -- @param asa
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-local function ioable( self, evs, asa, fd, deadline )
+local function ioable( self, evs, asa, fd, msec )
     local runq = self.synops.runq;
     local event = self.synops.event;
     local item = evs[fd];
     local op, ev, fdno, disabled;
 
     -- register to runq
-    if deadline then
-        local ok, err = runq:push( self, deadline );
+    if msec then
+        local ok, err = runq:push( self, msec );
 
         if not ok then
             return false, err;
@@ -406,7 +406,7 @@ local function ioable( self, evs, asa, fd, deadline )
         ev = item:data();
         ok, err = ev:watch();
         if not ok then
-            if deadline then
+            if msec then
                 runq:remove( self );
             end
 
@@ -422,7 +422,7 @@ local function ioable( self, evs, asa, fd, deadline )
 
         ev, err = event[asa]( event, self, fd );
         if err then
-            if deadline then
+            if msec then
                 runq:remove( self );
             end
 
@@ -439,7 +439,7 @@ local function ioable( self, evs, asa, fd, deadline )
     -- got io event
     if op == OP_EVENT and fdno == fd then
         -- remove from runq
-        if deadline then
+        if msec then
             runq:remove( self );
         end
 
@@ -457,7 +457,7 @@ local function ioable( self, evs, asa, fd, deadline )
         ev:unwatch();
         return false, nil, true;
     -- remove from runq
-    elseif deadline then
+    elseif msec then
         runq:remove( self );
     end
 
@@ -474,32 +474,32 @@ end
 
 --- readable
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:readable( fd, deadline )
-    return ioable( self, self.revs, 'readable', fd, deadline );
+function Callee:readable( fd, msec )
+    return ioable( self, self.revs, 'readable', fd, msec );
 end
 
 
 --- writable
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writable( fd, deadline )
-    return ioable( self, self.wevs, 'writable', fd, deadline );
+function Callee:writable( fd, msec )
+    return ioable( self, self.wevs, 'writable', fd, msec );
 end
 
 
 --- sleep
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
-function Callee:sleep( deadline )
-    local ok, err = self.synops.runq:push( self, deadline );
+function Callee:sleep( msec )
+    local ok, err = self.synops.runq:push( self, msec );
 
     if not ok then
         return false, err;
@@ -513,19 +513,19 @@ end
 
 
 --- sigwait
--- @param deadline
+-- @param msec
 -- @param ...
 -- @return signo
 -- @return err
 -- @return timeout
-function Callee:sigwait( deadline, ... )
+function Callee:sigwait( msec, ... )
     local runq = self.synops.runq;
     local event = self.synops.event;
     local sigset, sigmap;
 
-    -- register to runq with deadline
-    if deadline then
-        local ok, err = runq:push( self, deadline );
+    -- register to runq with msec
+    if msec then
+        local ok, err = runq:push( self, msec );
 
         if not ok then
             return nil, err;
@@ -574,7 +574,7 @@ function Callee:sigwait( deadline, ... )
         elseif op == OP_RUNQ then
             return nil, nil, true;
         -- remove from runq
-        elseif deadline then
+        elseif msec then
             runq:remove( self );
         end
 

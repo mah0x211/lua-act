@@ -175,15 +175,15 @@ end
 
 
 --- suspend
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return ...
 -- @return timeout
-function Synops.suspend( deadline )
+function Synops.suspend( msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:suspend( deadline );
+        return callee:suspend( msec );
     end
 
     error( 'cannot call suspend() at outside of execution context', 2 );
@@ -204,14 +204,14 @@ end
 
 
 --- sleep
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
-function Synops.sleep( deadline )
+function Synops.sleep( msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:sleep( deadline );
+        return callee:sleep( msec );
     end
 
     error( 'cannot call sleep() from outside of execution context', 2 );
@@ -219,16 +219,16 @@ end
 
 
 --- sigwait
--- @param deadline
+-- @param msec
 -- @param ...
 -- @return signo
 -- @return err
 -- @return timeout
-function Synops.sigwait( deadline, ... )
+function Synops.sigwait( msec, ... )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:sigwait( deadline, ... );
+        return callee:sigwait( msec, ... );
     end
 
     error( 'cannot call sleep() from outside of execution context', 2 );
@@ -237,15 +237,15 @@ end
 
 --- readlock
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.readlock( fd, deadline )
+function Synops.readlock( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readlock( fd, deadline );
+        return callee:readlock( fd, msec );
     end
 
     error( 'cannot call readlock() from outside of execution context', 2 );
@@ -267,15 +267,15 @@ end
 
 --- writelock
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.writelock( fd, deadline )
+function Synops.writelock( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:writelock( fd, deadline );
+        return callee:writelock( fd, msec );
     end
 
     error( 'cannot call writelock() from outside of execution context', 2 );
@@ -297,15 +297,15 @@ end
 
 --- readable
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.readable( fd, deadline )
+function Synops.readable( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readable( fd, deadline );
+        return callee:readable( fd, msec );
     end
 
     error( 'cannot call readable() from outside of execution context', 2 );
@@ -314,15 +314,15 @@ end
 
 --- writable
 -- @param fd
--- @param deadline
+-- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.writable( fd, deadline )
+function Synops.writable( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:writable( fd, deadline );
+        return callee:writable( fd, msec );
     end
 
     error( 'cannot call writable() from outside of execution context', 2 );
