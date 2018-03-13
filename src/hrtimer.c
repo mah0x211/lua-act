@@ -37,92 +37,12 @@
 #include "hrtimer.h"
 
 
-#define MODULE_MT   "synops.hrtimer"
-
-
-typedef struct {
-    uint64_t nsec;
-} hrtimer_t;
-
-
 static int sleep_lua( lua_State *L )
 {
-    hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
+    lua_Integer deadline = lauxh_checkinteger( L, 1 ) * 1000000ULL;
     uint64_t now = hrt_getnsec();
 
-    if( now > h->nsec || hrt_nanosleep( h->nsec - now ) == 0 ){
-        lua_pushboolean( L, 1 );
-        return 1;
-    }
-
-    // got error
-    lua_pushboolean( L, 1 );
-    lua_pushstring( L, strerror( errno ) );
-
-    return 1;
-}
-
-
-static int remain_lua( lua_State *L )
-{
-    hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
-    uint64_t now = hrt_getnsec();
-
-    // return a remaining msec
-    if( now < h->nsec ){
-        lua_pushinteger( L, ( h->nsec - now ) / 1000000ULL );
-    }
-    else {
-        lua_pushinteger( L, -1 );
-    }
-
-    return 1;
-}
-
-
-static int init_lua( lua_State *L )
-{
-    hrtimer_t *h = luaL_checkudata( L, 1, MODULE_MT );
-    lua_Integer msec = lauxh_checkinteger( L, 2 );
-
-    h->nsec = ( msec < 1 ) ? 0 : hrt_getnsec() + (uint64_t)msec * 1000000ULL;
-
-    return 0;
-}
-
-
-static int tostring_lua( lua_State *L )
-{
-    lua_pushfstring( L, MODULE_MT ": %p", lua_touserdata( L, 1 ) );
-    return 1;
-}
-
-
-static int new_lua( lua_State *L )
-{
-    lua_Integer msec = lauxh_optinteger( L, 1, 0 );
-    hrtimer_t *h = lua_newuserdata( L, sizeof( hrtimer_t ) );
-
-    if( h ){
-        h->nsec = ( msec < 1 ) ? 0 : hrt_getnsec() + (uint64_t)msec * 1000000ULL;
-        lauxh_setmetatable( L, MODULE_MT );
-
-        return 1;
-    }
-
-    // got error
-    lua_pushnil( L );
-    lua_pushstring( L, strerror( errno ) );
-
-    return 2;
-}
-
-
-static int msleep_lua( lua_State *L )
-{
-    lua_Integer msec = lauxh_optinteger( L, 1, 0 );
-
-    if( msec < 1 || hrt_nanosleep( msec * 1000000ULL ) == 0 ){
+    if( deadline < now || hrt_nanosleep( deadline - now ) == 0 ){
         lua_pushboolean( L, 1 );
         return 1;
     }
@@ -135,43 +55,43 @@ static int msleep_lua( lua_State *L )
 }
 
 
+static int remain_lua( lua_State *L )
+{
+    lua_Integer msec = lauxh_checkinteger( L, 1 );
+    uint64_t now = hrt_getnsec() / 1000000ULL;
+
+    // return a remaining msec
+    if( (uint64_t)msec > now ){
+        lua_pushinteger( L, msec - now );
+    }
+    else {
+        lua_pushinteger( L, 0 );
+    }
+
+    return 1;
+}
+
+
+static int now_lua( lua_State *L )
+{
+    if( lua_gettop( L ) ){
+        lua_Integer msec = lauxh_checkinteger( L, 1 );
+        lua_pushinteger( L, hrt_getnsec() / 1000000ULL + (uint64_t)msec );
+    }
+    else {
+        lua_pushinteger( L, hrt_getnsec() / 1000000ULL );
+    }
+
+    return 1;
+}
+
 
 LUALIB_API int luaopen_synops_hrtimer( lua_State *L )
 {
-    struct luaL_Reg mmethod[] = {
-        { "__tostring", tostring_lua },
-        { NULL, NULL }
-    };
-    struct luaL_Reg method[] = {
-        { "init", init_lua },
-        { "remain", remain_lua },
-        { "sleep", sleep_lua },
-        { NULL, NULL }
-    };
-    struct luaL_Reg *ptr = mmethod;
-
-    // create table __metatable
-    luaL_newmetatable( L, MODULE_MT );
-    // metamethods
-    while( ptr->name ){
-        lauxh_pushfn2tbl( L, ptr->name, ptr->func );
-        ptr++;
-    }
-    // metamethods
-    ptr = method;
-    lua_pushstring( L, "__index" );
     lua_newtable( L );
-    while( ptr->name ){
-        lauxh_pushfn2tbl( L, ptr->name, ptr->func );
-        ptr++;
-    }
-    lua_rawset( L, -3 );
-    lua_pop( L, 1 );
-
-    // add new function
-    lua_newtable( L );
-    lauxh_pushfn2tbl( L, "new", new_lua );
-    lauxh_pushfn2tbl( L, "msleep", msleep_lua );
+    lauxh_pushfn2tbl( L, "now", now_lua );
+    lauxh_pushfn2tbl( L, "remain", remain_lua );
+    lauxh_pushfn2tbl( L, "sleep", sleep_lua );
 
     return 1;
 }

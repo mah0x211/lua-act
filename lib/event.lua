@@ -127,6 +127,7 @@ end
 
 --- consume
 -- @param msec
+-- @return nev
 -- @return err
 function Event:consume( msec )
     if #self.loop > 0 then
@@ -136,7 +137,7 @@ function Event:consume( msec )
 
         -- got critical error
         if err then
-            return err;
+            return nil, err;
         -- consuming events
         elseif nev > 0 then
             local ev, callee, disabled = loop:getevent();
@@ -148,14 +149,11 @@ function Event:consume( msec )
                 ev, callee, disabled = loop:getevent();
             end
         end
+
+        return #self.loop;
     end
-end
 
-
---- len
--- @return nev
-function Event:len()
-    return #self.loop;
+    return 0;
 end
 
 

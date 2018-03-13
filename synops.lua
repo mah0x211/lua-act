@@ -30,7 +30,6 @@ require('nosigpipe');
 --- file scope variables
 local Deque = require('deque');
 local fork = require('process').fork;
-local HRTimer = require('synops.hrtimer');
 local RunQ = require('synops.runq');
 local Event = require('synops.event');
 local Callee = require('synops.callee');
@@ -348,7 +347,7 @@ end
 -- @return ok
 -- @return err
 local function runloop( fn, ... )
-    local event, runq, hrtimer, ok, err;
+    local event, runq, ok, err;
 
     -- check first argument
     assert( type( fn ) == 'function', 'fn must be function' );
@@ -382,39 +381,29 @@ local function runloop( fn, ... )
     end
 
     -- run synops scheduler
-    hrtimer = HRTimer.new();
     while true do
-        local msec = -1;
-
-        -- consume runq if timer time elapsed
-        if runq:len() > 0 then
-            msec = hrtimer:remain();
-            if msec < 0 then
-                msec = runq:consume(-1);
-                if msec > 0 then
-                    hrtimer:init( msec );
-                end
-            end
-        end
+        -- consume runq
+        local msec = runq:consume();
+        local remain;
 
         -- consume events
-        if event:len() > 0 then
-            err = event:consume( msec );
-            -- got critical error
-            if err then
-                return false, err;
+        remain, err = event:consume( msec );
+        -- got critical error
+        if err then
+            return false, err;
+        -- no more events
+        elseif remain == 0 then
+            -- finish if no more callee
+            if runq:len() == 0 then
+                return true;
             end
 
-            -- update timer
-            msec = runq:deadline(-1);
-            if msec > 0 then
-                hrtimer:init( msec );
+            -- sleep until timer time elapsed
+            ok, err = runq:sleep();
+            -- got critical error
+            if not ok then
+                return ok, err;
             end
-        -- sleep until timer time elapsed
-        elseif runq:len() > 0 then
-            hrtimer:sleep();
-        else
-            return true;
         end
     end
 end

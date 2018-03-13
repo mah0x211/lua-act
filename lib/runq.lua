@@ -30,6 +30,9 @@
 local Deque = require('deque');
 local MinHeap = require('minheap');
 local Aux = require('synops.aux');
+local timeNow = require('synops.hrtimer').now;
+local timeRemain = require('synops.hrtimer').remain;
+local timeSleep = require('synops.hrtimer').sleep;
 local isUInt = Aux.isUInt;
 local isFunction = Aux.isFunction;
 local setmetatable = setmetatable;
@@ -52,9 +55,11 @@ function RunQ:push( callee, msec )
     if not callee or not isFunction( callee.call ) then
         return false, 'callee must have a call method';
     elseif msec == nil then
-        msec = 0;
+        msec = timeNow();
     elseif not isUInt( msec ) then
         return false, 'msec must be unsigned integer';
+    else
+        msec = timeNow( msec );
     end
 
     -- register callee
@@ -69,13 +74,17 @@ function RunQ:push( callee, msec )
                 return false, err;
             end
 
+            -- push callee to queue
             qelm, err = queue:unshift( callee );
             if not qelm then
                 return false, err;
             end
 
+            -- push queue to minheap
             ref[msec] = queue;
             ref[queue] = self.heap:push( msec, queue );
+
+        -- push callee to existing queue
         else
             qelm, err = queue:unshift( callee );
             if not qelm then
@@ -117,46 +126,70 @@ end
 
 
 --- consume
--- @param msec
 -- @return msec
-function RunQ:consume( msec )
-    local helm = self.heap:pop();
+function RunQ:consume()
+    local msec = self:remain();
 
-    if helm then
-        local queue = helm.val;
-        local nqueue = #queue;
-        local ref = self.ref;
+    if msec < 1 then
+        local helm = self.heap:pop();
 
-        ref[queue] = nil;
-        ref[helm.num] = nil;
+        if helm then
+            local queue = helm.val;
+            local nqueue = #queue;
+            local ref = self.ref;
 
-        -- consume the current queued callees
-        for _ = 1, nqueue do
-            local callee = queue:pop();
+            ref[queue] = nil;
+            ref[helm.num] = nil;
 
-            if not callee then
-                break;
+            -- consume the current queued callees
+            for _ = 1, nqueue do
+                local callee = queue:pop();
+
+                if not callee then
+                    break;
+                end
+
+                -- remove from used table
+                ref[ref[callee]] = nil;
+                ref[callee] = nil;
+                callee:call( OP_RUNQ );
             end
-
-            -- remove from used table
-            ref[ref[callee]] = nil;
-            ref[callee] = nil;
-            callee:call( OP_RUNQ );
         end
 
-        return self:deadline( msec );
+        return self:remain();
     end
 
     return msec;
 end
 
 
---- deadline
--- @return deadline
-function RunQ:deadline( deadline )
+--- remain
+-- @return msec
+function RunQ:remain()
     local helm = self.heap:peek();
 
-    return helm and helm.num or deadline;
+    -- return remaining msec
+    if helm then
+        return timeRemain( helm.num );
+    end
+
+    return -1;
+end
+
+
+--- sleep
+-- @return ok
+-- @return err
+function RunQ:sleep()
+    local helm = self.heap:peek();
+
+    -- sleep until deadline
+    if helm then
+        return timeSleep( helm.num );
+    end
+
+    -- no need to sleep
+    return true;
 end
 
 
