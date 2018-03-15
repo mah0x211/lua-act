@@ -48,20 +48,12 @@ describe('test synops.runq module:', function()
 
     describe('test runq:consume method -', function()
         it('should be invoking the pushed items', function()
-            runq:push( a, 1 )
-            runq:push( b, 2 )
-            runq:push( c, 3 )
+            runq:push( a )
+            runq:push( b )
+            runq:push( c )
 
-            assert.are.equal( 3, runq:len() );
-            assert.are.equal( 2, runq:consume(-1) );
-            assert.are.equal( 2, runq:len() );
-            assert.are.equal( 3, runq:consume(-1) );
-            assert.are.equal( 1, runq:len() );
-            assert.are.equal( -1, runq:consume(-1) );
-            assert.are.equal( 0, runq:len() );
-
+            assert.are.equal( -1, runq:consume() );
             assert.are.same( {}, runq.ref );
-
             assert.are.same( { 'a', 'b', 'c' }, res );
         end);
     end)
