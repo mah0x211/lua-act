@@ -42,7 +42,7 @@ local SYNOPS_CTX;
 -- @param atexit
 -- @param fn
 -- @param ...
--- @return ok
+-- @return cid
 -- @return err
 local function spawn( atexit, fn, ... )
     local callee = SYNOPS_CTX.pool:pop();
@@ -55,7 +55,7 @@ local function spawn( atexit, fn, ... )
     else
         callee, err = Callee.new( SYNOPS_CTX, atexit, fn, ... );
         if err then
-            return false, err;
+            return nil, err;
         end
     end
 
@@ -63,11 +63,11 @@ local function spawn( atexit, fn, ... )
     if not atexit then
         ok, err = SYNOPS_CTX.runq:push( callee );
         if not ok then
-            return false, err;
+            return nil, err;
         end
     end
 
-    return true;
+    return callee.cid;
 end
 
 
@@ -107,7 +107,7 @@ end
 --- spawn
 -- @param fn
 -- @param ...
--- @return ok
+-- @return cid
 -- @return err
 function Synops.spawn( fn, ... )
     if Callee.acquire() then
@@ -152,7 +152,9 @@ end
 -- @return err
 function Synops.atexit( fn, ... )
     if Callee.acquire() then
-        return spawn( true, fn, ... );
+        local _, err = spawn( true, fn, ... );
+
+        return not err, err
     end
 
     error( 'cannot call atexit() at outside of execution context', 2 );
