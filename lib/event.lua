@@ -85,7 +85,7 @@ end
 -- @param callee
 -- @param signo
 -- @param oneshot
--- @return id
+-- @return ev
 -- @return err
 function Event:signal( callee, signo, oneshot )
     return self:register( callee, 'assignal', signo, oneshot );
@@ -96,7 +96,7 @@ end
 -- @param callee
 -- @param ival
 -- @param oneshot
--- @return id
+-- @return ev
 -- @return err
 function Event:timer( callee, ival, oneshot )
     return self:register( callee, 'astimer', ival, oneshot );
@@ -107,7 +107,7 @@ end
 -- @param callee
 -- @param fd
 -- @param oneshot
--- @return id
+-- @return ev
 -- @return err
 function Event:writable( callee, fd, oneshot )
     return self:register( callee, 'aswritable', fd, oneshot );
@@ -118,7 +118,7 @@ end
 -- @param callee
 -- @param fd
 -- @param oneshot
--- @return id
+-- @return ev
 -- @return err
 function Event:readable( callee, fd, oneshot )
     return self:register( callee, 'asreadable', fd, oneshot );
