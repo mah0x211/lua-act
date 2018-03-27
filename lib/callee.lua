@@ -422,6 +422,8 @@ local function ioable( self, operators, asa, fd, msec )
 
         -- found an event from another callee
         if ev then
+            -- change context
+            ev:context( self );
             -- remove ev from anothor callee
             callee.events[asa][fd] = nil;
         else
