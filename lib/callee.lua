@@ -51,6 +51,8 @@ local SUSPENDED = setmetatable({},{
 });
 local RLOCKS = {};
 local WLOCKS = {};
+local ROPERATORS = {};
+local WOPERATORS = {};
 local CURRENT_CALLEE;
 
 
@@ -155,15 +157,19 @@ function Callee:dispose( ok )
         self.sigset = nil;
     end
 
-    -- revoke io events
-    for _ = 1, #self.pool do
-        local ioev = self.pool:pop();
-        local fd = ioev:ident();
-
-        self.revs[fd] = nil;
-        self.wevs[fd] = nil;
-        event:revoke( ioev );
+    -- revoke readable events
+    for fd, ev in pairs( self.events.readable ) do
+        ROPERATORS[fd] = nil;
+        event:revoke( ev );
     end
+    self.events.readable = {};
+
+    -- revoke writable events
+    for fd, ev in pairs( self.events.writable ) do
+        WOPERATORS[fd] = nil;
+        event:revoke( ev );
+    end
+    self.events.writable = {};
 
     -- dispose child coroutines
     for _ = 1, #self.node do
@@ -378,93 +384,99 @@ end
 
 --- ioable
 -- @param self
--- @param evs
+-- @param operators
 -- @param asa
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-local function ioable( self, evs, asa, fd, msec )
+local function ioable( self, operators, asa, fd, msec )
     local runq = self.synops.runq;
     local event = self.synops.event;
-    local item = evs[fd];
-    local op, ev, fdno, disabled;
+    local events = self.events;
+    local ev = events[asa][fd];
+    local op, fdno, disabled;
 
-    -- register to runq
-    if msec then
-        local ok, err = runq:push( self, msec );
+    -- event not found
+    if not ev then
+        local callee = operators[fd];
 
-        if not ok then
-            return false, err;
-        end
-    end
-
-    if item then
-        local ok, err;
-
-        ev = item:data();
-        ok, err = ev:watch();
-        if not ok then
-            if msec then
-                runq:remove( self );
+        -- another callee has an 'asa' event of fd
+        if callee then
+            -- currently in-use
+            if callee.events.inuse == fd then
+                return false, 'operation already in progress';
             end
-
-            evs[fd] = nil;
-            self.pool:remove( item );
-            event:revoke( ev );
-
-            return false, err;
+            ev = callee.events[asa][fd];
         end
-    -- register io(readable or writable) event
-    else
-        local err;
 
-        ev, err = event[asa]( event, self, fd );
-        if err then
-            if msec then
-                runq:remove( self );
+        -- register to runq
+        if msec then
+            local ok, err = runq:push( self, msec );
+
+            if not ok then
+                return false, err;
             end
-
-            return false, err;
         end
 
-        item = self.pool:push( ev );
-        evs[fd] = item;
+        -- found an event from another callee
+        if ev then
+            -- remove ev from anothor callee
+            callee.events[asa][fd] = nil;
+        else
+            local err;
+
+            -- register io(readable or writable) event
+            ev, err = event[asa]( event, self, fd );
+            if err then
+                if msec then
+                    runq:remove( self );
+                end
+
+                return false, err;
+            end
+        end
+
+        -- save to local and global table
+        events.inuse = fd;
+        events[asa][fd] = ev;
+        operators[fd] = self;
     end
 
     -- wait until event fired
     op, fdno, disabled = yield();
+    events.inuse = -1;
 
     -- got io event
-    if op == OP_EVENT and fdno == fd then
-        -- remove from runq
-        if msec then
-            runq:remove( self );
-        end
+    if op == OP_EVENT then
+        if fdno == fd then
+            -- remove from runq
+            if msec then
+                runq:remove( self );
+            end
 
-        if disabled then
-            evs[fd] = nil;
-            self.pool:remove( item );
-            event:revoke( ev );
-        else
-            ev:unwatch();
-        end
+            if disabled then
+                events[asa][fd] = nil;
+                operators[fd] = nil;
+                event:revoke( ev );
+            end
 
-        return true;
+            return true;
+        end
     -- timed out
     elseif op == OP_RUNQ then
-        ev:unwatch();
         return false, nil, true;
+    end
+
     -- remove from runq
-    elseif msec then
+    if msec then
         runq:remove( self );
     end
 
     -- revoke io event
-    -- unwatch io event
-    evs[fd] = nil;
-    self.pool:remove( item );
+    events[asa][fd] = nil;
+    operators[fd] = nil;
     event:revoke( ev );
 
     -- normally unreachable
@@ -479,7 +491,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:readable( fd, msec )
-    return ioable( self, self.revs, 'readable', fd, msec );
+    return ioable( self, ROPERATORS, 'readable', fd, msec );
 end
 
 
@@ -490,7 +502,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:writable( fd, msec )
-    return ioable( self, self.wevs, 'writable', fd, msec );
+    return ioable( self, WOPERATORS, 'writable', fd, msec );
 end
 
 
@@ -657,11 +669,13 @@ local function new( synops, atexit, fn, ... )
         co = co,
         argv = Argv.new(),
         node = Deque.new(),
-        pool = Deque.new(),
         rlock = {},
         wlock = {},
-        revs = {},
-        wevs = {}
+        events = {
+            inuse = -1,
+            readable = {},
+            writable = {},
+        }
     }, {
         __index = Callee
     });
