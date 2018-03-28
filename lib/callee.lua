@@ -51,8 +51,10 @@ local SUSPENDED = setmetatable({},{
 });
 local RLOCKS = {};
 local WLOCKS = {};
-local ROPERATORS = {};
-local WOPERATORS = {};
+local OPERATORS = {
+    readable = {},
+    writable = {}
+};
 local CURRENT_CALLEE;
 
 
@@ -104,6 +106,34 @@ end
 local Callee = {};
 
 
+--- revoke
+function Callee:revoke()
+    local event = self.synops.event;
+
+    -- revoke signal events
+    if self.sigset then
+        local sigset = self.sigset;
+
+        for _ = 1, #sigset do
+            event:revoke( sigset:pop() );
+        end
+        self.sigset = nil;
+    end
+
+    -- revoke io event
+    if self.evfd ~= -1 then
+        local ev = self.ev;
+
+        OPERATORS[self.evasa][self.evfd] = nil;
+        self.ev = nil;
+        self.evfd = -1;
+        self.evasa = '';
+        self.evuse = false;
+        event:revoke( ev );
+    end
+end
+
+
 --- __call
 function Callee:call( ... )
     local co = self.co;
@@ -126,7 +156,6 @@ end
 -- @param ok
 function Callee:dispose( ok )
     local runq = self.synops.runq;
-    local event = self.synops.event;
 
     runq:remove( self );
     -- remove state properties
@@ -149,27 +178,8 @@ function Callee:dispose( ok )
     end
     self.wlock = {};
 
-    -- revoke signal events
-    if self.sigset then
-        for _ = 1, #self.sigset do
-            event:revoke( self.sigset:pop() );
-        end
-        self.sigset = nil;
-    end
-
-    -- revoke readable events
-    for fd, ev in pairs( self.events.readable ) do
-        ROPERATORS[fd] = nil;
-        event:revoke( ev );
-    end
-    self.events.readable = {};
-
-    -- revoke writable events
-    for fd, ev in pairs( self.events.writable ) do
-        WOPERATORS[fd] = nil;
-        event:revoke( ev );
-    end
-    self.events.writable = {};
+    -- revoke all events currently in use
+    self:revoke();
 
     -- dispose child coroutines
     for _ = 1, #self.node do
@@ -394,21 +404,33 @@ end
 local function ioable( self, operators, asa, fd, msec )
     local runq = self.synops.runq;
     local event = self.synops.event;
-    local events = self.events;
-    local ev = events[asa][fd];
     local op, fdno, disabled;
 
-    -- event not found
-    if not ev then
+    -- fd is not watching yet
+    if self.evfd ~= fd or self.evasa ~= asa then
         local callee = operators[fd];
+
+        -- revoke retained event
+        self:revoke();
 
         -- another callee has an 'asa' event of fd
         if callee then
             -- currently in-use
-            if callee.events.inuse == fd then
+            if callee.evuse then
                 return false, 'operation already in progress';
             end
-            ev = callee.events[asa][fd];
+
+            -- retain ev and related info
+            self.ev = callee.ev;
+            self.evfd = fd;
+            self.evasa = asa;
+            operators[fd] = self;
+            self.ev:context( self );
+
+            -- remove ev and related info
+            callee.ev = nil;
+            callee.evfd = -1;
+            callee.evasa = '';
         end
 
         -- register to runq
@@ -420,17 +442,10 @@ local function ioable( self, operators, asa, fd, msec )
             end
         end
 
-        -- found an event from another callee
-        if ev then
-            -- change context
-            ev:context( self );
-            -- remove ev from anothor callee
-            callee.events[asa][fd] = nil;
-        else
-            local err;
+        -- register io(readable or writable) event
+        if not self.ev then
+            local ev, err = event[asa]( event, self, fd );
 
-            -- register io(readable or writable) event
-            ev, err = event[asa]( event, self, fd );
             if err then
                 if msec then
                     runq:remove( self );
@@ -438,17 +453,19 @@ local function ioable( self, operators, asa, fd, msec )
 
                 return false, err;
             end
-        end
 
-        -- save to local and global table
-        events.inuse = fd;
-        events[asa][fd] = ev;
-        operators[fd] = self;
+            -- retain ev and related info
+            self.ev = ev;
+            self.evfd = fd;
+            self.evasa = asa;
+            operators[fd] = self;
+        end
     end
 
+    self.evuse = true;
     -- wait until event fired
     op, fdno, disabled = yield();
-    events.inuse = -1;
+    self.evuse = false;
 
     -- got io event
     if op == OP_EVENT then
@@ -459,9 +476,7 @@ local function ioable( self, operators, asa, fd, msec )
             end
 
             if disabled then
-                events[asa][fd] = nil;
-                operators[fd] = nil;
-                event:revoke( ev );
+                self:revoke();
             end
 
             return true;
@@ -476,10 +491,8 @@ local function ioable( self, operators, asa, fd, msec )
         runq:remove( self );
     end
 
-    -- revoke io event
-    events[asa][fd] = nil;
-    operators[fd] = nil;
-    event:revoke( ev );
+    -- revoke event
+    self:revoke();
 
     -- normally unreachable
     error( 'invalid implements' );
@@ -493,7 +506,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:readable( fd, msec )
-    return ioable( self, ROPERATORS, 'readable', fd, msec );
+    return ioable( self, OPERATORS.readable, 'readable', fd, msec );
 end
 
 
@@ -504,7 +517,7 @@ end
 -- @return err
 -- @return timeout
 function Callee:writable( fd, msec )
-    return ioable( self, WOPERATORS, 'writable', fd, msec );
+    return ioable( self, OPERATORS.writable, 'writable', fd, msec );
 end
 
 
@@ -573,6 +586,9 @@ function Callee:sigwait( msec, ... )
     else
         local op, signo;
 
+        -- revoke all events currently in use
+        self:revoke();
+        -- wait signal events
         self.sigset = sigset;
         op, signo = yield();
         self.sigset = nil;
@@ -673,11 +689,10 @@ local function new( synops, atexit, fn, ... )
         node = Deque.new(),
         rlock = {},
         wlock = {},
-        events = {
-            inuse = -1,
-            readable = {},
-            writable = {},
-        }
+        -- ev = [event object]
+        evfd = -1,
+        evasa = '', -- '', 'readable' or 'writable'
+        evuse = false, -- true or false
     }, {
         __index = Callee
     });
