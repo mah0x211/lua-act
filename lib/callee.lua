@@ -242,6 +242,8 @@ end
 -- @return ...
 function Callee:await()
     if #self.node > 0 then
+        -- revoke all events currently in use
+        self:revoke();
         self.wait = true;
         return yield();
     end
@@ -267,6 +269,8 @@ function Callee:suspend( msec )
         end
     end
 
+    -- revoke all events currently in use
+    self:revoke();
     -- wait until resumed by resume method
     SUSPENDED[cid] = self;
     if yield() == OP_RUNQ then
@@ -294,7 +298,11 @@ function Callee:later()
 
     if not ok then
         return false, err;
-    elseif yield() == OP_RUNQ then
+    end
+
+    -- revoke all events currently in use
+    self:revoke();
+    if yield() == OP_RUNQ then
         return true;
     end
 
@@ -530,7 +538,11 @@ function Callee:sleep( msec )
 
     if not ok then
         return false, err;
-    elseif yield() == OP_RUNQ then
+    end
+
+    -- revoke all events currently in use
+    self:revoke();
+    if yield() == OP_RUNQ then
         return true;
     end
 
