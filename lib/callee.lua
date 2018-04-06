@@ -400,6 +400,71 @@ function Callee:writelock( fd, msec )
 end
 
 
+--- closefd
+-- @param self
+-- @param operators
+-- @param fd
+-- @return ok
+-- @return err
+local function closefd( self, operators, fd )
+    local callee = operators[fd];
+
+    -- found
+    if callee then
+        operators[fd] = nil;
+        self.synops.runq:remove( callee );
+        self.synops.event:revoke( callee.ev );
+        -- reset event properties
+        callee.ev = nil;
+        callee.evfd = -1;
+        -- currently in-use
+        if callee.evuse then
+            callee.evuse = false;
+            callee.evasa = 'closefd';
+            -- requeue without timeout
+            return self.synops.runq:push( callee );
+        end
+        callee.evasa = '';
+    end
+
+    return true;
+end
+
+
+--- closer
+-- @param fd
+-- @return ok
+-- @return err
+function Callee:closer( fd )
+    return closefd( self, OPERATORS.readable, fd );
+end
+
+
+--- closew
+-- @param fd
+-- @return ok
+-- @return err
+function Callee:closew( fd )
+    return closefd( self, OPERATORS.writable, fd );
+end
+
+
+--- close
+-- @param fd
+-- @return ok
+-- @return err
+function Callee:close( fd )
+    local _, rerr = closefd( self, OPERATORS.readable, fd );
+    local _, werr = closefd( self, OPERATORS.writable, fd );
+
+    if not rerr and not werr then
+        return true;
+    end
+
+    return false, rerr or werr;
+end
+
+
 --- ioable
 -- @param self
 -- @param operators
@@ -489,9 +554,15 @@ local function ioable( self, operators, asa, fd, msec )
 
             return true;
         end
-    -- timed out
     elseif op == OP_RUNQ then
-        return false, nil, true;
+        -- revoked by closefd
+        if self.evasa == 'closefd' then
+            self.evasa = '';
+            return false;
+        -- timed out
+        elseif msec then
+            return false, nil, true;
+        end
     end
 
     -- remove from runq
