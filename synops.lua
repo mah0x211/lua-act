@@ -296,6 +296,51 @@ function Synops.writeunlock( fd )
 end
 
 
+--- closer
+-- @param fd
+-- @return ok
+-- @return err
+function Synops.closer( fd )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:closer( fd );
+    end
+
+    error( 'cannot call closer() from outside of execution context', 2 );
+end
+
+
+--- closew
+-- @param fd
+-- @return ok
+-- @return err
+function Synops.closew( fd )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:closew( fd );
+    end
+
+    error( 'cannot call closew() from outside of execution context', 2 );
+end
+
+
+--- close
+-- @param fd
+-- @return ok
+-- @return err
+function Synops.close( fd )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:close( fd );
+    end
+
+    error( 'cannot call close() from outside of execution context', 2 );
+end
+
+
 --- readable
 -- @param fd
 -- @param msec
