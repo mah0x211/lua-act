@@ -236,142 +236,142 @@ function Synops.sigwait( msec, ... )
 end
 
 
---- readlock
+--- readLock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.readlock( fd, msec )
+function Synops.readLock( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readlock( fd, msec );
+        return callee:readLock( fd, msec );
     end
 
-    error( 'cannot call readlock() from outside of execution context', 2 );
+    error( 'cannot call readLock() from outside of execution context', 2 );
 end
 
 
---- readunlock
+--- readUnlock
 -- @param fd
-function Synops.readunlock( fd )
+function Synops.readUnlock( fd )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readunlock( fd );
+        return callee:readUnlock( fd );
     end
 
-    error( 'cannot call readunlock() from outside of execution context', 2 );
+    error( 'cannot call readUnlock() from outside of execution context', 2 );
 end
 
 
---- writelock
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
-function Synops.writelock( fd, msec )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:writelock( fd, msec );
-    end
-
-    error( 'cannot call writelock() from outside of execution context', 2 );
-end
-
-
---- writeunlock
--- @param fd
-function Synops.writeunlock( fd )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:writeunlock( fd );
-    end
-
-    error( 'cannot call writeunlock() from outside of execution context', 2 );
-end
-
-
---- closer
--- @param fd
--- @return ok
--- @return err
-function Synops.closer( fd )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:closer( fd );
-    end
-
-    error( 'cannot call closer() from outside of execution context', 2 );
-end
-
-
---- closew
--- @param fd
--- @return ok
--- @return err
-function Synops.closew( fd )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:closew( fd );
-    end
-
-    error( 'cannot call closew() from outside of execution context', 2 );
-end
-
-
---- close
--- @param fd
--- @return ok
--- @return err
-function Synops.close( fd )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:close( fd );
-    end
-
-    error( 'cannot call close() from outside of execution context', 2 );
-end
-
-
---- readable
+--- writeLock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.readable( fd, msec )
+function Synops.writeLock( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:readable( fd, msec );
+        return callee:writeLock( fd, msec );
     end
 
-    error( 'cannot call readable() from outside of execution context', 2 );
+    error( 'cannot call writeLock() from outside of execution context', 2 );
 end
 
 
---- writable
+--- writeUnlock
+-- @param fd
+function Synops.writeUnlock( fd )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:writeUnlock( fd );
+    end
+
+    error( 'cannot call writeUnlock() from outside of execution context', 2 );
+end
+
+
+--- unwaitReadable
+-- @param fd
+-- @return ok
+-- @return err
+function Synops.unwaitReadable( fd )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:unwaitReadable( fd );
+    end
+
+    error( 'cannot call unwaitReadable() from outside of execution context', 2 );
+end
+
+
+--- unwaitWritable
+-- @param fd
+-- @return ok
+-- @return err
+function Synops.unwaitWritable( fd )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:unwaitWritable( fd );
+    end
+
+    error( 'cannot call unwaitWritable() from outside of execution context', 2 );
+end
+
+
+--- unwait
+-- @param fd
+-- @return ok
+-- @return err
+function Synops.unwait( fd )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:unwait( fd );
+    end
+
+    error( 'cannot call unwait() from outside of execution context', 2 );
+end
+
+
+--- waitReadable
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.writable( fd, msec )
+function Synops.waitReadable( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
-        return callee:writable( fd, msec );
+        return callee:waitReadable( fd, msec );
     end
 
-    error( 'cannot call writable() from outside of execution context', 2 );
+    error( 'cannot call waitReadable() from outside of execution context', 2 );
+end
+
+
+--- waitWritable
+-- @param fd
+-- @param msec
+-- @return ok
+-- @return err
+-- @return timeout
+function Synops.waitWritable( fd, msec )
+    local callee = Callee.acquire();
+
+    if callee then
+        return callee:waitWritable( fd, msec );
+    end
+
+    error( 'cannot call waitWritable() from outside of execution context', 2 );
 end
 
 

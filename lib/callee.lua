@@ -329,16 +329,16 @@ local function rwunlock( self, locks, asa, fd )
 end
 
 
---- readunlock
+--- readUnlock
 -- @param fd
-function Callee:readunlock( fd )
+function Callee:readUnlock( fd )
     rwunlock( self, RLOCKS, 'rlock', fd );
 end
 
 
---- writeunlock
+--- writeUnlock
 -- @param fd
-function Callee:writeunlock( fd )
+function Callee:writeUnlock( fd )
     rwunlock( self, WLOCKS, 'wlock', fd );
 end
 
@@ -378,35 +378,35 @@ local function rwlock( self, locks, asa, fd, msec )
 end
 
 
---- readlock
+--- readLock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:readlock( fd, msec )
+function Callee:readLock( fd, msec )
     return rwlock( self, RLOCKS, 'rlock', fd, msec );
 end
 
 
---- writelock
+--- writeLock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writelock( fd, msec )
+function Callee:writeLock( fd, msec )
     return rwlock( self, WLOCKS, 'wlock', fd, msec );
 end
 
 
---- closefd
+--- unwaitfd
 -- @param self
 -- @param operators
 -- @param fd
 -- @return ok
 -- @return err
-local function closefd( self, operators, fd )
+local function unwaitfd( self, operators, fd )
     local callee = operators[fd];
 
     -- found
@@ -420,7 +420,7 @@ local function closefd( self, operators, fd )
         -- currently in-use
         if callee.evuse then
             callee.evuse = false;
-            callee.evasa = 'closefd';
+            callee.evasa = 'unwaitfd';
             -- requeue without timeout
             return self.synops.runq:push( callee );
         end
@@ -431,31 +431,31 @@ local function closefd( self, operators, fd )
 end
 
 
---- closer
+--- unwaitReadable
 -- @param fd
 -- @return ok
 -- @return err
-function Callee:closer( fd )
-    return closefd( self, OPERATORS.readable, fd );
+function Callee:unwaitReadable( fd )
+    return unwaitfd( self, OPERATORS.readable, fd );
 end
 
 
---- closew
+--- unwaitWritable
 -- @param fd
 -- @return ok
 -- @return err
-function Callee:closew( fd )
-    return closefd( self, OPERATORS.writable, fd );
+function Callee:unwaitWritable( fd )
+    return unwaitfd( self, OPERATORS.writable, fd );
 end
 
 
---- close
+--- unwait
 -- @param fd
 -- @return ok
 -- @return err
-function Callee:close( fd )
-    local _, rerr = closefd( self, OPERATORS.readable, fd );
-    local _, werr = closefd( self, OPERATORS.writable, fd );
+function Callee:unwait( fd )
+    local _, rerr = unwaitfd( self, OPERATORS.readable, fd );
+    local _, werr = unwaitfd( self, OPERATORS.writable, fd );
 
     if not rerr and not werr then
         return true;
@@ -465,7 +465,7 @@ function Callee:close( fd )
 end
 
 
---- ioable
+--- waitable
 -- @param self
 -- @param operators
 -- @param asa
@@ -474,7 +474,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-local function ioable( self, operators, asa, fd, msec )
+local function waitable( self, operators, asa, fd, msec )
     local runq = self.synops.runq;
     local event = self.synops.event;
     local op, fdno, disabled;
@@ -555,8 +555,8 @@ local function ioable( self, operators, asa, fd, msec )
             return true;
         end
     elseif op == OP_RUNQ then
-        -- revoked by closefd
-        if self.evasa == 'closefd' then
+        -- revoked by unwaitfd
+        if self.evasa == 'unwaitfd' then
             self.evasa = '';
             return false;
         -- timed out
@@ -578,25 +578,25 @@ local function ioable( self, operators, asa, fd, msec )
 end
 
 
---- readable
+--- waitReadable
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:readable( fd, msec )
-    return ioable( self, OPERATORS.readable, 'readable', fd, msec );
+function Callee:waitReadable( fd, msec )
+    return waitable( self, OPERATORS.readable, 'readable', fd, msec );
 end
 
 
---- writable
+--- waitWritable
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writable( fd, msec )
-    return ioable( self, OPERATORS.writable, 'writable', fd, msec );
+function Callee:waitWritable( fd, msec )
+    return waitable( self, OPERATORS.writable, 'writable', fd, msec );
 end
 
 
