@@ -20,7 +20,7 @@
  *  DEALINGS IN THE SOFTWARE.
  *
  *  coro.c
- *  lua-synops
+ *  lua-act
  *  Created by Masatoshi Teruya on 17/01/08.
  *
  */
@@ -35,7 +35,7 @@
 #include "lauxhlib.h"
 
 
-#define MODULE_MT   "synops.coro"
+#define MODULE_MT   "act.coro"
 
 
 typedef struct {
@@ -275,7 +275,7 @@ static int new_lua( lua_State *L )
 }
 
 
-LUALIB_API int luaopen_synops_coro( lua_State *L )
+LUALIB_API int luaopen_act_coro( lua_State *L )
 {
     struct luaL_Reg mmethod[] = {
         { "__gc", gc_lua },

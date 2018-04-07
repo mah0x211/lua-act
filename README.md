@@ -1,4 +1,4 @@
-lua-synops
+lua-act
 ===
 
 coroutine based synchronously non-blocking operations module.

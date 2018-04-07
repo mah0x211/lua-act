@@ -20,7 +20,7 @@
  *  DEALINGS IN THE SOFTWARE.
  *
  *  aux_fileno.c
- *  lua-synops
+ *  lua-act
  *  Created by Masatoshi Teruya on 17/03/19.
  *
  */
@@ -44,7 +44,7 @@ static int fileno_lua( lua_State *L )
 }
 
 
-LUALIB_API int luaopen_synops_aux_fileno( lua_State *L )
+LUALIB_API int luaopen_act_aux_fileno( lua_State *L )
 {
     lua_pushcfunction( L, fileno_lua );
 

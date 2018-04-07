@@ -21,7 +21,7 @@
   THE SOFTWARE.
 
   lib/aux.lua
-  lua-synops
+  lua-act
   Created by Masatoshi Teruya on 17/03/04.
 
 --]]

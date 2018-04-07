@@ -20,8 +20,8 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
 
-  synops.lua
-  lua-synops
+  act.lua
+  lua-act
   Created by Masatoshi Teruya on 16/12/25.
 
 --]]
@@ -30,12 +30,12 @@ require('nosigpipe');
 --- file scope variables
 local Deque = require('deque');
 local fork = require('process').fork;
-local RunQ = require('synops.runq');
-local Event = require('synops.event');
-local Callee = require('synops.callee');
+local RunQ = require('act.runq');
+local Event = require('act.event');
+local Callee = require('act.callee');
 local setmetatable = setmetatable;
 --- constants
-local SYNOPS_CTX;
+local ACT_CTX;
 
 
 --- spawn
@@ -45,7 +45,7 @@ local SYNOPS_CTX;
 -- @return cid
 -- @return err
 local function spawn( atexit, fn, ... )
-    local callee = SYNOPS_CTX.pool:pop();
+    local callee = ACT_CTX.pool:pop();
     local ok, err;
 
     -- use pooled callee
@@ -53,7 +53,7 @@ local function spawn( atexit, fn, ... )
         callee:init( atexit, fn, ... );
     -- create new callee
     else
-        callee, err = Callee.new( SYNOPS_CTX, atexit, fn, ... );
+        callee, err = Callee.new( ACT_CTX, atexit, fn, ... );
         if err then
             return nil, err;
         end
@@ -61,7 +61,7 @@ local function spawn( atexit, fn, ... )
 
     -- push to runq if not atexit
     if not atexit then
-        ok, err = SYNOPS_CTX.runq:push( callee );
+        ok, err = ACT_CTX.runq:push( callee );
         if not ok then
             return nil, err;
         end
@@ -71,13 +71,13 @@ local function spawn( atexit, fn, ... )
 end
 
 
---- class Synops
-local Synops = {};
+--- class Act
+local Act = {};
 
 
 --- pollable
 -- @return ok
-function Synops.pollable()
+function Act.pollable()
     return Callee.acquire() and true or false;
 end
 
@@ -86,7 +86,7 @@ end
 -- @return pid
 -- @return err
 -- @return again
-function Synops.fork()
+function Act.fork()
     if Callee.acquire() then
         local pid, err, again = fork();
 
@@ -94,7 +94,7 @@ function Synops.fork()
             return nil, err, again;
         -- child process must be rebuilding event properties
         elseif pid == 0 then
-            SYNOPS_CTX.event:renew();
+            ACT_CTX.event:renew();
         end
 
         return pid;
@@ -109,7 +109,7 @@ end
 -- @param ...
 -- @return cid
 -- @return err
-function Synops.spawn( fn, ... )
+function Act.spawn( fn, ... )
     if Callee.acquire() then
         return spawn( false, fn, ... );
     end
@@ -120,7 +120,7 @@ end
 
 --- exit
 -- @param ...
-function Synops.exit( ... )
+function Act.exit( ... )
     local callee = Callee.acquire();
 
     if callee then
@@ -134,7 +134,7 @@ end
 --- later
 -- @return ok
 -- @return err
-function Synops.later()
+function Act.later()
     local callee = Callee.acquire();
 
     if callee then
@@ -150,7 +150,7 @@ end
 -- @param ...
 -- @return ok
 -- @return err
-function Synops.atexit( fn, ... )
+function Act.atexit( fn, ... )
     if Callee.acquire() then
         local _, err = spawn( true, fn, ... );
 
@@ -164,7 +164,7 @@ end
 --- await
 -- @return ok
 -- @return ...
-function Synops.await()
+function Act.await()
     local callee = Callee.acquire();
 
     if callee then
@@ -180,7 +180,7 @@ end
 -- @return ok
 -- @return ...
 -- @return timeout
-function Synops.suspend( msec )
+function Act.suspend( msec )
     local callee = Callee.acquire();
 
     if callee then
@@ -195,7 +195,7 @@ end
 -- @param cid
 -- @param ...
 -- @return ok
-function Synops.resume( cid, ... )
+function Act.resume( cid, ... )
     if Callee.acquire() then
         return Callee.resume( cid, ... );
     end
@@ -208,7 +208,7 @@ end
 -- @param msec
 -- @return ok
 -- @return err
-function Synops.sleep( msec )
+function Act.sleep( msec )
     local callee = Callee.acquire();
 
     if callee then
@@ -225,7 +225,7 @@ end
 -- @return signo
 -- @return err
 -- @return timeout
-function Synops.sigwait( msec, ... )
+function Act.sigwait( msec, ... )
     local callee = Callee.acquire();
 
     if callee then
@@ -242,7 +242,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.readLock( fd, msec )
+function Act.readLock( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
@@ -255,7 +255,7 @@ end
 
 --- readUnlock
 -- @param fd
-function Synops.readUnlock( fd )
+function Act.readUnlock( fd )
     local callee = Callee.acquire();
 
     if callee then
@@ -272,7 +272,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.writeLock( fd, msec )
+function Act.writeLock( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
@@ -285,7 +285,7 @@ end
 
 --- writeUnlock
 -- @param fd
-function Synops.writeUnlock( fd )
+function Act.writeUnlock( fd )
     local callee = Callee.acquire();
 
     if callee then
@@ -300,7 +300,7 @@ end
 -- @param fd
 -- @return ok
 -- @return err
-function Synops.unwaitReadable( fd )
+function Act.unwaitReadable( fd )
     if Callee.acquire() then
         return Callee.unwaitReadable( fd );
     end
@@ -313,7 +313,7 @@ end
 -- @param fd
 -- @return ok
 -- @return err
-function Synops.unwaitWritable( fd )
+function Act.unwaitWritable( fd )
     if Callee.acquire() then
         return Callee.unwaitWritable( fd );
     end
@@ -326,7 +326,7 @@ end
 -- @param fd
 -- @return ok
 -- @return err
-function Synops.unwait( fd )
+function Act.unwait( fd )
     if Callee.acquire() then
         return Callee.unwait( fd );
     end
@@ -341,7 +341,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.waitReadable( fd, msec )
+function Act.waitReadable( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
@@ -358,7 +358,7 @@ end
 -- @return ok
 -- @return err
 -- @return timeout
-function Synops.waitWritable( fd, msec )
+function Act.waitWritable( fd, msec )
     local callee = Callee.acquire();
 
     if callee then
@@ -371,7 +371,7 @@ end
 
 --- getcid
 -- @return cid
-function Synops.getcid()
+function Act.getcid()
     local callee = Callee.acquire();
 
     if callee then
@@ -393,8 +393,8 @@ local function runloop( fn, ... )
     -- check first argument
     assert( type( fn ) == 'function', 'fn must be function' );
 
-    if SYNOPS_CTX then
-        return false, 'synops run already';
+    if ACT_CTX then
+        return false, 'act run already';
     end
 
     -- create event
@@ -403,9 +403,9 @@ local function runloop( fn, ... )
         return false, err;
     end
 
-    -- create synops context
+    -- create act context
     runq = RunQ.new();
-    SYNOPS_CTX = setmetatable({
+    ACT_CTX = setmetatable({
         event = event,
         runq = runq,
         pool = Deque.new()
@@ -421,7 +421,7 @@ local function runloop( fn, ... )
         return false, err;
     end
 
-    -- run synops scheduler
+    -- run act scheduler
     while true do
         -- consume runq
         local msec = runq:consume();
@@ -455,10 +455,10 @@ end
 -- @param ...
 -- @return ok
 -- @return err
-function Synops.run( fn, ... )
+function Act.run( fn, ... )
     local ok, rv, err = pcall( runloop, fn, ... );
 
-    SYNOPS_CTX = nil;
+    ACT_CTX = nil;
     if ok then
         return rv, err;
     end
@@ -468,4 +468,4 @@ end
 
 
 -- exports
-return Synops;
+return Act;

@@ -20,13 +20,13 @@
  *  DEALINGS IN THE SOFTWARE.
  *
  *  hrtimer.h
- *  lua-synops
+ *  lua-act
  *  Created by Masatoshi Teruya on 17/03/05.
  *
  */
 
-#ifndef synops_hrtimer_h
-#define synops_hrtimer_h
+#ifndef act_hrtimer_h
+#define act_hrtimer_h
 
 #include <stdint.h>
 #include <time.h>

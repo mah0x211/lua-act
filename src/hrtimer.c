@@ -20,7 +20,7 @@
  *  DEALINGS IN THE SOFTWARE.
  *
  *  hrtimer.c
- *  lua-synops
+ *  lua-act
  *  Created by Masatoshi Teruya on 17/03/05.
  *
  */
@@ -86,7 +86,7 @@ static int now_lua( lua_State *L )
 }
 
 
-LUALIB_API int luaopen_synops_hrtimer( lua_State *L )
+LUALIB_API int luaopen_act_hrtimer( lua_State *L )
 {
     lua_newtable( L );
     lauxh_pushfn2tbl( L, "now", now_lua );

@@ -21,7 +21,7 @@
   THE SOFTWARE.
 
   lib/event.lua
-  lua-synops
+  lua-act
   Created by Masatoshi Teruya on 16/12/25.
 
 --]]
@@ -29,7 +29,7 @@
 --- file scope variables
 local Deque = require('deque');
 local Sentry = require('sentry');
-local OP_EVENT = require('synops.aux').OP_EVENT;
+local OP_EVENT = require('act.aux').OP_EVENT;
 local setmetatable = setmetatable;
 
 

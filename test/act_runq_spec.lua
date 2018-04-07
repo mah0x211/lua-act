@@ -1,16 +1,16 @@
 --[[
 
-  test/synops_runq_spec.lua
+  test/act_runq_spec.lua
   lua-coop
   Created by Masatoshi Teruya on 17/01/4.
 
 --]]
 --- file scope variables
-local SynopsRunQ = require('synops.runq')
+local ActRunQ = require('act.runq')
 
 
-describe('test synops.runq module:', function()
-    local runq = SynopsRunQ.new()
+describe('test act.runq module:', function()
+    local runq = ActRunQ.new()
     local res = {}
     local a = { call = function() res[1] = 'a' end }
     local b = { call = function() res[2] = 'b' end }

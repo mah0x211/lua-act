@@ -1,11 +1,11 @@
-package = "synops"
+package = "act"
 version = "scm-1"
 source = {
-    url = "gitrec://github.com/mah0x211/lua-synops.git"
+    url = "gitrec://github.com/mah0x211/lua-act.git"
 }
 description = {
     summary = "coroutine based synchronously non-blocking operations module",
-    homepage = "https://github.com/mah0x211/lua-synops",
+    homepage = "https://github.com/mah0x211/lua-act",
     license = "MIT/X11",
     maintainer = "Masatoshi Teruya"
 }
@@ -22,27 +22,27 @@ build = {
     type = "builtin",
     install = {
         bin = {
-            synops = "bin/synops.lua"
+            act = "bin/act.lua"
         }
     },
     modules = {
-        synops = "synops.lua",
-        ['synops.aux'] = "lib/aux.lua",
-        ['synops.aux.fileno'] = {
+        act = "act.lua",
+        ['act.aux'] = "lib/aux.lua",
+        ['act.aux.fileno'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/aux_fileno.c" }
         },
-        ['synops.callee'] = "lib/callee.lua",
-        ['synops.coro'] = {
+        ['act.callee'] = "lib/callee.lua",
+        ['act.coro'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/coro.c" }
         },
-        ['synops.event'] = "lib/event.lua",
-        ['synops.hrtimer'] = {
+        ['act.event'] = "lib/event.lua",
+        ['act.hrtimer'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
         },
-        ['synops.runq'] = "lib/runq.lua",
+        ['act.runq'] = "lib/runq.lua",
         -- Temporary Measures
         -- To avoid module namespace collisions, building the dependent modules
         -- by this rockspec.

@@ -20,30 +20,30 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
 
-  bin/synops.lua
-  lua-synops
+  bin/act.lua
+  lua-act
   Created by Masatoshi Teruya on 17/03/18.
 
 --]]
 
 --- file scope variables
-local Synops = require('synops');
-local SynopsRun = Synops.run;
+local Act = require('act');
+local ActRun = Act.run;
 local loadfile = loadfile;
 local select = select;
 local USAGE = [[
-synops - coroutine based synchronously non-blocking operations module
-Usage: synops [filename] [arg, ...]
+act - coroutine based synchronously non-blocking operations module
+Usage: act [filename] [arg, ...]
 ]];
 
-Synops.run = nil;
+Act.run = nil;
 if not arg[1] then
     print( USAGE );
     os.exit(0);
 end
 
--- export APIs to global except Synops.run
-for k, v in pairs( Synops ) do
+-- export APIs to global except Act.run
+for k, v in pairs( Act ) do
     if type( k ) == 'string' and k ~= 'run' and
        type( v ) == 'function' then
         _G[k] = v;
@@ -52,7 +52,7 @@ end
 
 
 local fn = assert( loadfile( arg[1] ) );
-local ok, err = SynopsRun( fn, select( 2, ... ) );
+local ok, err = ActRun( fn, select( 2, ... ) );
 
 if not ok then
     print( err );

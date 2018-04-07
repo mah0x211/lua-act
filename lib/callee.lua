@@ -21,15 +21,15 @@
   THE SOFTWARE.
 
   lib/callee.lua
-  lua-synops
+  lua-act
   Created by Masatoshi Teruya on 16/12/26.
 
 --]]
 --- file scope variables
 local Argv = require('argv');
 local Deque = require('deque');
-local Aux = require('synops.aux');
-local Coro = require('synops.coro');
+local Aux = require('act.aux');
+local Coro = require('act.coro');
 local concat = Aux.concat;
 local isUInt = Aux.isUInt;
 local yield = coroutine.yield;
@@ -69,8 +69,8 @@ local function unwaitfd( operators, fd )
     -- found
     if callee then
         operators[fd] = nil;
-        callee.synops.runq:remove( callee );
-        callee.synops.event:revoke( callee.ev );
+        callee.act.runq:remove( callee );
+        callee.act.event:revoke( callee.ev );
         -- reset event properties
         callee.ev = nil;
         callee.evfd = -1;
@@ -79,7 +79,7 @@ local function unwaitfd( operators, fd )
             callee.evuse = false;
             callee.evasa = 'unwaitfd';
             -- requeue without timeout
-            return callee.synops.runq:push( callee );
+            return callee.act.runq:push( callee );
         end
         callee.evasa = '';
     end
@@ -134,8 +134,8 @@ local function resume( cid, ... )
         SUSPENDED[cid] = nil;
         callee.argv:set( 0, ... );
         -- resume via runq
-        callee.synops.runq:remove( callee );
-        callee.synops.runq:push( callee );
+        callee.act.runq:remove( callee );
+        callee.act.runq:push( callee );
 
         return true;
     end
@@ -171,7 +171,7 @@ local Callee = {};
 
 --- revoke
 function Callee:revoke()
-    local event = self.synops.event;
+    local event = self.act.event;
 
     -- revoke signal events
     if self.sigset then
@@ -218,7 +218,7 @@ end
 --- dispose
 -- @param ok
 function Callee:dispose( ok )
-    local runq = self.synops.runq;
+    local runq = self.act.runq;
 
     runq:remove( self );
     -- remove state properties
@@ -285,7 +285,7 @@ function Callee:dispose( ok )
     end
 
     -- add to pool for reuse
-    self.synops.pool:push( self );
+    self.act.pool:push( self );
 end
 
 
@@ -325,7 +325,7 @@ function Callee:suspend( msec )
 
     if msec ~= nil then
         -- suspend until reached to msec
-        local ok, err = self.synops.runq:push( self, msec );
+        local ok, err = self.act.runq:push( self, msec );
 
         if not ok then
             return false, err;
@@ -340,7 +340,7 @@ function Callee:suspend( msec )
         -- resumed by time-out if self exists in suspend list
         if SUSPENDED[cid] then
             SUSPENDED[cid] = nil;
-            self.synops.runq:remove( self );
+            self.act.runq:remove( self );
             return false, nil, true;
         end
 
@@ -357,7 +357,7 @@ end
 -- @return ok
 -- @return err
 function Callee:later()
-    local ok, err = self.synops.runq:push( self );
+    local ok, err = self.act.runq:push( self );
 
     if not ok then
         return false, err;
@@ -387,7 +387,7 @@ local function rwunlock( self, locks, asa, fd )
         self[asa][fd] = nil;
         -- remove cidq maintained by fd
         locks[fd] = nil;
-        resumeq( self.synops.runq, cidq );
+        resumeq( self.act.runq, cidq );
     end
 end
 
@@ -473,8 +473,8 @@ end
 -- @return err
 -- @return timeout
 local function waitable( self, operators, asa, fd, msec )
-    local runq = self.synops.runq;
-    local event = self.synops.event;
+    local runq = self.act.runq;
+    local event = self.act.event;
     local op, fdno, disabled;
 
     -- fd is not watching yet
@@ -603,7 +603,7 @@ end
 -- @return ok
 -- @return err
 function Callee:sleep( msec )
-    local ok, err = self.synops.runq:push( self, msec );
+    local ok, err = self.act.runq:push( self, msec );
 
     if not ok then
         return false, err;
@@ -627,8 +627,8 @@ end
 -- @return err
 -- @return timeout
 function Callee:sigwait( msec, ... )
-    local runq = self.synops.runq;
-    local event = self.synops.event;
+    local runq = self.act.runq;
+    local event = self.act.event;
     local sigset, sigmap;
 
     -- register to runq with msec
@@ -749,13 +749,13 @@ end
 
 
 --- new
--- @param synops
+-- @param act
 -- @param atexit
 -- @param fn
 -- @param ...
 -- @return callee
 -- @return err
-local function new( synops, atexit, fn, ... )
+local function new( act, atexit, fn, ... )
     local co, err = Coro.new( atexit, fn, ...  );
     local callee;
 
@@ -764,7 +764,7 @@ local function new( synops, atexit, fn, ... )
     end
 
     callee = setmetatable({
-        synops = synops,
+        act = act,
         co = co,
         argv = Argv.new(),
         node = Deque.new(),

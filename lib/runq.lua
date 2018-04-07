@@ -21,7 +21,7 @@
   THE SOFTWARE.
 
   lib/runq.lua
-  lua-synops
+  lua-act
   Created by Masatoshi Teruya on 16/12/24.
 
 --]]
@@ -29,10 +29,10 @@
 --- file scope variables
 local Deque = require('deque');
 local MinHeap = require('minheap');
-local Aux = require('synops.aux');
-local timeNow = require('synops.hrtimer').now;
-local timeRemain = require('synops.hrtimer').remain;
-local timeSleep = require('synops.hrtimer').sleep;
+local Aux = require('act.aux');
+local timeNow = require('act.hrtimer').now;
+local timeRemain = require('act.hrtimer').remain;
+local timeSleep = require('act.hrtimer').sleep;
 local isUInt = Aux.isUInt;
 local isFunction = Aux.isFunction;
 local setmetatable = setmetatable;
