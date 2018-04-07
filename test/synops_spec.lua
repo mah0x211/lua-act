@@ -367,25 +367,25 @@ describe('test synops module:', function()
     end)
 
 
-    describe('test synops.readable -', function()
+    describe('test synops.waitReadable -', function()
         it('fail on called from outside of execution context', function()
-            assert.is_not_true( pcall( synops.readable ) )
+            assert.is_not_true( pcall( synops.waitReadable ) )
         end)
 
         it('fail with invalid arguments', function()
             assert.is_not_true( synops.run(function()
-                synops.readable( -1 )
+                synops.waitReadable( -1 )
             end))
 
             assert.is_not_true( synops.run(function()
-                assert( synops.readable( 0, -1 ) )
+                assert( synops.waitReadable( 0, -1 ) )
             end))
         end)
 
         it('fail by timeout', function()
             assert.is_true( synops.run(function()
                 local reader, writer = socketpair()
-                local ok, err, timeout = synops.readable( reader:fd(), 50 )
+                local ok, err, timeout = synops.waitReadable( reader:fd(), 50 )
 
                 assert( ok == false )
                 assert( timeout == true )
@@ -399,7 +399,7 @@ describe('test synops module:', function()
                 local ok, msg, err, again
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader:fd(), 50 )
+                    local ok, err, timeout = synops.waitReadable( reader:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -426,7 +426,7 @@ describe('test synops module:', function()
                 local ok, msg
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readable( reader:fd(), 50 )
+                    local ok, err, timeout = synops.waitReadable( reader:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -445,18 +445,18 @@ describe('test synops module:', function()
     end)
 
 
-    describe('test synops.writable -', function()
+    describe('test synops.waitWritable -', function()
         it('fail on called from outside of execution context', function()
-            assert.is_not_true( pcall( synops.writable ) )
+            assert.is_not_true( pcall( synops.waitWritable ) )
         end)
 
         it('fail with invalid arguments', function()
             assert.is_not_true( synops.run(function()
-                synops.writable( -1 )
+                synops.waitWritable( -1 )
             end))
 
             assert.is_not_true( synops.run(function()
-                assert( synops.writable( 0, -1 ) )
+                assert( synops.waitWritable( 0, -1 ) )
             end))
         end)
 
@@ -474,7 +474,7 @@ describe('test synops module:', function()
                 msg = table.concat( msg )
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 50 )
+                    local ok, err, timeout = synops.waitWritable( writer:fd(), 50 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -496,7 +496,7 @@ describe('test synops module:', function()
                 local ok, len, err, again
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 50 )
+                    local ok, err, timeout = synops.waitWritable( writer:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -524,7 +524,7 @@ describe('test synops module:', function()
                 local ok, len
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writable( writer:fd(), 50 )
+                    local ok, err, timeout = synops.waitWritable( writer:fd(), 50 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -657,9 +657,9 @@ describe('test synops module:', function()
     end)
 
 
-    describe('test synops.readlock -', function()
+    describe('test synops.readLock -', function()
         it('fail on called from outside of execution context', function()
-            assert.is_not_true( pcall( synops.readlock ) )
+            assert.is_not_true( pcall( synops.readLock ) )
         end)
 
         it('wakes up in order of the shortest timeout', function()
@@ -667,7 +667,7 @@ describe('test synops module:', function()
                 local reader, writer = socketpair()
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader:fd(), 30 )
+                    local ok, err, timeout = synops.readLock( reader:fd(), 30 )
 
                     synops.sleep(30)
                     assert( ok == true )
@@ -677,7 +677,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader:fd(), 20 )
+                    local ok, err, timeout = synops.readLock( reader:fd(), 20 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -686,7 +686,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader:fd(), 10 )
+                    local ok, err, timeout = synops.readLock( reader:fd(), 10 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -714,7 +714,7 @@ describe('test synops module:', function()
                 local reader, writer = socketpair()
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader:fd(), 30 )
+                    local ok, err, timeout = synops.readLock( reader:fd(), 30 )
 
                     synops.sleep(5)
                     assert( ok == true )
@@ -724,7 +724,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader:fd(), 20 )
+                    local ok, err, timeout = synops.readLock( reader:fd(), 20 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -733,7 +733,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader:fd(), 10 )
+                    local ok, err, timeout = synops.readLock( reader:fd(), 10 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -764,12 +764,12 @@ describe('test synops module:', function()
                 synops.spawn(function()
                     local ok, err, timeout
 
-                    ok, err, timeout = synops.readlock( reader1:fd(), 30 )
+                    ok, err, timeout = synops.readLock( reader1:fd(), 30 )
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
 
-                    ok, err, timeout = synops.readlock( reader2:fd(), 30 )
+                    ok, err, timeout = synops.readLock( reader2:fd(), 30 )
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
@@ -780,7 +780,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader1:fd(), 20 )
+                    local ok, err, timeout = synops.readLock( reader1:fd(), 20 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -789,7 +789,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( reader2:fd(), 10 )
+                    local ok, err, timeout = synops.readLock( reader2:fd(), 10 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -813,9 +813,9 @@ describe('test synops module:', function()
     end)
 
 
-    describe('test synops.writelock -', function()
+    describe('test synops.writeLock -', function()
         it('fail on called from outside of execution context', function()
-            assert.is_not_true( pcall( synops.writelock ) )
+            assert.is_not_true( pcall( synops.writeLock ) )
         end)
 
         it('wakes up in order of the shortest timeout', function()
@@ -823,7 +823,7 @@ describe('test synops module:', function()
                 local reader, writer = socketpair()
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writelock( writer:fd(), 30 )
+                    local ok, err, timeout = synops.writeLock( writer:fd(), 30 )
 
                     synops.sleep(30)
                     assert( ok == true )
@@ -833,7 +833,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writelock( writer:fd(), 20 )
+                    local ok, err, timeout = synops.writeLock( writer:fd(), 20 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -842,7 +842,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.writelock( writer:fd(), 10 )
+                    local ok, err, timeout = synops.writeLock( writer:fd(), 10 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -869,7 +869,7 @@ describe('test synops module:', function()
                 local reader, writer = socketpair()
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( writer:fd(), 30 )
+                    local ok, err, timeout = synops.readLock( writer:fd(), 30 )
 
                     synops.sleep(5)
                     assert( ok == true )
@@ -879,7 +879,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( writer:fd(), 20 )
+                    local ok, err, timeout = synops.readLock( writer:fd(), 20 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -888,7 +888,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( writer:fd(), 10 )
+                    local ok, err, timeout = synops.readLock( writer:fd(), 10 )
 
                     assert( ok == true )
                     assert( err == nil )
@@ -918,12 +918,12 @@ describe('test synops module:', function()
                 synops.spawn(function()
                     local ok, err, timeout
 
-                    ok, err, timeout = synops.readlock( writer1:fd(), 30 )
+                    ok, err, timeout = synops.readLock( writer1:fd(), 30 )
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
 
-                    ok, err, timeout = synops.readlock( writer2:fd(), 30 )
+                    ok, err, timeout = synops.readLock( writer2:fd(), 30 )
                     assert( ok == true )
                     assert( err == nil )
                     assert( timeout == nil )
@@ -934,7 +934,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( writer1:fd(), 20 )
+                    local ok, err, timeout = synops.readLock( writer1:fd(), 20 )
 
                     assert( ok == false )
                     assert( err == nil )
@@ -943,7 +943,7 @@ describe('test synops module:', function()
                 end)
 
                 synops.spawn(function()
-                    local ok, err, timeout = synops.readlock( writer2:fd(), 10 )
+                    local ok, err, timeout = synops.readLock( writer2:fd(), 10 )
 
                     assert( ok == false )
                     assert( err == nil )
