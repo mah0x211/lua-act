@@ -58,6 +58,69 @@ local OPERATORS = {
 local CURRENT_CALLEE;
 
 
+--- unwaitfd
+-- @param operators
+-- @param fd
+-- @return ok
+-- @return err
+local function unwaitfd( operators, fd )
+    local callee = operators[fd];
+
+    -- found
+    if callee then
+        operators[fd] = nil;
+        callee.synops.runq:remove( callee );
+        callee.synops.event:revoke( callee.ev );
+        -- reset event properties
+        callee.ev = nil;
+        callee.evfd = -1;
+        -- currently in-use
+        if callee.evuse then
+            callee.evuse = false;
+            callee.evasa = 'unwaitfd';
+            -- requeue without timeout
+            return callee.synops.runq:push( callee );
+        end
+        callee.evasa = '';
+    end
+
+    return true;
+end
+
+
+--- unwaitReadable
+-- @param fd
+-- @return ok
+-- @return err
+local function unwaitReadable( fd )
+    return unwaitfd( OPERATORS.readable, fd );
+end
+
+
+--- unwaitWritable
+-- @param fd
+-- @return ok
+-- @return err
+local function unwaitWritable( fd )
+    return unwaitfd( OPERATORS.writable, fd );
+end
+
+
+--- unwait
+-- @param fd
+-- @return ok
+-- @return err
+local function unwait( fd )
+    local _, rerr = unwaitfd( OPERATORS.readable, fd );
+    local _, werr = unwaitfd( OPERATORS.writable, fd );
+
+    if not rerr and not werr then
+        return true;
+    end
+
+    return false, rerr or werr;
+end
+
 
 --- resume
 -- @param cid
@@ -400,71 +463,6 @@ function Callee:writeLock( fd, msec )
 end
 
 
---- unwaitfd
--- @param self
--- @param operators
--- @param fd
--- @return ok
--- @return err
-local function unwaitfd( self, operators, fd )
-    local callee = operators[fd];
-
-    -- found
-    if callee then
-        operators[fd] = nil;
-        self.synops.runq:remove( callee );
-        self.synops.event:revoke( callee.ev );
-        -- reset event properties
-        callee.ev = nil;
-        callee.evfd = -1;
-        -- currently in-use
-        if callee.evuse then
-            callee.evuse = false;
-            callee.evasa = 'unwaitfd';
-            -- requeue without timeout
-            return self.synops.runq:push( callee );
-        end
-        callee.evasa = '';
-    end
-
-    return true;
-end
-
-
---- unwaitReadable
--- @param fd
--- @return ok
--- @return err
-function Callee:unwaitReadable( fd )
-    return unwaitfd( self, OPERATORS.readable, fd );
-end
-
-
---- unwaitWritable
--- @param fd
--- @return ok
--- @return err
-function Callee:unwaitWritable( fd )
-    return unwaitfd( self, OPERATORS.writable, fd );
-end
-
-
---- unwait
--- @param fd
--- @return ok
--- @return err
-function Callee:unwait( fd )
-    local _, rerr = unwaitfd( self, OPERATORS.readable, fd );
-    local _, werr = unwaitfd( self, OPERATORS.writable, fd );
-
-    if not rerr and not werr then
-        return true;
-    end
-
-    return false, rerr or werr;
-end
-
-
 --- waitable
 -- @param self
 -- @param operators
@@ -799,6 +797,9 @@ end
 return {
     new = new,
     acquire = acquire,
+    unwait = unwait,
+    unwaitReadable = unwaitReadable,
+    unwaitWritable = unwaitWritable,
     resume = resume
 };
 

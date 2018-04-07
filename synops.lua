@@ -301,10 +301,8 @@ end
 -- @return ok
 -- @return err
 function Synops.unwaitReadable( fd )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:unwaitReadable( fd );
+    if Callee.acquire() then
+        return Callee.unwaitReadable( fd );
     end
 
     error( 'cannot call unwaitReadable() from outside of execution context', 2 );
@@ -316,10 +314,8 @@ end
 -- @return ok
 -- @return err
 function Synops.unwaitWritable( fd )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:unwaitWritable( fd );
+    if Callee.acquire() then
+        return Callee.unwaitWritable( fd );
     end
 
     error( 'cannot call unwaitWritable() from outside of execution context', 2 );
@@ -331,10 +327,8 @@ end
 -- @return ok
 -- @return err
 function Synops.unwait( fd )
-    local callee = Callee.acquire();
-
-    if callee then
-        return callee:unwait( fd );
+    if Callee.acquire() then
+        return Callee.unwait( fd );
     end
 
     error( 'cannot call unwait() from outside of execution context', 2 );
