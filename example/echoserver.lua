@@ -26,10 +26,10 @@
   Created by Masatoshi Teruya on 16/12/24.
 
 --]]
-local Act = require('act');
+local Act = require('act')
 -- you need to install the net module as follows;
 --  $ luarocks install net
-local InetServer = require('net.stream.inet').server;
+local InetServer = require('net.stream.inet').server
 
 
 local function handler( client )
