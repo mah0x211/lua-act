@@ -30,11 +30,13 @@ require('nosigpipe');
 --- file scope variables
 local Deque = require('deque');
 local fork = require('process').fork;
+local waitpid = require('process').waitpid;
 local RunQ = require('act.runq');
 local Event = require('act.event');
 local Callee = require('act.callee');
 local setmetatable = setmetatable;
 --- constants
+local WNOHANG = require('process').WNOHANG;
 local ACT_CTX;
 
 
@@ -101,6 +103,19 @@ function Act.fork()
     end
 
     error( 'cannot call fork() from outside of execution context', 2 );
+end
+
+
+--- waitpid
+-- @param pid
+-- @return status
+-- @return err
+function Act.waitpid( pid )
+    if Callee.acquire() then
+        return waitpid( pid, WNOHANG );
+    end
+
+    error( 'cannot call waitpid() from outside of execution context', 2 );
 end
 
 
