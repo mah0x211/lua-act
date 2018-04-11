@@ -30,7 +30,7 @@
 local Deque = require('deque');
 local MinHeap = require('minheap');
 local Aux = require('act.aux');
-local timeNow = require('act.hrtimer').now;
+local getmsec = require('act.hrtimer').getmsec;
 local timeRemain = require('act.hrtimer').remain;
 local timeSleep = require('act.hrtimer').sleep;
 local isUInt = Aux.isUInt;
@@ -55,11 +55,11 @@ function RunQ:push( callee, msec )
     if not callee or not isFunction( callee.call ) then
         return false, 'callee must have a call method';
     elseif msec == nil then
-        msec = timeNow();
+        msec = getmsec();
     elseif not isUInt( msec ) then
         return false, 'msec must be unsigned integer';
     else
-        msec = timeNow( msec );
+        msec = getmsec( msec );
     end
 
     -- register callee
