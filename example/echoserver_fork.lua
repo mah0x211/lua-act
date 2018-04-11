@@ -82,7 +82,7 @@ local function handleSignal( nworker )
             nworker = waitWorkerExit( nworker )
             -- send SIGKILL if worker still exists
             if nworker > 0 then
-                Signal.killpg( Signal.SIGKILL, -1 )
+                Signal.killpg( Signal.SIGKILL )
                 nworker = waitWorkerExit( nworker )
             end
             break
