@@ -92,26 +92,11 @@ static int getnsec_lua( lua_State *L )
 }
 
 
-static int now_lua( lua_State *L )
-{
-    if( lua_gettop( L ) ){
-        lua_Integer msec = lauxh_checkinteger( L, 1 );
-        lua_pushinteger( L, hrt_getnsec() / 1000000ULL + (uint64_t)msec );
-    }
-    else {
-        lua_pushinteger( L, hrt_getnsec() / 1000000ULL );
-    }
-
-    return 1;
-}
-
-
 LUALIB_API int luaopen_act_hrtimer( lua_State *L )
 {
     lua_newtable( L );
     lauxh_pushfn2tbl( L, "getnsec", getnsec_lua );
     lauxh_pushfn2tbl( L, "getmsec", getmsec_lua );
-    lauxh_pushfn2tbl( L, "now", now_lua );
     lauxh_pushfn2tbl( L, "remain", remain_lua );
     lauxh_pushfn2tbl( L, "msleep", msleep_lua );
 
