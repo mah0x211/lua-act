@@ -37,7 +37,7 @@
 #include "hrtimer.h"
 
 
-static int sleep_lua( lua_State *L )
+static int msleep_lua( lua_State *L )
 {
     lua_Integer deadline = lauxh_checkinteger( L, 1 ) * 1000000ULL;
     uint64_t now = hrt_getnsec();
@@ -113,7 +113,7 @@ LUALIB_API int luaopen_act_hrtimer( lua_State *L )
     lauxh_pushfn2tbl( L, "getmsec", getmsec_lua );
     lauxh_pushfn2tbl( L, "now", now_lua );
     lauxh_pushfn2tbl( L, "remain", remain_lua );
-    lauxh_pushfn2tbl( L, "sleep", sleep_lua );
+    lauxh_pushfn2tbl( L, "msleep", msleep_lua );
 
     return 1;
 }

@@ -32,7 +32,7 @@ local MinHeap = require('minheap');
 local Aux = require('act.aux');
 local getmsec = require('act.hrtimer').getmsec;
 local timeRemain = require('act.hrtimer').remain;
-local timeSleep = require('act.hrtimer').sleep;
+local msleep = require('act.hrtimer').msleep;
 local isUInt = Aux.isUInt;
 local isFunction = Aux.isFunction;
 local setmetatable = setmetatable;
@@ -185,7 +185,7 @@ function RunQ:sleep()
 
     -- sleep until deadline
     if helm then
-        return timeSleep( helm.num );
+        return msleep( helm.num );
     end
 
     -- no need to sleep
