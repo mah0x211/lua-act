@@ -55,6 +55,24 @@ static int msleep_lua( lua_State *L )
 }
 
 
+static int nsleep_lua( lua_State *L )
+{
+    lua_Integer deadline = lauxh_checkinteger( L, 1 );
+    uint64_t now = hrt_getnsec();
+
+    if( deadline < now || hrt_nanosleep( deadline - now ) == 0 ){
+        lua_pushboolean( L, 1 );
+        return 1;
+    }
+
+    // got error
+    lua_pushboolean( L, 0 );
+    lua_pushstring( L, strerror( errno ) );
+
+    return 2;
+}
+
+
 static int remain_lua( lua_State *L )
 {
     lua_Integer msec = lauxh_checkinteger( L, 1 );
@@ -98,6 +116,7 @@ LUALIB_API int luaopen_act_hrtimer( lua_State *L )
     lauxh_pushfn2tbl( L, "getnsec", getnsec_lua );
     lauxh_pushfn2tbl( L, "getmsec", getmsec_lua );
     lauxh_pushfn2tbl( L, "remain", remain_lua );
+    lauxh_pushfn2tbl( L, "nsleep", nsleep_lua );
     lauxh_pushfn2tbl( L, "msleep", msleep_lua );
 
     return 1;
