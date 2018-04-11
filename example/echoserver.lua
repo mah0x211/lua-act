@@ -51,11 +51,11 @@ local function handler( client )
 end
 
 
-Act.run(function()
+local ok, err = Act.run(function()
     local server, err = InetServer.new({
         host = '127.0.0.1',
         port = 5000,
-    });
+    })
 
     err = err or server:listen()
     if err then
@@ -77,3 +77,7 @@ Act.run(function()
     server:close()
     print( 'end server' )
 end)
+
+if not ok then
+    error(err)
+end
