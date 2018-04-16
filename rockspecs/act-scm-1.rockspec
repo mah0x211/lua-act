@@ -42,6 +42,10 @@ build = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
         },
+        ['act.pipe'] = {
+            incdirs = { "deps/lauxhlib" },
+            sources = { "src/pipe.c" }
+        },
         ['act.runq'] = "lib/runq.lua",
         -- Temporary Measures
         -- To avoid module namespace collisions, building the dependent modules
