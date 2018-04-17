@@ -504,24 +504,11 @@ local function waitable( self, operators, asa, fd, msec )
             callee.evasa = '';
         end
 
-        -- register to runq
-        if msec then
-            local ok, err = runq:push( self, msec );
-
-            if not ok then
-                return false, err;
-            end
-        end
-
         -- register io(readable or writable) event
         if not self.ev then
             local ev, err = event[asa]( event, self, fd );
 
             if err then
-                if msec then
-                    runq:remove( self );
-                end
-
                 return false, err;
             end
 
@@ -530,6 +517,22 @@ local function waitable( self, operators, asa, fd, msec )
             self.evfd = fd;
             self.evasa = asa;
             operators[fd] = self;
+        end
+    end
+
+    -- register to runq
+    if msec then
+        local ok, err = runq:push( self, msec );
+
+        if not ok then
+            local ev = self.ev;
+            -- revoke io event
+            self.ev = nil;
+            self.evfd = -1;
+            self.evasa = '';
+            operators[fd] = nil;
+            event:revoke( ev );
+            return false, err;
         end
     end
 
