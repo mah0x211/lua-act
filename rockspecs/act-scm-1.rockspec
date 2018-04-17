@@ -42,6 +42,7 @@ build = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
         },
+        ['act.pipe'] = "lib/pipe.lua",
         ['act.pipe.syscall'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/pipe.c" }
