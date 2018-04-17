@@ -273,7 +273,7 @@ static inline void createmt( lua_State *L, const char *tname,
 }
 
 
-LUALIB_API int luaopen_act_pipe( lua_State *L )
+LUALIB_API int luaopen_act_pipe_syscall( lua_State *L )
 {
     struct luaL_Reg reader_mmethods[] = {
         { "__gc", gc_lua },
@@ -300,8 +300,7 @@ LUALIB_API int luaopen_act_pipe( lua_State *L )
 
     createmt( L, PIPE_READER_MT, reader_mmethods, reader_methods );
     createmt( L, PIPE_WRITER_MT, writer_mmethods, writer_methods );
-    lua_newtable( L );
-    lauxh_pushfn2tbl( L, "new", new_lua );
+    lua_pushcfunction( L, new_lua );
 
     return 1;
 }
