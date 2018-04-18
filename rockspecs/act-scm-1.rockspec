@@ -28,9 +28,9 @@ build = {
     modules = {
         act = "act.lua",
         ['act.aux'] = "lib/aux.lua",
-        ['act.aux.fileno'] = {
+        ['act.aux.syscall'] = {
             incdirs = { "deps/lauxhlib" },
-            sources = { "src/aux_fileno.c" }
+            sources = { "src/aux.c" }
         },
         ['act.callee'] = "lib/callee.lua",
         ['act.coro'] = {

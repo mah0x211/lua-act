@@ -19,7 +19,7 @@
  *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  *  DEALINGS IN THE SOFTWARE.
  *
- *  aux_fileno.c
+ *  aux.c
  *  lua-act
  *  Created by Masatoshi Teruya on 17/03/19.
  *
@@ -44,7 +44,7 @@ static int fileno_lua( lua_State *L )
 }
 
 
-LUALIB_API int luaopen_act_aux_fileno( lua_State *L )
+LUALIB_API int luaopen_act_aux_syscall( lua_State *L )
 {
     lua_pushcfunction( L, fileno_lua );
 
