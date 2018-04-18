@@ -46,7 +46,17 @@ static int fileno_lua( lua_State *L )
 
 LUALIB_API int luaopen_act_aux_syscall( lua_State *L )
 {
-    lua_pushcfunction( L, fileno_lua );
+    struct luaL_Reg funcs[] = {
+        { "fileno", fileno_lua },
+        { NULL, NULL }
+    };
+    struct luaL_Reg *ptr = funcs;
+
+    lua_newtable( L );
+    while( ptr->name ){
+        lauxh_pushfn2tbl( L, ptr->name, ptr->func );
+        ptr++;
+    }
 
     return 1;
 }
