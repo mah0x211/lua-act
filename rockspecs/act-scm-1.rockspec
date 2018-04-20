@@ -12,11 +12,11 @@ description = {
 dependencies = {
     "lua >= 5.1",
     "luarocks-fetch-gitrec >= 0.2",
-    "argv >= 0.2.0",
+    "argv >= 0.2.1",
     "minheap >= 0.1.1",
     "nosigpipe >= 0.1.0",
     "process >= 1.7.0",
-    "sentry >= 0.9.0",
+    "sentry >= 0.9.1",
 }
 build = {
     type = "builtin",
