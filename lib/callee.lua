@@ -757,16 +757,9 @@ end
 -- @param fn
 -- @param ...
 -- @return callee
--- @return err
 local function new( act, atexit, fn, ... )
-    local co, err = Coro.new( atexit, fn, ...  );
-    local callee;
-
-    if err then
-        return nil, err;
-    end
-
-    callee = setmetatable({
+    local co = Coro.new( atexit, fn, ...  );
+    local callee = setmetatable({
         act = act,
         co = co,
         argv = Argv.new(),
@@ -780,6 +773,7 @@ local function new( act, atexit, fn, ... )
     }, {
         __index = Callee
     });
+
     -- set callee-id
     -- remove 'table: ' prefix
     callee.cid = strsub( tostring( callee ), 10 );

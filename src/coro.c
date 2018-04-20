@@ -60,18 +60,10 @@ static int call_lua( lua_State *L )
     lua_settop( coro->res, 0 );
 
     // should create new thread
-    if( !coro->co )
-    {
+    if( !coro->co ){
 CREATE_NEWTHREAD:
-        // failed to create new thread
-        if( !( coro->co = lua_newthread( L ) ) ){
-            lua_pushstring( coro->res, strerror( errno ) );
-            lua_pushboolean( L, 1 );
-            lua_pushinteger( L, LUA_ERRMEM );
-            return 2;
-        }
-
-        // retain thread
+        // create new thread
+        coro->co = lua_newthread( L );
         coro->ref_co = lauxh_ref( L );
         goto SET_ENTRYFN;
     }
@@ -230,48 +222,36 @@ static int new_lua( lua_State *L )
 {
     int argc = lua_gettop( L );
     int append = lauxh_checkboolean( L, 1 );
-    lua_State *co = NULL;
-    lua_State *arg = NULL;
-    lua_State *res = NULL;
-
     luaL_checktype( L, 2, LUA_TFUNCTION );
-    if( ( co = lua_newthread( L ) ) &&
-        ( arg = lua_newthread( L ) ) &&
-        ( res = lua_newthread( L ) ) )
-    {
-        int ref_res = lauxh_ref( L );
-        int ref_arg = lauxh_ref( L );
-        int ref_co = lauxh_ref( L );
-        int ref_fn = LUA_NOREF;
-        coro_t *coro = NULL;
 
-        if( argc > 2 ){
-            lua_xmove( L, arg, argc - 2 );
-        }
-        ref_fn = lauxh_ref( L );
+    lua_State *co = lua_newthread( L );
+    lua_State *arg = lua_newthread( L );
+    lua_State *res = lua_newthread( L );
+    int ref_res = lauxh_ref( L );
+    int ref_arg = lauxh_ref( L );
+    int ref_co = lauxh_ref( L );
+    int ref_fn = LUA_NOREF;
+    coro_t *coro = NULL;
 
-        if( ( coro = lua_newuserdata( L, sizeof( coro_t ) ) ) ){
-            *coro = (coro_t){
-                .append = append,
-                .ref_fn = ref_fn,
-                .ref_co = ref_co,
-                .ref_arg = ref_arg,
-                .ref_res = ref_res,
-                .co = co,
-                .arg = arg,
-                .res = res
-            };
-            lauxh_setmetatable( L, MODULE_MT );
-            return 1;
-        }
+    if( argc > 2 ){
+        lua_xmove( L, arg, argc - 2 );
     }
+    ref_fn = lauxh_ref( L );
 
-    // got error
-    lua_settop( L, 0 );
-    lua_pushnil( L );
-    lua_pushstring( L, strerror( errno ) );
+    coro = lua_newuserdata( L, sizeof( coro_t ) );
+    *coro = (coro_t){
+        .append = append,
+        .ref_fn = ref_fn,
+        .ref_co = ref_co,
+        .ref_arg = ref_arg,
+        .ref_res = ref_res,
+        .co = co,
+        .arg = arg,
+        .res = res
+    };
+    lauxh_setmetatable( L, MODULE_MT );
 
-    return 2;
+    return 1;
 }
 
 

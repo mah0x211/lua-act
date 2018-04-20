@@ -214,18 +214,15 @@ static inline int setflags( int fd )
 
 static int new_lua( lua_State *L )
 {
+    pipe_fd_t *reader = lua_newuserdata( L, sizeof( pipe_fd_t ) );
+    pipe_fd_t *writer = lua_newuserdata( L, sizeof( pipe_fd_t ) );
     int fds[2];
-    pipe_fd_t *reader = NULL;
-    pipe_fd_t *writer = NULL;
 
-    lua_settop( L, 0 );
-    if( ( reader = lua_newuserdata( L, sizeof( pipe_fd_t ) ) ) &&
-        ( writer = lua_newuserdata( L, sizeof( pipe_fd_t ) ) ) &&
-        pipe( fds ) == 0 )
+    if( pipe( fds ) == 0 )
     {
-        *reader = (pipe_fd_t){ fds[0] };
-        *writer = (pipe_fd_t){ fds[1] };
         if( setflags( fds[0] ) == 0 && setflags( fds[1] ) == 0 ){
+            *reader = (pipe_fd_t){ fds[0] };
+            *writer = (pipe_fd_t){ fds[1] };
             luaL_getmetatable( L, PIPE_READER_MT );
             lua_setmetatable( L, -3 );
             luaL_getmetatable( L, PIPE_WRITER_MT );

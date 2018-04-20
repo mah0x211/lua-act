@@ -55,10 +55,7 @@ local function spawn( atexit, fn, ... )
         callee:init( atexit, fn, ... );
     -- create new callee
     else
-        callee, err = Callee.new( ACT_CTX, atexit, fn, ... );
-        if err then
-            return nil, err;
-        end
+        callee = Callee.new( ACT_CTX, atexit, fn, ... );
     end
 
     -- push to runq if not atexit
