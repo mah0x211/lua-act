@@ -69,27 +69,15 @@ function RunQ:push( callee, msec )
 
         -- create new queue associated for msec
         if not queue then
-            queue, err = Deque.new();
-            if not queue then
-                return false, err;
-            end
-
+            queue = Deque.new();
             -- push callee to queue
-            qelm, err = queue:unshift( callee );
-            if not qelm then
-                return false, err;
-            end
-
+            qelm = queue:unshift( callee );
             -- push queue to minheap
             ref[msec] = queue;
             ref[queue] = self.heap:push( msec, queue );
-
         -- push callee to existing queue
         else
-            qelm, err = queue:unshift( callee );
-            if not qelm then
-                return false, err;
-            end
+            qelm = queue:unshift( callee );
         end
 
         ref[callee] = qelm;
