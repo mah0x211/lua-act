@@ -219,22 +219,20 @@ static int decode_lua( lua_State *L )
 {
     size_t len = 0;
     uint8_t *data = (uint8_t*)lauxh_checklstring( L, 1, &len );
-    size_t pos = 0;
-    int n = 0;
+    size_t pos = decode_val( L, data, len, 0 );
 
-    while( pos < len )
-    {
-        pos = decode_val( L, data, len, pos );
-        if( !pos ){
-            lua_settop( L, 0 );
-            lua_pushnil( L );
-            lua_pushstring( L, strerror( EILSEQ ) );
-            return 2;
-        }
-        n++;
+    if( pos ){
+        lua_pushinteger( L, pos );
+        return 2;
     }
 
-    return n;
+    // failure
+    lua_settop( L, 0 );
+    lua_pushnil( L );
+    lua_pushnil( L );
+    lua_pushstring( L, strerror( EILSEQ ) );
+
+    return 3;
 }
 
 
@@ -299,7 +297,6 @@ static int encode_tbl( lua_State *L, aux_mem_t *m, int idx )
         return -1;
     }
 
-    // printf("ENCODE TABLE-------------- %d\n", lua_gettop( th ));
     // push space
     lua_pushnil( L );
     while( lua_next( L, idx ) )
@@ -321,8 +318,6 @@ static int encode_tbl( lua_State *L, aux_mem_t *m, int idx )
                         if( encode_val( L, m, kvidx - 1 ) == 1 &&
                             encode_val( L, m, kvidx ) == 1 )
                         {
-                            // printf("push keyval pair: narr:%d nrec: %d\n", *narr, *nrec);
-                            // printf("concat: %d elms\n", lua_gettop( th ) - top );
                             if( lauxh_isinteger( L, -2 ) ){
                                 narr++;
                             }
@@ -333,7 +328,6 @@ static int encode_tbl( lua_State *L, aux_mem_t *m, int idx )
                             continue;
                         }
                         // failure
-                        // printf("failed to push keyval pair: narr:%d nrec: %d\n", *narr, *nrec);
                         return -1;
                 }
             break;
@@ -348,7 +342,6 @@ static int encode_tbl( lua_State *L, aux_mem_t *m, int idx )
     *(int*)(m->mem + offset + sizeof( int )) = nrec;
     // set end-of-table
     *buf = LUA_TNIL;
-    // printf("ENCODE TABLE--------------EOF %d\n", lua_gettop( th ) );
 
     return aux_mem_cpy( m, (void*)buf, 1 );
 }
@@ -371,7 +364,6 @@ static int encode_val( lua_State *L, aux_mem_t *m, int idx )
 
         // unsupported value
         default:
-            // printf("found unsupported value %d %s\n", lua_type(L,idx), lua_typename(L,lua_type(L,idx)));
             return 0;
     }
 }
