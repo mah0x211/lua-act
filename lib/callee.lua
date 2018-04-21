@@ -61,8 +61,6 @@ local CURRENT_CALLEE;
 --- unwaitfd
 -- @param operators
 -- @param fd
--- @return ok
--- @return err
 local function unwaitfd( operators, fd )
     local callee = operators[fd];
 
@@ -79,30 +77,25 @@ local function unwaitfd( operators, fd )
             callee.evuse = false;
             callee.evasa = 'unwaitfd';
             -- requeue without timeout
-            return callee.act.runq:push( callee );
+            assert( callee.act.runq:push( callee ) );
+        else
+            callee.evasa = '';
         end
-        callee.evasa = '';
     end
-
-    return true;
 end
 
 
 --- unwaitReadable
 -- @param fd
--- @return ok
--- @return err
 local function unwaitReadable( fd )
-    return unwaitfd( OPERATORS.readable, fd );
+    unwaitfd( OPERATORS.readable, fd );
 end
 
 
 --- unwaitWritable
 -- @param fd
--- @return ok
--- @return err
 local function unwaitWritable( fd )
-    return unwaitfd( OPERATORS.writable, fd );
+    unwaitfd( OPERATORS.writable, fd );
 end
 
 

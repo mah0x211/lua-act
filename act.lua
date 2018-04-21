@@ -310,40 +310,38 @@ end
 
 --- unwaitReadable
 -- @param fd
--- @return ok
--- @return err
 function Act.unwaitReadable( fd )
     if Callee.acquire() then
-        return Callee.unwaitReadable( fd );
+        Callee.unwaitReadable( fd );
+    else
+        error(
+            'cannot call unwaitReadable() from outside of execution context', 2
+        );
     end
-
-    error( 'cannot call unwaitReadable() from outside of execution context', 2 );
 end
 
 
 --- unwaitWritable
 -- @param fd
--- @return ok
--- @return err
 function Act.unwaitWritable( fd )
     if Callee.acquire() then
-        return Callee.unwaitWritable( fd );
+        Callee.unwaitWritable( fd );
+    else
+        error(
+            'cannot call unwaitWritable() from outside of execution context', 2
+        );
     end
-
-    error( 'cannot call unwaitWritable() from outside of execution context', 2 );
 end
 
 
 --- unwait
 -- @param fd
--- @return ok
--- @return err
 function Act.unwait( fd )
     if Callee.acquire() then
-        return Callee.unwait( fd );
+        Callee.unwait( fd );
+    else
+        error( 'cannot call unwait() from outside of execution context', 2 );
     end
-
-    error( 'cannot call unwait() from outside of execution context', 2 );
 end
 
 
