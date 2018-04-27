@@ -669,6 +669,12 @@ function Callee:sigwait( msec, ... )
         self.sigset = sigset;
         op, signo = yield();
         self.sigset = nil;
+
+        -- remove from runq
+        if msec then
+            runq:remove( self );
+        end
+
         -- revoke signal events
         for _ = 1, #sigset do
             event:revoke( sigset:pop() );
@@ -680,9 +686,6 @@ function Callee:sigwait( msec, ... )
         -- timed out
         elseif op == OP_RUNQ then
             return nil, nil, true;
-        -- remove from runq
-        elseif msec then
-            runq:remove( self );
         end
 
         -- normally unreachable
