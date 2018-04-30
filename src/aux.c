@@ -119,6 +119,7 @@ static inline size_t decode_str( lua_State *L, uint8_t *data, size_t len,
         }
     }
 
+    errno = EAGAIN;
     return 0;
 }
 
@@ -133,6 +134,7 @@ static inline size_t decode_num( lua_State *L, uint8_t *data, size_t len,
         return pos + sizeof( lua_Number );
     }
 
+    errno = EAGAIN;
     return 0;
 }
 
@@ -144,6 +146,7 @@ static inline size_t decode_bol( lua_State *L, uint8_t *data, size_t len,
         return pos + 1;
     }
 
+    errno = EAGAIN;
     return 0;
 }
 
@@ -163,14 +166,17 @@ static inline size_t decode_tbl( lua_State *L, uint8_t *data, size_t len,
         lua_createtable( L, narr, nrec );
         pos += sizeof( int ) + sizeof( int );
 
+        // decode key-value pairs
         while( pos < len )
         {
             switch( data[pos] )
             {
                 case LUA_TNIL:
+                    // found end-of-table
                     if( !pair ){
                         return pos + 1;
                     }
+                    errno = EILSEQ;
                     return 0;
 
                 default:
@@ -180,15 +186,15 @@ static inline size_t decode_tbl( lua_State *L, uint8_t *data, size_t len,
                     }
             }
 
+            // set key-value pair to table
             if( ++pair > 1 ){
                 pair = 0;
                 lua_rawset( L, -3 );
             }
         }
-
-        return pos;
     }
 
+    errno = EAGAIN;
     return 0;
 }
 
@@ -210,6 +216,7 @@ static size_t decode_val( lua_State *L, uint8_t *data, size_t len, size_t pos )
 
         // found illegal byte sequence
         default:
+            errno = EILSEQ;
             return 0;
     }
 }
@@ -219,10 +226,11 @@ static int decode_lua( lua_State *L )
 {
     size_t len = 0;
     uint8_t *data = (uint8_t*)lauxh_checklstring( L, 1, &len );
-    size_t pos = decode_val( L, data, len, 0 );
+    uint64_t pos = lauxh_optuint64( L, 2, 0 );
+    size_t use = decode_val( L, data, len, ( pos ) ? pos - 1 : 0 );
 
-    if( pos ){
-        lua_pushinteger( L, pos );
+    if( use ){
+        lua_pushinteger( L, use );
         return 2;
     }
 
@@ -230,7 +238,12 @@ static int decode_lua( lua_State *L )
     lua_settop( L, 0 );
     lua_pushnil( L );
     lua_pushnil( L );
-    lua_pushstring( L, strerror( EILSEQ ) );
+    if( errno == EAGAIN ){
+        lua_pushnil( L );
+        lua_pushboolean( L, 1 );
+        return 4;
+    }
+    lua_pushstring( L, strerror( errno ) );
 
     return 3;
 }
