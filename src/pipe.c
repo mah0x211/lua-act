@@ -205,7 +205,7 @@ static inline int setflags( int fd )
     int flg = fcntl( fd, F_GETFL, 0 );
 
     if( flg != -1 && fcntl( fd, F_SETFL, flg|O_NONBLOCK ) != -1 ){
-        return fcntl( fd, F_SETFD, flg|FD_CLOEXEC );
+        return fcntl( fd, F_SETFD, FD_CLOEXEC );
     }
 
     return -1;
