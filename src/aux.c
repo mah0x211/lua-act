@@ -201,6 +201,12 @@ static inline size_t decode_tbl( lua_State *L, uint8_t *data, size_t len,
 
 static size_t decode_val( lua_State *L, uint8_t *data, size_t len, size_t pos )
 {
+    // no more data
+    if( pos == len ){
+        errno = EAGAIN;
+        return 0;
+    }
+
     switch( data[pos++] ){
         case LUA_TBOOLEAN:
             return decode_bol( L, data, len, pos );
