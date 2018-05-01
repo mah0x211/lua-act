@@ -227,8 +227,17 @@ static int decode_lua( lua_State *L )
     size_t len = 0;
     uint8_t *data = (uint8_t*)lauxh_checklstring( L, 1, &len );
     uint64_t pos = lauxh_optuint64( L, 2, 0 );
-    size_t use = decode_val( L, data, len, ( pos ) ? pos - 1 : 0 );
+    size_t use = 0;
 
+    if( pos )
+    {
+        pos--;
+        if( pos > len ){
+            pos = len;
+        }
+    }
+
+    use = decode_val( L, data, len, pos );
     if( use ){
         lua_pushinteger( L, use );
         return 2;
