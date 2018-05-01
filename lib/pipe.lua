@@ -40,11 +40,11 @@ local Pipe = {};
 
 
 --- read
--- @param deadline
+-- @param msec
 -- @return str
 -- @return err
 -- @return timeout
-function Pipe:read( deadline )
+function Pipe:read( msec )
     local str, err, again = self.reader:read();
 
     if not again then
@@ -55,7 +55,7 @@ function Pipe:read( deadline )
 
         repeat
             -- wait until readable
-            ok, err, timeout = waitReadable( reader:fd(), deadline );
+            ok, err, timeout = waitReadable( reader:fd(), msec );
             if ok then
                 str, err, again = reader:read();
             end
@@ -68,11 +68,11 @@ end
 
 --- write
 -- @param str
--- @param deadline
+-- @param msec
 -- @return len
 -- @return err
 -- @return timeout
-function Pipe:write( str, deadline )
+function Pipe:write( str, msec )
     local len, err, again = self.writer:write( str );
 
     if not again then
@@ -90,7 +90,7 @@ function Pipe:write( str, deadline )
             end
 
             -- wait until writable
-            ok, err, timeout = waitWritable( writer:fd(), deadline );
+            ok, err, timeout = waitWritable( writer:fd(), msec );
             if ok then
                 len, err, again = writer:write( str );
             end
