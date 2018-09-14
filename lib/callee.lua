@@ -27,7 +27,7 @@
 --]]
 --- file scope variables
 local Argv = require('argv');
-local Deque = require('deque');
+local Deque = require('deq');
 local Aux = require('act.aux');
 local Coro = require('act.coro');
 local concat = Aux.concat;

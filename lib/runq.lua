@@ -27,7 +27,7 @@
 --]]
 
 --- file scope variables
-local Deque = require('deque');
+local Deque = require('deq');
 local MinHeap = require('minheap');
 local Aux = require('act.aux');
 local getmsec = require('act.hrtimer').getmsec;

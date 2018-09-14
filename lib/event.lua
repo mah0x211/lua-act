@@ -27,7 +27,7 @@
 --]]
 
 --- file scope variables
-local Deque = require('deque');
+local Deque = require('deq');
 local Sentry = require('sentry');
 local OP_EVENT = require('act.aux').OP_EVENT;
 local setmetatable = setmetatable;

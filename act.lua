@@ -28,7 +28,7 @@
 --- ignore SIGPIPE
 require('nosigpipe');
 --- file scope variables
-local Deque = require('deque');
+local Deque = require('deq');
 local fork = require('process').fork;
 local waitpid = require('process').waitpid;
 local RunQ = require('act.runq');
