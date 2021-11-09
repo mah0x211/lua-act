@@ -1,4 +1,4 @@
-/*
+/**
  *  Copyright (C) 2017 Masatoshi Teruya
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,102 +24,93 @@
  *  Created by Masatoshi Teruya on 17/03/05.
  *
  */
-#include <unistd.h>
 #include <errno.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 // lua
-#include <lua.h>
-#include <lauxlib.h>
-#include "lauxhlib.h"
 #include "hrtimer.h"
+#include "lauxhlib.h"
+#include <lauxlib.h>
+#include <lua.h>
 
-
-static int msleep_lua( lua_State *L )
+static int msleep_lua(lua_State *L)
 {
-    lua_Integer deadline = lauxh_checkinteger( L, 1 ) * 1000000ULL;
-    uint64_t now = hrt_getnsec();
+    lua_Integer deadline = lauxh_checkinteger(L, 1) * 1000000ULL;
+    uint64_t now         = hrt_getnsec();
 
-    if( deadline < now || hrt_nanosleep( deadline - now ) == 0 ){
-        lua_pushboolean( L, 1 );
+    if (deadline < now || hrt_nanosleep(deadline - now) == 0) {
+        lua_pushboolean(L, 1);
         return 1;
     }
 
     // got error
-    lua_pushboolean( L, 0 );
-    lua_pushstring( L, strerror( errno ) );
+    lua_pushboolean(L, 0);
+    lua_pushstring(L, strerror(errno));
 
     return 2;
 }
 
-
-static int nsleep_lua( lua_State *L )
+static int nsleep_lua(lua_State *L)
 {
-    lua_Integer deadline = lauxh_checkinteger( L, 1 );
-    uint64_t now = hrt_getnsec();
+    lua_Integer deadline = lauxh_checkinteger(L, 1);
+    uint64_t now         = hrt_getnsec();
 
-    if( deadline < now || hrt_nanosleep( deadline - now ) == 0 ){
-        lua_pushboolean( L, 1 );
+    if (deadline < now || hrt_nanosleep(deadline - now) == 0) {
+        lua_pushboolean(L, 1);
         return 1;
     }
 
     // got error
-    lua_pushboolean( L, 0 );
-    lua_pushstring( L, strerror( errno ) );
+    lua_pushboolean(L, 0);
+    lua_pushstring(L, strerror(errno));
 
     return 2;
 }
 
-
-static int remain_lua( lua_State *L )
+static int remain_lua(lua_State *L)
 {
-    lua_Integer msec = lauxh_checkinteger( L, 1 );
-    uint64_t now = hrt_getnsec() / 1000000ULL;
+    lua_Integer msec = lauxh_checkinteger(L, 1);
+    uint64_t now     = hrt_getnsec() / 1000000ULL;
 
     // return a remaining msec
-    if( (uint64_t)msec > now ){
-        lua_pushinteger( L, msec - now );
+    if ((uint64_t)msec > now) {
+        lua_pushinteger(L, msec - now);
+    } else {
+        lua_pushinteger(L, 0);
     }
-    else {
-        lua_pushinteger( L, 0 );
-    }
 
     return 1;
 }
 
-
-static int getmsec_lua( lua_State *L )
+static int getmsec_lua(lua_State *L)
 {
-    lua_Integer msec = lauxh_optinteger( L, 1, 0 );
+    lua_Integer msec = lauxh_optinteger(L, 1, 0);
 
-    lua_pushinteger( L, hrt_getnsec() / 1000000ULL + (uint64_t)msec );
+    lua_pushinteger(L, hrt_getnsec() / 1000000ULL + (uint64_t)msec);
 
     return 1;
 }
 
-
-static int getnsec_lua( lua_State *L )
+static int getnsec_lua(lua_State *L)
 {
-    lua_Integer nsec = lauxh_optinteger( L, 1, 0 );
+    lua_Integer nsec = lauxh_optinteger(L, 1, 0);
 
-    lua_pushinteger( L, hrt_getnsec() + (uint64_t)nsec );
+    lua_pushinteger(L, hrt_getnsec() + (uint64_t)nsec);
 
     return 1;
 }
 
-
-LUALIB_API int luaopen_act_hrtimer( lua_State *L )
+LUALIB_API int luaopen_act_hrtimer(lua_State *L)
 {
-    lua_newtable( L );
-    lauxh_pushfn2tbl( L, "getnsec", getnsec_lua );
-    lauxh_pushfn2tbl( L, "getmsec", getmsec_lua );
-    lauxh_pushfn2tbl( L, "remain", remain_lua );
-    lauxh_pushfn2tbl( L, "nsleep", nsleep_lua );
-    lauxh_pushfn2tbl( L, "msleep", msleep_lua );
+    lua_newtable(L);
+    lauxh_pushfn2tbl(L, "getnsec", getnsec_lua);
+    lauxh_pushfn2tbl(L, "getmsec", getmsec_lua);
+    lauxh_pushfn2tbl(L, "remain", remain_lua);
+    lauxh_pushfn2tbl(L, "nsleep", nsleep_lua);
+    lauxh_pushfn2tbl(L, "msleep", msleep_lua);
 
     return 1;
 }
-
-
