@@ -81,15 +81,15 @@ local function unwaitfd(operators, fd)
     end
 end
 
---- unwaitReadable
+--- unwait_readable
 -- @param fd
-local function unwaitReadable(fd)
+local function unwait_readable(fd)
     unwaitfd(OPERATORS.readable, fd)
 end
 
---- unwaitWritable
+--- unwait_writable
 -- @param fd
-local function unwaitWritable(fd)
+local function unwait_writable(fd)
     unwaitfd(OPERATORS.writable, fd)
 end
 
@@ -370,15 +370,15 @@ local function rwunlock(self, locks, asa, fd)
     end
 end
 
---- readUnlock
+--- read_unlock
 -- @param fd
-function Callee:readUnlock(fd)
+function Callee:read_unlock(fd)
     rwunlock(self, RLOCKS, 'rlock', fd)
 end
 
---- writeUnlock
+--- write_unlock
 -- @param fd
-function Callee:writeUnlock(fd)
+function Callee:write_unlock(fd)
     rwunlock(self, WLOCKS, 'wlock', fd)
 end
 
@@ -416,23 +416,23 @@ local function rwlock(self, locks, asa, fd, msec)
     return true
 end
 
---- readLock
+--- read_lock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:readLock(fd, msec)
+function Callee:read_lock(fd, msec)
     return rwlock(self, RLOCKS, 'rlock', fd, msec)
 end
 
---- writeLock
+--- write_lock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:writeLock(fd, msec)
+function Callee:write_lock(fd, msec)
     return rwlock(self, WLOCKS, 'wlock', fd, msec)
 end
 
@@ -551,23 +551,23 @@ local function waitable(self, operators, asa, fd, msec)
     error('invalid implements')
 end
 
---- waitReadable
+--- wait_readable
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:waitReadable(fd, msec)
+function Callee:wait_readable(fd, msec)
     return waitable(self, OPERATORS.readable, 'readable', fd, msec)
 end
 
---- waitWritable
+--- wait_writable
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Callee:waitWritable(fd, msec)
+function Callee:wait_writable(fd, msec)
     return waitable(self, OPERATORS.writable, 'writable', fd, msec)
 end
 
@@ -764,8 +764,8 @@ return {
     new = new,
     acquire = acquire,
     unwait = unwait,
-    unwaitReadable = unwaitReadable,
-    unwaitWritable = unwaitWritable,
+    unwait_readable = unwait_readable,
+    unwait_writable = unwait_writable,
     resume = resume,
 }
 

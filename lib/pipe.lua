@@ -25,10 +25,10 @@
 --
 --- file scope variables
 local pipe = require('act.pipe.syscall')
-local waitReadable = require('act').waitReadable
-local waitWritable = require('act').waitWritable
-local unwaitReadable = require('act').unwaitReadable
-local unwaitWritable = require('act').unwaitWritable
+local wait_readable = require('act').wait_readable
+local wait_writable = require('act').wait_writable
+local unwait_readable = require('act').unwait_readable
+local unwait_writable = require('act').unwait_writable
 local strsub = string.sub
 
 --- class Pipe
@@ -50,7 +50,7 @@ function Pipe:read(msec)
 
         repeat
             -- wait until readable
-            ok, err, timeout = waitReadable(reader:fd(), msec)
+            ok, err, timeout = wait_readable(reader:fd(), msec)
             if ok then
                 str, err, again = reader:read()
             end
@@ -84,7 +84,7 @@ function Pipe:write(str, msec)
             end
 
             -- wait until writable
-            ok, err, timeout = waitWritable(writer:fd(), msec)
+            ok, err, timeout = wait_writable(writer:fd(), msec)
             if ok then
                 len, err, again = writer:write(str)
             end
@@ -96,8 +96,8 @@ end
 
 --- close
 function Pipe:close()
-    unwaitReadable(self.reader:fd())
-    unwaitWritable(self.writer:fd())
+    unwait_readable(self.reader:fd())
+    unwait_writable(self.writer:fd())
     -- close descriptors
     self.reader:close()
     self.writer:close()

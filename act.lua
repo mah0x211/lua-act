@@ -231,80 +231,80 @@ function Act.sigwait(msec, ...)
     error('cannot call sleep() from outside of execution context', 2)
 end
 
---- readLock
+--- read_lock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Act.readLock(fd, msec)
+function Act.read_lock(fd, msec)
     local callee = Callee.acquire()
 
     if callee then
-        return callee:readLock(fd, msec)
+        return callee:read_lock(fd, msec)
     end
 
-    error('cannot call readLock() from outside of execution context', 2)
+    error('cannot call read_lock() from outside of execution context', 2)
 end
 
---- readUnlock
+--- read_unlock
 -- @param fd
-function Act.readUnlock(fd)
+function Act.read_unlock(fd)
     local callee = Callee.acquire()
 
     if callee then
-        return callee:readUnlock(fd)
+        return callee:read_unlock(fd)
     end
 
-    error('cannot call readUnlock() from outside of execution context', 2)
+    error('cannot call read_unlock() from outside of execution context', 2)
 end
 
---- writeLock
+--- write_lock
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Act.writeLock(fd, msec)
+function Act.write_lock(fd, msec)
     local callee = Callee.acquire()
 
     if callee then
-        return callee:writeLock(fd, msec)
+        return callee:write_lock(fd, msec)
     end
 
-    error('cannot call writeLock() from outside of execution context', 2)
+    error('cannot call write_lock() from outside of execution context', 2)
 end
 
---- writeUnlock
+--- write_unlock
 -- @param fd
-function Act.writeUnlock(fd)
+function Act.write_unlock(fd)
     local callee = Callee.acquire()
 
     if callee then
-        return callee:writeUnlock(fd)
+        return callee:write_unlock(fd)
     end
 
-    error('cannot call writeUnlock() from outside of execution context', 2)
+    error('cannot call write_unlock() from outside of execution context', 2)
 end
 
---- unwaitReadable
+--- unwait_readable
 -- @param fd
-function Act.unwaitReadable(fd)
+function Act.unwait_readable(fd)
     if Callee.acquire() then
-        Callee.unwaitReadable(fd)
+        Callee.unwait_readable(fd)
     else
-        error('cannot call unwaitReadable() from outside of execution context',
+        error('cannot call unwait_readable() from outside of execution context',
               2)
     end
 end
 
---- unwaitWritable
+--- unwait_writable
 -- @param fd
-function Act.unwaitWritable(fd)
+function Act.unwait_writable(fd)
     if Callee.acquire() then
-        Callee.unwaitWritable(fd)
+        Callee.unwait_writable(fd)
     else
-        error('cannot call unwaitWritable() from outside of execution context',
+        error('cannot call unwait_writable() from outside of execution context',
               2)
     end
 end
@@ -319,36 +319,36 @@ function Act.unwait(fd)
     end
 end
 
---- waitReadable
+--- wait_readable
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Act.waitReadable(fd, msec)
+function Act.wait_readable(fd, msec)
     local callee = Callee.acquire()
 
     if callee then
-        return callee:waitReadable(fd, msec)
+        return callee:wait_readable(fd, msec)
     end
 
-    error('cannot call waitReadable() from outside of execution context', 2)
+    error('cannot call wait_readable() from outside of execution context', 2)
 end
 
---- waitWritable
+--- wait_writable
 -- @param fd
 -- @param msec
 -- @return ok
 -- @return err
 -- @return timeout
-function Act.waitWritable(fd, msec)
+function Act.wait_writable(fd, msec)
     local callee = Callee.acquire()
 
     if callee then
-        return callee:waitWritable(fd, msec)
+        return callee:wait_writable(fd, msec)
     end
 
-    error('cannot call waitWritable() from outside of execution context', 2)
+    error('cannot call wait_writable() from outside of execution context', 2)
 end
 
 --- getcid
