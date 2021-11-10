@@ -100,7 +100,7 @@ function RunQ:remove(callee)
             local helm = ref[queue]
 
             ref[queue] = nil
-            ref[helm.num] = nil
+            ref[helm.pri] = nil
             self.heap:del(helm.idx)
         end
     end
@@ -120,7 +120,7 @@ function RunQ:consume()
             local ref = self.ref
 
             ref[queue] = nil
-            ref[helm.num] = nil
+            ref[helm.pri] = nil
 
             -- consume the current queued callees
             for _ = 1, nqueue do
@@ -150,7 +150,7 @@ function RunQ:remain()
 
     -- return remaining msec
     if helm then
-        return timeRemain(helm.num)
+        return timeRemain(helm.pri)
     end
 
     return -1
@@ -164,7 +164,7 @@ function RunQ:sleep()
 
     -- sleep until deadline
     if helm then
-        return msleep(helm.num)
+        return msleep(helm.pri)
     end
 
     -- no need to sleep
