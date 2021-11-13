@@ -1,7 +1,7 @@
 package = "act"
 version = "scm-1"
 source = {
-    url = "gitrec://github.com/mah0x211/lua-act.git"
+    url = "git+https://github.com/mah0x211/lua-act.git"
 }
 description = {
     summary = "coroutine based synchronously non-blocking operations module",
@@ -11,9 +11,9 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "luarocks-fetch-gitrec >= 0.2",
     "argv >= 0.2.1",
-    "minheap >= 0.1.1",
+    "deq >= 0.4.4",
+    "minheap ~> 0.2",
     "nosigpipe >= 0.1.0",
     "process >= 1.8.1",
     "sentry >= 0.9.1",
@@ -48,16 +48,5 @@ build = {
             sources = { "src/pipe.c" }
         },
         ['act.runq'] = "lib/runq.lua",
-        -- Temporary Measures
-        -- To avoid module namespace collisions, building the dependent modules
-        -- by this rockspec.
-        deque = {
-            incdirs = {
-                "deps/lauxhlib"
-            },
-            sources = {
-                "deps/lua-deque/src/deque.c"
-            }
-        },
     }
 }

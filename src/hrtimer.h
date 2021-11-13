@@ -1,4 +1,4 @@
-/*
+/**
  *  Copyright (C) 2017 Masatoshi Teruya
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -32,15 +32,15 @@
 #include <time.h>
 
 #if defined(__APPLE__)
-#include <mach/mach.h>
-#include <mach/mach_time.h>
+# include <mach/mach.h>
+# include <mach/mach_time.h>
 
-static inline uint64_t hrt_getnsec( void )
+static inline uint64_t hrt_getnsec(void)
 {
-    static mach_timebase_info_data_t tbinfo = { 0 };
+    static mach_timebase_info_data_t tbinfo = {0};
 
-    if( tbinfo.denom == 0 ){
-        (void)mach_timebase_info( &tbinfo );
+    if (tbinfo.denom == 0) {
+        (void)mach_timebase_info(&tbinfo);
     }
 
     return mach_absolute_time() * tbinfo.numer / tbinfo.denom;
@@ -48,30 +48,27 @@ static inline uint64_t hrt_getnsec( void )
 
 #else
 
-static inline uint64_t hrt_getnsec( void )
+static inline uint64_t hrt_getnsec(void)
 {
     struct timespec ts = {0};
 
-#if defined(CLOCK_MONOTONIC_COARSE)
-    clock_gettime( CLOCK_MONOTONIC_COARSE, &ts );
-#else
-    clock_gettime( CLOCK_MONOTONIC, &ts );
-#endif
+# if defined(CLOCK_MONOTONIC_COARSE)
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+# else
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+# endif
 
     return (uint64_t)ts.tv_sec * 1000000000 + (uint64_t)ts.tv_nsec;
 }
 
 #endif
 
-
-static inline int hrt_nanosleep( uint64_t nsec )
+static inline int hrt_nanosleep(uint64_t nsec)
 {
-    struct timespec req = {
-        .tv_sec = nsec / UINT64_C(1000000000),
-        .tv_nsec = nsec % UINT64_C(1000000000)
-    };
+    struct timespec req = {.tv_sec  = nsec / UINT64_C(1000000000),
+                           .tv_nsec = nsec % UINT64_C(1000000000)};
 
-    return nanosleep( &req, NULL );
+    return nanosleep(&req, NULL);
 }
 
 #endif
