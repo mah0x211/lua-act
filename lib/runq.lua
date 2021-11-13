@@ -60,7 +60,7 @@ function RunQ:push(callee, msec)
     -- register callee
     if not ref[callee] then
         local queue = ref[msec]
-        local qelm, err
+        local qelm
 
         -- create new queue associated for msec
         if not queue then

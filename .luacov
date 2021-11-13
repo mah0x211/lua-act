@@ -1,0 +1,11 @@
+codefromstrings = false
+runreport = true
+deletestats = false
+modules = {
+    act = "act.lua",
+    ['act.aux'] = "lib/aux.lua",
+    ['act.callee'] = "lib/callee.lua",
+    ['act.event'] = "lib/event.lua",
+    ['act.pipe'] = "lib/pipe.lua",
+    ['act.runq'] = "lib/runq.lua",
+}

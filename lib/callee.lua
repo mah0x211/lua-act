@@ -27,7 +27,7 @@
 local Argv = require('argv')
 local Deque = require('deq')
 local Aux = require('act.aux')
-local Coro = require('act.coro')
+local reco = require('reco')
 local concat = Aux.concat
 local isUInt = Aux.isUInt
 local yield = coroutine.yield
@@ -37,12 +37,12 @@ local strsub = string.sub
 -- constants
 local OP_EVENT = Aux.OP_EVENT
 local OP_RUNQ = Aux.OP_RUNQ
--- local CO_OK = Coro.OK
--- local CO_YIELD = Coro.YIELD
--- local ERRRUN = Coro.ERRRUN
--- local ERRSYNTAX = Coro.ERRSYNTAX
--- local ERRMEM = Coro.ERRMEM
--- local ERRERR = Coro.ERRERR
+local OK = reco.OK
+-- local CO_YIELD = reco.YIELD
+-- local ERRRUN = reco.ERRRUN
+-- local ERRSYNTAX = reco.ERRSYNTAX
+-- local ERRMEM = reco.ERRMEM
+-- local ERRERR = reco.ERRERR
 --- static variables
 local SUSPENDED = setmetatable({}, {
     __mode = 'v',
@@ -178,18 +178,15 @@ function Callee:revoke()
     end
 end
 
---- __call
+--- call
 function Callee:call(...)
-    local co = self.co
-    local done, status
-
     CURRENT_CALLEE = self
     -- call with passed arguments
-    done, status = co(...)
+    local done, status = self.co(self.args:select(#self.args, ...))
     CURRENT_CALLEE = false
 
     if done then
-        self:dispose(not status and true or false)
+        self:dispose(status == OK)
     elseif self.term then
         self:dispose(true)
     end
@@ -253,18 +250,18 @@ function Callee:dispose(ok)
             -- should not return ok value if atexit function
             if root.atexit then
                 root.atexit = nil
-                root:call(self.co:getres())
+                root:call(self.co:results())
             else
-                root:call(ok, self.co:getres())
+                root:call(ok, self.co:results())
             end
         elseif not ok then
             error(concat({
-                self.co:getres(),
+                self.co:results(),
             }, '\n'))
         end
     elseif not ok then
         error(concat({
-            self.co:getres(),
+            self.co:results(),
         }, '\n'))
     end
 
@@ -702,8 +699,8 @@ local function torelate(self, atexit)
                 current.root = self
                 current.ref = self.node:push(current)
             end
-            -- set as a child
         else
+            -- set as a child
             self.root = root
             self.ref = root.node:push(self)
         end
@@ -717,7 +714,9 @@ end
 -- @param fn
 -- @param ...
 function Callee:init(atexit, fn, ...)
-    self.co:init(atexit, fn, ...)
+    self.atexit = atexit
+    self.args:set(0, ...)
+    self.co:reset(fn)
     -- set relationship
     torelate(self, atexit)
 end
@@ -729,10 +728,15 @@ end
 -- @param ...
 -- @return callee
 local function new(act, atexit, fn, ...)
-    local co = Coro.new(atexit, fn, ...)
+    local co = reco.new(fn)
+    local args = Argv.new()
+    args:set(0, ...)
+
     local callee = setmetatable({
         act = act,
         co = co,
+        atexit = atexit,
+        args = args,
         argv = Argv.new(),
         node = Deque.new(),
         rlock = {},
