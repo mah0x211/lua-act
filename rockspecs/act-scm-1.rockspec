@@ -16,6 +16,7 @@ dependencies = {
     "minheap ~> 0.2",
     "nosigpipe ~> 0.1",
     "process ~> 1.9",
+    "reco ~> 1.5",
     "sentry ~> 0.9",
 }
 build = {
@@ -33,10 +34,6 @@ build = {
             sources = { "src/aux.c" }
         },
         ['act.callee'] = "lib/callee.lua",
-        ['act.coro'] = {
-            incdirs = { "deps/lauxhlib" },
-            sources = { "src/coro.c" }
-        },
         ['act.event'] = "lib/event.lua",
         ['act.hrtimer'] = {
             incdirs = { "deps/lauxhlib" },
