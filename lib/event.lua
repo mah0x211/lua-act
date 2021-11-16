@@ -24,27 +24,72 @@
 -- Created by Masatoshi Teruya on 16/12/25.
 --
 --- file scope variables
-local Deque = require('deq')
-local Sentry = require('sentry')
-local OP_EVENT = require('act.aux').OP_EVENT
+local rawset = rawset
 local setmetatable = setmetatable
+local deque_new = require('deq').new
+local sentry_new = require('sentry').new
+local OP_EVENT = require('act.aux').OP_EVENT
 
---- class Event
+--- @class act.event.Event
+--- @field loop sentry.Loop
+--- @field pool Deque
+--- @field used table<sentry.Event, boolean>
 local Event = {}
 
+function Event:__newindex()
+    error('attempt to protected value', 2)
+end
+
+--- init
+--- @return act.event.Event ev
+--- @return string? err
+function Event:init()
+    local loop, err = sentry_new()
+    if err then
+        return nil, err
+    end
+
+    rawset(self, 'loop', loop)
+    rawset(self, 'pool', deque_new())
+    rawset(self, 'used', setmetatable({}, {
+        __mode = 'k',
+    }))
+
+    return self
+end
+
+--- renew
+--- @return boolean ok
+--- @return string? err
+function Event:renew()
+    local ok, err = self.loop:renew()
+    if not ok then
+        return false, err
+    end
+
+    -- re-create new pool (dispose pooled events)
+    self.pool = deque_new()
+    -- renew used events
+    for ev in pairs(self.used) do
+        assert(ev:renew())
+    end
+
+    return true
+end
+
 --- register
--- @param callee
--- @param asa
--- @param val
--- @param oneshot
--- @param edge
--- @return ev
--- @return err
+--- @param callee act.callee.Callee
+--- @param asa string
+--- @param val integer|number
+--- @param oneshot? boolean
+--- @param edge? boolean
+--- @return sentry.Event ev
+--- @return string? err
 function Event:register(callee, asa, val, oneshot, edge)
     local ev = self.pool:pop()
     local err
 
-    -- create new context
+    -- create new event
     if not ev then
         ev, err = self.loop:newevent()
         if err then
@@ -52,7 +97,7 @@ function Event:register(callee, asa, val, oneshot, edge)
         end
     end
 
-    -- register event
+    -- register event as a asa
     err = ev[asa](ev, val, callee, oneshot, edge)
     if err then
         return nil, err
@@ -65,7 +110,7 @@ function Event:register(callee, asa, val, oneshot, edge)
 end
 
 --- revoke
--- @param ev
+--- @param ev sentry.Event
 function Event:revoke(ev)
     -- release reference of event explicitly
     self.used[ev] = nil
@@ -75,60 +120,60 @@ function Event:revoke(ev)
 end
 
 --- signal
--- @param callee
--- @param signo
--- @param oneshot
--- @return ev
--- @return err
+--- @param callee act.callee.Callee
+--- @param signo integer
+--- @param oneshot boolean
+--- @return sentry.Event ev
+--- @return string? err
 function Event:signal(callee, signo, oneshot)
     return self:register(callee, 'assignal', signo, oneshot)
 end
 
 --- timer
--- @param callee
--- @param ival
--- @param oneshot
--- @return ev
--- @return err
+--- @param callee act.callee.Callee
+--- @param ival number
+--- @param oneshot boolean
+--- @return sentry.Event ev
+--- @return string? err
 function Event:timer(callee, ival, oneshot)
     return self:register(callee, 'astimer', ival, oneshot)
 end
 
 --- writable
--- @param callee
--- @param fd
--- @param oneshot
--- @return ev
--- @return err
+--- @param callee act.callee.Callee
+--- @param fd integer
+--- @param oneshot boolean
+--- @return sentry.Event ev
+--- @return string? err
 function Event:writable(callee, fd, oneshot)
     return self:register(callee, 'aswritable', fd, oneshot)
 end
 
 --- readable
--- @param callee
--- @param fd
--- @param oneshot
--- @return ev
--- @return err
+--- @param callee act.callee.Callee
+--- @param fd integer
+--- @param oneshot boolean
+--- @return sentry.Event ev
+--- @return string? err
 function Event:readable(callee, fd, oneshot)
     return self:register(callee, 'asreadable', fd, oneshot)
 end
 
 --- consume
--- @param msec
--- @return nev
--- @return err
+--- @param msec integer
+--- @return integer nev
+--- @return string? err
 function Event:consume(msec)
     if #self.loop > 0 then
         local loop = self.loop
         -- wait events
         local nev, err = loop:wait(msec)
 
-        -- got critical error
         if err then
+            -- got critical error
             return nil, err
-            -- consuming events
         elseif nev > 0 then
+            -- consuming events
             local ev, callee, disabled = loop:getevent()
 
             while ev do
@@ -145,48 +190,7 @@ function Event:consume(msec)
     return 0
 end
 
---- renew
--- @return ok
--- @return err
-function Event:renew()
-    local ok, err = self.loop:renew()
-
-    if not ok then
-        return false, err
-    end
-
-    -- re-create new pool (dispose pooled events)
-    self.pool = Deque.new()
-    -- renew used events
-    for ev in pairs(self.used) do
-        assert(ev:renew())
-    end
-
-    return true
-end
-
---- new
--- @return events
--- @return err
-local function new()
-    local loop, err = Sentry.new()
-
-    if err then
-        return nil, err
-    end
-
-    return setmetatable({
-        loop = loop,
-        pool = Deque.new(),
-        used = setmetatable({}, {
-            __mode = 'k',
-        }),
-    }, {
-        __index = Event,
-    })
-end
-
 return {
-    new = new,
+    new = require('metamodule').new.Event(Event),
 }
 
