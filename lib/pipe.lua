@@ -24,7 +24,7 @@
 -- Created by Masatoshi Teruya on 18/04/17.
 --
 --- file scope variables
-local pipe = require('act.pipe.syscall')
+local pipe = require('pipe')
 local wait_readable = require('act').wait_readable
 local wait_writable = require('act').wait_writable
 local unwait_readable = require('act').unwait_readable
@@ -106,7 +106,7 @@ end
 --- new
 -- @return pipe
 local function new()
-    local reader, writer, err = pipe()
+    local reader, writer, err = pipe(true)
 
     if err then
         return nil, err

@@ -17,6 +17,7 @@ dependencies = {
     "mah0x211/metamodule ~> 0.2",
     "mah0x211/minheap ~> 0.2",
     "mah0x211/nosigpipe ~> 0.1",
+    "mah0x211/pipe ~> 0.2",
     "mah0x211/process ~> 1.9",
     "mah0x211/reco ~> 1.5",
     "mah0x211/sentry ~> 0.9",
@@ -43,10 +44,6 @@ build = {
             sources = { "src/hrtimer.c" }
         },
         ['act.pipe'] = "lib/pipe.lua",
-        ['act.pipe.syscall'] = {
-            incdirs = { "deps/lauxhlib" },
-            sources = { "src/pipe.c" }
-        },
         ['act.runq'] = "lib/runq.lua",
     }
 }
