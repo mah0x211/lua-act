@@ -40,12 +40,6 @@ typedef struct {
     size_t use;
 } aux_mem_t;
 
-#define aux_mem_nil                                                            \
- (aux_mem_t)                                                                   \
- {                                                                             \
-  .mem = NULL, .blk = 0, .cap = 0, .use = 0                                    \
- }
-
 static int aux_mem_init(aux_mem_t *m)
 {
     long blk = sysconf(_SC_PAGESIZE);
@@ -361,7 +355,7 @@ static int encode_val(lua_State *L, aux_mem_t *m, int idx)
 static int encode_lua(lua_State *L)
 {
     int argc    = lua_gettop(L);
-    aux_mem_t m = aux_mem_nil;
+    aux_mem_t m = {.mem = NULL, .blk = 0, .cap = 0, .use = 0};
     int i       = 1;
 
     if (aux_mem_init(&m) == -1) {
