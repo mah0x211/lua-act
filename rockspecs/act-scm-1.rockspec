@@ -1,3 +1,4 @@
+rockspec_format = "3.0"
 package = "act"
 version = "scm-1"
 source = {
@@ -11,13 +12,15 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "argv ~> 0.3",
-    "deq ~> 0.4",
-    "minheap ~> 0.2",
-    "nosigpipe ~> 0.1",
-    "process ~> 1.9",
-    "reco ~> 1.5",
-    "sentry ~> 0.9",
+    "mah0x211/argv ~> 0.3",
+    "mah0x211/deq ~> 0.4",
+    "mah0x211/metamodule ~> 0.2",
+    "mah0x211/minheap ~> 0.2",
+    "mah0x211/nosigpipe ~> 0.1",
+    "mah0x211/pipe ~> 0.2",
+    "mah0x211/process ~> 1.9",
+    "mah0x211/reco ~> 1.5",
+    "mah0x211/sentry ~> 0.9",
 }
 build = {
     type = "builtin",
@@ -34,16 +37,13 @@ build = {
             sources = { "src/aux.c" }
         },
         ['act.callee'] = "lib/callee.lua",
+        ['act.context'] = "lib/context.lua",
         ['act.event'] = "lib/event.lua",
         ['act.hrtimer'] = {
             incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
         },
         ['act.pipe'] = "lib/pipe.lua",
-        ['act.pipe.syscall'] = {
-            incdirs = { "deps/lauxhlib" },
-            sources = { "src/pipe.c" }
-        },
         ['act.runq'] = "lib/runq.lua",
     }
 }

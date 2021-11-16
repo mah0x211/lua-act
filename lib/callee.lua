@@ -24,19 +24,20 @@
 -- Created by Masatoshi Teruya on 16/12/26.
 --
 --- file scope variables
-local Argv = require('argv')
-local Deque = require('deq')
-local Aux = require('act.aux')
-local reco = require('reco')
-local concat = Aux.concat
-local isUInt = Aux.isUInt
 local yield = coroutine.yield
 local setmetatable = setmetatable
 local tostring = tostring
 local strsub = string.sub
+local argv_new = require('argv').new
+local deque_new = require('deq').new
+local reco = require('reco')
+local reco_new = reco.new
+local aux = require('act.aux')
+local concat = aux.concat
+local isUInt = aux.isUInt
 -- constants
-local OP_EVENT = Aux.OP_EVENT
-local OP_RUNQ = Aux.OP_RUNQ
+local OP_EVENT = aux.OP_EVENT
+local OP_RUNQ = aux.OP_RUNQ
 local OK = reco.OK
 -- local CO_YIELD = reco.YIELD
 -- local ERRRUN = reco.ERRRUN
@@ -53,7 +54,15 @@ local OPERATORS = {
     readable = {},
     writable = {},
 }
+
+--- @type act.callee.Callee
 local CURRENT_CALLEE
+
+--- acquire
+--- @return act.callee.Callee callee
+local function acquire()
+    return CURRENT_CALLEE
+end
 
 --- unwaitfd
 -- @param operators
@@ -95,17 +104,9 @@ end
 
 --- unwait
 -- @param fd
--- @return ok
--- @return err
 local function unwait(fd)
-    local _, rerr = unwaitfd(OPERATORS.readable, fd)
-    local _, werr = unwaitfd(OPERATORS.writable, fd)
-
-    if not rerr and not werr then
-        return true
-    end
-
-    return false, rerr or werr
+    unwaitfd(OPERATORS.readable, fd)
+    unwaitfd(OPERATORS.writable, fd)
 end
 
 --- resume
@@ -148,7 +149,7 @@ local function resumeq(runq, cidq)
     end
 end
 
---- class Callee
+--- @class act.callee.Callee
 local Callee = {}
 
 --- revoke
@@ -183,7 +184,7 @@ function Callee:call(...)
     CURRENT_CALLEE = self
     -- call with passed arguments
     local done, status = self.co(self.args:select(#self.args, ...))
-    CURRENT_CALLEE = false
+    CURRENT_CALLEE = nil
 
     if done then
         self:dispose(status == OK)
@@ -193,7 +194,7 @@ function Callee:call(...)
 end
 
 --- dispose
--- @param ok
+--- @param ok boolean
 function Callee:dispose(ok)
     local runq = self.act.runq
 
@@ -228,19 +229,19 @@ function Callee:dispose(ok)
         -- remove from runq
         runq:remove(child)
         -- release references
-        child.root = nil
+        child.parent = nil
         child.ref = nil
         -- call dispose method
         child:dispose(true)
     end
 
-    -- call root node
-    if self.root then
-        local root = self.root
+    -- call parent node
+    if self.parent then
+        local root = self.parent
         local ref = self.ref
 
         -- release references
-        self.root = nil
+        self.parent = nil
         self.ref = nil
         -- detouch from from root node
         root.node:remove(ref)
@@ -270,7 +271,7 @@ function Callee:dispose(ok)
 end
 
 --- exit
--- @param ...
+--- @vararg any
 function Callee:exit(...)
     self.term = true
     yield(...)
@@ -280,8 +281,8 @@ function Callee:exit(...)
 end
 
 --- await
--- @return ok
--- @return ...
+--- @return boolean ok
+--- @return ...
 function Callee:await()
     if #self.node > 0 then
         -- revoke all events currently in use
@@ -294,10 +295,11 @@ function Callee:await()
 end
 
 --- suspend
--- @param msec
--- @return ok
--- @return ...
--- @return timeout
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return ...
+--- @return boolean timeout
 function Callee:suspend(msec)
     local cid = self.cid
 
@@ -331,8 +333,8 @@ function Callee:suspend(msec)
 end
 
 --- later
--- @return ok
--- @return err
+--- @return boolean ok
+--- @return string? err
 function Callee:later()
     local ok, err = self.act.runq:push(self)
 
@@ -351,46 +353,46 @@ function Callee:later()
 end
 
 --- rwunlock
--- @param self
--- @param locks
--- @param asa
--- @param fd
-local function rwunlock(self, locks, asa, fd)
-    local cidq = self[asa][fd]
+--- @param callee act.callee.Callee
+--- @param locks table
+--- @param asa string
+--- @param fd integer
+local function rwunlock(callee, locks, asa, fd)
+    local cidq = callee[asa][fd]
 
     -- resume all suspended callee
     if cidq then
-        self[asa][fd] = nil
+        callee[asa][fd] = nil
         -- remove cidq maintained by fd
         locks[fd] = nil
-        resumeq(self.act.runq, cidq)
+        resumeq(callee.act.runq, cidq)
     end
 end
 
 --- read_unlock
--- @param fd
+--- @param fd integer
 function Callee:read_unlock(fd)
     rwunlock(self, RLOCKS, 'rlock', fd)
 end
 
 --- write_unlock
--- @param fd
+--- @param fd integer
 function Callee:write_unlock(fd)
     rwunlock(self, WLOCKS, 'wlock', fd)
 end
 
 --- rwlock
--- @param self
--- @param locks
--- @param asa
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
-local function rwlock(self, locks, asa, fd, msec)
+--- @param callee act.callee.Callee
+--- @param locks table
+--- @param asa string
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
+local function rwlock(callee, locks, asa, fd, msec)
     assert(isUInt(fd), 'fd must be unsigned integer')
-    if not self[asa][fd] then
+    if not callee[asa][fd] then
         local cidq = locks[fd]
 
         -- other callee is waiting
@@ -398,8 +400,8 @@ local function rwlock(self, locks, asa, fd, msec)
             local idx = #cidq + 1
             local ok, err, timeout
 
-            cidq[idx] = self.cid
-            ok, err, timeout = self:suspend(msec)
+            cidq[idx] = callee.cid
+            ok, err, timeout = callee:suspend(msec)
             cidq[idx] = false
 
             return ok, err, timeout
@@ -407,41 +409,41 @@ local function rwlock(self, locks, asa, fd, msec)
 
         -- create read or write queue
         locks[fd] = {}
-        self[asa][fd] = locks[fd]
+        callee[asa][fd] = locks[fd]
     end
 
     return true
 end
 
 --- read_lock
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Callee:read_lock(fd, msec)
     return rwlock(self, RLOCKS, 'rlock', fd, msec)
 end
 
 --- write_lock
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Callee:write_lock(fd, msec)
     return rwlock(self, WLOCKS, 'wlock', fd, msec)
 end
 
 --- waitable
--- @param self
--- @param operators
--- @param asa
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param self act.callee.Callee
+--- @param operators table
+--- @param asa string
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 local function waitable(self, operators, asa, fd, msec)
     local runq = self.act.runq
     local event = self.act.event
@@ -549,29 +551,29 @@ local function waitable(self, operators, asa, fd, msec)
 end
 
 --- wait_readable
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Callee:wait_readable(fd, msec)
     return waitable(self, OPERATORS.readable, 'readable', fd, msec)
 end
 
 --- wait_writable
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Callee:wait_writable(fd, msec)
     return waitable(self, OPERATORS.writable, 'writable', fd, msec)
 end
 
 --- sleep
--- @param msec
--- @return ok
--- @return err
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
 function Callee:sleep(msec)
     local ok, err = self.act.runq:push(self, msec)
 
@@ -590,11 +592,11 @@ function Callee:sleep(msec)
 end
 
 --- sigwait
--- @param msec
--- @param ...
--- @return signo
--- @return err
--- @return timeout
+--- @param msec integer
+--- @vararg integer signo
+--- @return integer signo
+--- @return string? err
+--- @return boolean? timeout
 function Callee:sigwait(msec, ...)
     local runq = self.act.runq
     local event = self.act.event
@@ -609,7 +611,7 @@ function Callee:sigwait(msec, ...)
         end
     end
 
-    sigset = Deque.new()
+    sigset = deque_new()
     sigmap = {}
     -- register signal events
     for _, signo in pairs({
@@ -668,104 +670,89 @@ function Callee:sigwait(msec, ...)
     end
 end
 
---- torelate
--- @param self
--- @param atexit
-local function torelate(self, atexit)
-    if CURRENT_CALLEE then
-        local root = CURRENT_CALLEE
-
-        -- TODO: must be refactor
-        -- set as a parent
-        if atexit then
-            local current = root
-
-            -- atexit node always await child node
-            self.wait = true
-            self.atexit = true
-
-            root = root.root
-            -- change root node of current callee
-            if root then
-                -- remove current reference from root
-                root.node:remove(current.ref)
-
-                self.root = root
-                self.ref = root.node:push(self)
-
-                current.root = self
-                current.ref = self.node:push(current)
-            else
-                current.root = self
-                current.ref = self.node:push(current)
-            end
-        else
-            -- set as a child
-            self.root = root
-            self.ref = root.node:push(self)
+--- attach2caller
+--- @param caller act.callee.Callee
+--- @param callee act.callee.Callee
+--- @param atexit boolean
+local function attach2caller(caller, callee, atexit)
+    if caller then
+        -- set as a child: caller -> callee
+        if not atexit then
+            callee.parent = caller
+            callee.ref = caller.node:push(callee)
+            return
         end
+
+        -- atexit node always await child node
+        callee.wait = true
+        callee.atexit = true
+
+        -- set as a parent of caller: callee -> caller
+        local parent = caller.parent
+        if not parent then
+            caller.parent = callee
+            caller.ref = callee.node:push(caller)
+            return
+        end
+
+        -- change parent of caller: caller_parent -> callee -> caller
+        parent.node:remove(caller.ref)
+        caller.parent = callee
+        caller.ref = callee.node:push(caller)
+        callee.parent = parent
+        callee.ref = parent.node:push(callee)
+
     elseif atexit then
-        error('invalid implements')
+        error('root callee cannot be run at exit')
     end
 end
 
---- init
--- @param atexit
--- @param fn
--- @param ...
-function Callee:init(atexit, fn, ...)
+--- renew
+--- @param atexit boolean
+--- @param fn function
+--- @vararg any
+function Callee:renew(atexit, fn, ...)
     self.atexit = atexit
     self.args:set(0, ...)
     self.co:reset(fn)
     -- set relationship
-    torelate(self, atexit)
+    attach2caller(CURRENT_CALLEE, self, atexit)
 end
 
 --- new
--- @param act
--- @param atexit
--- @param fn
--- @param ...
--- @return callee
-local function new(act, atexit, fn, ...)
-    local co = reco.new(fn)
-    local args = Argv.new()
+--- @param act act.context.Context
+--- @param atexit boolean
+--- @param fn function
+--- @vararg any
+--- @return act.callee.Callee callee
+function Callee:init(act, atexit, fn, ...)
+    local args = argv_new()
     args:set(0, ...)
 
-    local callee = setmetatable({
-        act = act,
-        co = co,
-        atexit = atexit,
-        args = args,
-        argv = Argv.new(),
-        node = Deque.new(),
-        rlock = {},
-        wlock = {},
-        -- ev = [event object]
-        evfd = -1,
-        evasa = '', -- '', 'readable' or 'writable'
-        evuse = false, -- true or false
-    }, {
-        __index = Callee,
-    })
+    self.act = act
+    self.atexit = atexit
+    self.co = reco_new(fn)
+    self.args = args
+    self.argv = argv_new()
+    self.node = deque_new()
+    self.rlock = {}
+    self.wlock = {}
+    -- ev = [event object]
+    self.evfd = -1
+    self.evasa = '' -- '', 'readable' or 'writable'
+    self.evuse = false -- true or false
 
     -- set callee-id
     -- remove 'table: ' prefix
-    callee.cid = strsub(tostring(callee), 10)
+    self.cid = strsub(tostring(self), 10)
     -- set relationship
-    torelate(callee, atexit)
+    attach2caller(CURRENT_CALLEE, self, atexit)
 
-    return callee
-end
-
---- acquire
--- @return callee
-local function acquire()
-    return CURRENT_CALLEE
+    return self
 end
 
 return {
-    new = new,
+    new = require('metamodule').new.Callee(Callee),
     acquire = acquire,
     unwait = unwait,
     unwait_readable = unwait_readable,

@@ -26,38 +26,43 @@
 --- ignore SIGPIPE
 require('nosigpipe')
 --- file scope variables
-local Deque = require('deq')
-local fork = require('process').fork
-local waitpid = require('process').waitpid
-local RunQ = require('act.runq')
-local Event = require('act.event')
+local pcall = pcall
+local process = require('process')
+local fork = process.fork
+local waitpid = process.waitpid
 local Callee = require('act.callee')
-local setmetatable = setmetatable
+local callee_new = Callee.new
+local callee_acquire = Callee.acquire
+local callee_resume = Callee.resume
+local callee_unwait_writable = Callee.unwait_writable
+local callee_unwait_readable = Callee.unwait_readable
+local callee_unwait = Callee.unwait
+local context_new = require('act.context').new
 --- constants
 local WNOHANG = require('process').WNOHANG
+--- @type act.context.Context
 local ACT_CTX
 
 --- spawn
--- @param atexit
--- @param fn
--- @param ...
--- @return cid
--- @return err
+--- @param atexit boolean
+--- @param fn function
+--- @vararg any
+--- @return any cid
+--- @return string? err
 local function spawn(atexit, fn, ...)
-    local callee = ACT_CTX.pool:pop()
-    local ok, err
+    local callee = ACT_CTX:pop()
 
     -- use pooled callee
     if callee then
-        callee:init(atexit, fn, ...)
+        callee:renew(atexit, fn, ...)
     else
         -- create new callee
-        callee = Callee.new(ACT_CTX, atexit, fn, ...)
+        callee = callee_new(ACT_CTX, atexit, fn, ...)
     end
 
     -- push to runq if not atexit
     if not atexit then
-        ok, err = ACT_CTX.runq:push(callee)
+        local ok, err = ACT_CTX:pushq(callee)
         if not ok then
             return nil, err
         end
@@ -66,28 +71,28 @@ local function spawn(atexit, fn, ...)
     return callee.cid
 end
 
---- class Act
+--- @class Act
 local Act = {}
 
 --- pollable
--- @return ok
+--- @return boolean ok
 function Act.pollable()
-    return Callee.acquire() and true or false
+    return callee_acquire() and true or false
 end
 
 --- fork
--- @return pid
--- @return err
--- @return again
+--- @return integer pid
+--- @return string? err
+--- @return boolean? again
 function Act.fork()
-    if Callee.acquire() then
+    if callee_acquire() then
         local pid, err, again = fork()
 
         if not pid then
             return nil, err, again
         elseif pid == 0 then
             -- child process must be rebuilding event properties
-            ACT_CTX.event:renew()
+            ACT_CTX:renew()
         end
 
         return pid
@@ -97,11 +102,11 @@ function Act.fork()
 end
 
 --- waitpid
--- @param pid
--- @return status
--- @return err
+--- @param pid integer
+--- @return table? status
+--- @return string? err
 function Act.waitpid(pid)
-    if Callee.acquire() then
+    if callee_acquire() then
         return waitpid(pid, WNOHANG)
     end
 
@@ -109,12 +114,12 @@ function Act.waitpid(pid)
 end
 
 --- spawn
--- @param fn
--- @param ...
--- @return cid
--- @return err
+--- @param fn function
+--- @vararg ...
+--- @return any cid
+--- @return string? err
 function Act.spawn(fn, ...)
-    if Callee.acquire() then
+    if callee_acquire() then
         return spawn(false, fn, ...)
     end
 
@@ -122,9 +127,9 @@ function Act.spawn(fn, ...)
 end
 
 --- exit
--- @param ...
+--- @vararg ...
 function Act.exit(...)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         callee:exit(...)
@@ -134,10 +139,10 @@ function Act.exit(...)
 end
 
 --- later
--- @return ok
--- @return err
+--- @return boolean ok
+--- @return string? err
 function Act.later()
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:later()
@@ -147,12 +152,12 @@ function Act.later()
 end
 
 --- atexit
--- @param fn
--- @param ...
--- @return ok
--- @return err
+--- @param fn function
+--- @vararg any
+--- @return boolean ok
+--- @return string? err
 function Act.atexit(fn, ...)
-    if Callee.acquire() then
+    if callee_acquire() then
         local _, err = spawn(true, fn, ...)
 
         return not err, err
@@ -162,10 +167,10 @@ function Act.atexit(fn, ...)
 end
 
 --- await
--- @return ok
--- @return ...
+--- @return boolean ok
+--- @return ...
 function Act.await()
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:await()
@@ -175,12 +180,12 @@ function Act.await()
 end
 
 --- suspend
--- @param msec
--- @return ok
--- @return ...
--- @return timeout
+--- @param msec integer
+--- @return boolean ok
+--- @return any ...
+--- @return boolean timeout
 function Act.suspend(msec)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:suspend(msec)
@@ -190,23 +195,23 @@ function Act.suspend(msec)
 end
 
 --- resume
--- @param cid
--- @param ...
--- @return ok
+--- @param cid any
+--- @vararg ...
+--- @return boolean ok
 function Act.resume(cid, ...)
-    if Callee.acquire() then
-        return Callee.resume(cid, ...)
+    if callee_acquire() then
+        return callee_resume(cid, ...)
     end
 
     error('cannot call resume() at outside of execution context', 2)
 end
 
 --- sleep
--- @param msec
--- @return ok
--- @return err
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
 function Act.sleep(msec)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:sleep(msec)
@@ -216,13 +221,13 @@ function Act.sleep(msec)
 end
 
 --- sigwait
--- @param msec
--- @param ...
--- @return signo
--- @return err
--- @return timeout
+--- @param msec integer
+--- @vararg any
+--- @return integer signo
+--- @return string? err
+--- @return boolean? timeout
 function Act.sigwait(msec, ...)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:sigwait(msec, ...)
@@ -232,13 +237,13 @@ function Act.sigwait(msec, ...)
 end
 
 --- read_lock
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Act.read_lock(fd, msec)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:read_lock(fd, msec)
@@ -248,9 +253,9 @@ function Act.read_lock(fd, msec)
 end
 
 --- read_unlock
--- @param fd
+--- @param fd integer
 function Act.read_unlock(fd)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:read_unlock(fd)
@@ -260,13 +265,13 @@ function Act.read_unlock(fd)
 end
 
 --- write_lock
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Act.write_lock(fd, msec)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:write_lock(fd, msec)
@@ -276,9 +281,9 @@ function Act.write_lock(fd, msec)
 end
 
 --- write_unlock
--- @param fd
+--- @param fd integer
 function Act.write_unlock(fd)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:write_unlock(fd)
@@ -288,10 +293,10 @@ function Act.write_unlock(fd)
 end
 
 --- unwait_readable
--- @param fd
+--- @param fd integer
 function Act.unwait_readable(fd)
-    if Callee.acquire() then
-        Callee.unwait_readable(fd)
+    if callee_acquire() then
+        callee_unwait_readable(fd)
     else
         error('cannot call unwait_readable() from outside of execution context',
               2)
@@ -299,10 +304,10 @@ function Act.unwait_readable(fd)
 end
 
 --- unwait_writable
--- @param fd
+--- @param fd integer
 function Act.unwait_writable(fd)
-    if Callee.acquire() then
-        Callee.unwait_writable(fd)
+    if callee_acquire() then
+        callee_unwait_writable(fd)
     else
         error('cannot call unwait_writable() from outside of execution context',
               2)
@@ -310,23 +315,23 @@ function Act.unwait_writable(fd)
 end
 
 --- unwait
--- @param fd
+--- @param fd integer
 function Act.unwait(fd)
-    if Callee.acquire() then
-        Callee.unwait(fd)
+    if callee_acquire() then
+        callee_unwait(fd)
     else
         error('cannot call unwait() from outside of execution context', 2)
     end
 end
 
 --- wait_readable
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Act.wait_readable(fd, msec)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:wait_readable(fd, msec)
@@ -336,13 +341,13 @@ function Act.wait_readable(fd, msec)
 end
 
 --- wait_writable
--- @param fd
--- @param msec
--- @return ok
--- @return err
--- @return timeout
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return string? err
+--- @return boolean? timeout
 function Act.wait_writable(fd, msec)
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee:wait_writable(fd, msec)
@@ -352,9 +357,9 @@ function Act.wait_writable(fd, msec)
 end
 
 --- getcid
--- @return cid
+--- @return any cid
 function Act.getcid()
-    local callee = Callee.acquire()
+    local callee = callee_acquire()
 
     if callee then
         return callee.cid
@@ -364,45 +369,34 @@ function Act.getcid()
 end
 
 --- runloop
--- @param fn
--- @param ...
--- @return ok
--- @return err
+--- @param fn function
+--- @vararg any
+--- @return boolean ok
+--- @return string? err
 local function runloop(fn, ...)
-    local event, runq, ok, err
-
     -- check first argument
     assert(type(fn) == 'function', 'fn must be function')
-
     if ACT_CTX then
         return false, 'act run already'
     end
 
-    -- create event
-    event, err = Event.new()
+    -- create act context
+    local err
+    ACT_CTX, err = context_new()
     if err then
         return false, err
     end
 
-    -- create act context
-    runq = RunQ.new()
-    ACT_CTX = setmetatable({
-        event = event,
-        runq = runq,
-        pool = Deque.new(),
-    }, {
-        __newindex = function()
-            error('attempt to protected value', 2)
-        end,
-    })
-
     -- create main coroutine
+    local ok
     ok, err = spawn(false, fn, ...)
     if not ok then
         return false, err
     end
 
     -- run act scheduler
+    local runq = ACT_CTX.runq
+    local event = ACT_CTX.event
     while true do
         -- consume runq
         local msec = runq:consume()
@@ -431,10 +425,10 @@ local function runloop(fn, ...)
 end
 
 --- run
--- @param fn
--- @param ...
--- @return ok
--- @return err
+--- @param fn function
+--- @vararg any
+--- @return boolean ok
+--- @return string err
 function Act.run(fn, ...)
     local ok, rv, err = pcall(runloop, fn, ...)
 
