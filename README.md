@@ -15,6 +15,7 @@ coroutine based synchronously non-blocking operations module.
 
 - argv: <https://github.com/mah0x211/lua-argv>
 - deq: <https://github.com/mah0x211/lua-deq>
+- metamodule: <https://github.com/mah0x211/lua-metamodule>
 - minheap: <https://github.com/mah0x211/lua-minheap>
 - nosigpipe: <https://github.com/mah0x211/lua-nosigpipe>
 - process: <https://github.com/mah0x211/lua-process>

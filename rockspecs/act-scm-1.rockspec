@@ -24,11 +24,6 @@ dependencies = {
 }
 build = {
     type = "builtin",
-    install = {
-        bin = {
-            act = "bin/act.lua"
-        }
-    },
     modules = {
         act = "act.lua",
         ['act.aux'] = "lib/aux.lua",
