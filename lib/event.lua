@@ -78,7 +78,7 @@ function Event:renew()
 end
 
 --- register
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param asa string
 --- @param val integer|number
 --- @param oneshot? boolean
@@ -116,7 +116,7 @@ function Event:revoke(ev)
 end
 
 --- signal
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param signo integer
 --- @param oneshot boolean
 --- @return evm.signal ev
@@ -126,7 +126,7 @@ function Event:signal(callee, signo, oneshot)
 end
 
 --- timer
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param ival number
 --- @param oneshot boolean
 --- @return evm.timer ev
@@ -136,7 +136,7 @@ function Event:timer(callee, ival, oneshot)
 end
 
 --- writable
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param fd integer
 --- @param oneshot boolean
 --- @return evm.writable ev
@@ -146,7 +146,7 @@ function Event:writable(callee, fd, oneshot)
 end
 
 --- readable
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param fd integer
 --- @param oneshot boolean
 --- @return evm.readable ev

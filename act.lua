@@ -37,7 +37,7 @@ local callee_unwait_readable = Callee.unwait_readable
 local callee_unwait = Callee.unwait
 local context_new = require('act.context').new
 --- constants
---- @type act.context.Context
+--- @type act.context
 local ACT_CTX
 
 --- spawn
