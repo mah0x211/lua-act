@@ -25,7 +25,7 @@
 --
 --- file scope variables
 local rawset = rawset
-local deque_new = require('deq').new
+local deque_new = require('deque').new
 local minheap_new = require('minheap').new
 local hrtimer = require('act.hrtimer')
 local hrtimer_getmsec = hrtimer.getmsec

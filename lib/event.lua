@@ -26,8 +26,8 @@
 --- file scope variables
 local rawset = rawset
 local setmetatable = setmetatable
-local deque_new = require('deq').new
 local sentry_new = require('sentry').new
+local deque_new = require('deque').new
 local OP_EVENT = require('act.aux').OP_EVENT
 
 --- @class act.event.Event

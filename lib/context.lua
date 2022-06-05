@@ -21,7 +21,7 @@
 --
 --- file scope variables
 local rawset = rawset
-local deque_new = require('deq').new
+local deque_new = require('deque').new
 local event_new = require('act.event').new
 local runq_new = require('act.runq').new
 
