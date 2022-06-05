@@ -27,9 +27,7 @@
 require('nosigpipe')
 --- file scope variables
 local pcall = pcall
-local process = require('process')
-local fork = process.fork
-local waitpid = process.waitpid
+local fork = require('fork')
 local Callee = require('act.callee')
 local callee_new = Callee.new
 local callee_acquire = Callee.acquire
@@ -39,7 +37,6 @@ local callee_unwait_readable = Callee.unwait_readable
 local callee_unwait = Callee.unwait
 local context_new = require('act.context').new
 --- constants
-local WNOHANG = require('process').WNOHANG
 --- @type act.context.Context
 local ACT_CTX
 
@@ -81,36 +78,23 @@ function Act.pollable()
 end
 
 --- fork
---- @return integer pid
---- @return string? err
+--- @return fork.process pid
+--- @return error? err
 --- @return boolean? again
 function Act.fork()
     if callee_acquire() then
-        local pid, err, again = fork()
+        local p, err, again = fork()
 
-        if not pid then
+        if not p then
             return nil, err, again
-        elseif pid == 0 then
+        elseif p:is_child() then
             -- child process must be rebuilding event properties
             ACT_CTX:renew()
         end
 
-        return pid
+        return p
     end
-
     error('cannot call fork() from outside of execution context', 2)
-end
-
---- waitpid
---- @param pid integer
---- @return table? status
---- @return string? err
-function Act.waitpid(pid)
-    if callee_acquire() then
-        return waitpid(pid, WNOHANG)
-    end
-
-    error('cannot call waitpid() from outside of execution context', 2)
 end
 
 --- spawn
