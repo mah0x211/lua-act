@@ -41,23 +41,21 @@ local Pipe = {}
 -- @return timeout
 function Pipe:read(msec)
     local str, err, again = self.reader:read()
-
     if not again then
         return str, err
-    else
-        local reader = self.reader
-        local ok, timeout
-
-        repeat
-            -- wait until readable
-            ok, err, timeout = wait_readable(reader:fd(), msec)
-            if ok then
-                str, err, again = reader:read()
-            end
-        until not again or timeout
-
-        return str, err, timeout
     end
+
+    local reader = self.reader
+    local ok, timeout
+    repeat
+        -- wait until readable
+        ok, err, timeout = wait_readable(reader:fd(), msec)
+        if ok then
+            str, err, again = reader:read()
+        end
+    until not again or timeout
+
+    return str, err, timeout
 end
 
 --- write
@@ -68,30 +66,28 @@ end
 -- @return timeout
 function Pipe:write(str, msec)
     local len, err, again = self.writer:write(str)
-
     if not again then
         return len, err
-    else
-        local writer = self.writer
-        local total = 0
-        local ok, timeout
-
-        repeat
-            total = total + len
-            -- eliminate write data
-            if len > 0 then
-                str = strsub(str, len + 1)
-            end
-
-            -- wait until writable
-            ok, err, timeout = wait_writable(writer:fd(), msec)
-            if ok then
-                len, err, again = writer:write(str)
-            end
-        until not again or timeout
-
-        return len and total + len, err, timeout
     end
+
+    local writer = self.writer
+    local total = 0
+    local ok, timeout
+    repeat
+        total = total + len
+        -- eliminate write data
+        if len > 0 then
+            str = strsub(str, len + 1)
+        end
+
+        -- wait until writable
+        ok, err, timeout = wait_writable(writer:fd(), msec)
+        if ok then
+            len, err, again = writer:write(str)
+        end
+    until not again or timeout
+
+    return len and total + len, err, timeout
 end
 
 --- close
