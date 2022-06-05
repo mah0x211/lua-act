@@ -20,7 +20,7 @@ dependencies = {
     "mah0x211/nosigpipe >= 0.1",
     "mah0x211/pipe >= 0.3",
     "mah0x211/reco >= 1.5",
-    "mah0x211/sentry >= 0.9",
+    "mah0x211/evm >= 0.10",
 }
 build = {
     type = "builtin",
