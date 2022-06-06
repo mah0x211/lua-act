@@ -1,6 +1,7 @@
 require('luacov')
 local testcase = require('testcase')
 local nanotime = require('testcase.timer').nanotime
+local getpid = require('testcase.getpid')
 local errno = require('errno')
 local llsocket = require('llsocket')
 local signal = require('signal')
@@ -22,17 +23,31 @@ function testcase.run()
         assert(b == 'bar', 'b is unknown argument')
     end, 'foo', 'bar'))
 
-    -- test that fail with a non-function argument
-    assert.is_false(act.run())
-    assert.is_false(act.run(1))
-    assert.is_false(act.run('str'))
-    assert.is_false(act.run({}))
-
     -- test that fail when called from the running function
-    assert.is_false(act.run(function(a, b)
-        assert(act.run(function()
-        end))
-    end, 'foo', 'bar'))
+    assert(act.run(function()
+        local ok, err = act.run(function()
+        end)
+        assert.is_false(ok)
+        assert.match(err, 'act run already')
+    end))
+
+    -- test that fail with a non-function argument
+    local err = assert.throws(act.run)
+    assert.match(err, 'fn must be function')
+end
+
+function testcase.fork()
+    -- test that fork process
+    assert(act.run(function()
+        local pid = getpid()
+        local p = assert(act.fork())
+        if p:is_child() then
+            assert.not_equal(pid, getpid())
+            return
+        end
+        local res = assert(p:wait())
+        assert.equal(res.exit, 0)
+    end))
 end
 
 function testcase.sleep()
@@ -83,15 +98,8 @@ function testcase.sleep()
 
     -- test that fail with invalid deadline
     assert(act.run(function()
-        for _, v in ipairs({
-            'str',
-            1.1,
-            -1,
-        }) do
-            local ok, err = act.sleep(v)
-            assert.is_false(ok)
-            assert.match(err, 'msec must be unsigned integer')
-        end
+        local err = assert.throws(act.sleep, -1)
+        assert.match(err, 'msec must be unsigned integer')
     end))
 
     -- test that fail on called from outside of execution context
@@ -113,7 +121,7 @@ function testcase.spawn()
     -- test that fail with a non-function argument
     assert(act.run(function()
         local err = assert.throws(act.spawn, 1)
-        assert.match(err, 'function expected, got number')
+        assert.match(err, 'fn must be function')
     end))
 
     -- test that fail on called from outside of execution context
@@ -243,7 +251,7 @@ function testcase.atexit()
     -- test that fail with a non-function argument
     assert(act.run(function()
         local err = assert.throws(act.atexit, 1)
-        assert.match(err, 'function expected, got number')
+        assert.match(err, 'fn must be function')
     end))
 
     -- test that fail on called from outside of execution context
@@ -329,19 +337,6 @@ function testcase.wait_readable()
         assert.equal(msg, 'hello world!')
     end))
 
-    -- test that fail with invalid arguments
-    assert(act.run(function()
-        local err = assert.throws(act.wait_readable, -1)
-        assert.match(err, 'fd value range')
-    end))
-
-    assert(act.run(function()
-        local ok, err, timeout = act.wait_readable(0, -1)
-        assert.is_false(ok)
-        assert.match(err, 'msec must be unsigned integer')
-        assert.is_nil(timeout)
-    end))
-
     -- test that fail by timeout
     assert(act.run(function()
         local sock = socketpair()
@@ -373,6 +368,15 @@ function testcase.wait_readable()
         assert.is_nil(again)
     end))
 
+    -- test that fail with invalid arguments
+    assert(act.run(function()
+        local err = assert.throws(act.wait_readable, -1)
+        assert.match(err, 'fd must be unsigned integer')
+
+        err = assert.throws(act.wait_readable, 0, -1)
+        assert.match(err, 'msec must be unsigned integer')
+    end))
+
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.wait_readable)
     assert.match(err, 'outside of execution')
@@ -393,23 +397,10 @@ function testcase.wait_writable()
         end)
 
         act.later()
-        local ok, len = act.await()
-        assert.is_true(ok)
+        local _, len, err = assert(act.await())
+        assert(len, err)
         assert.equal(len, 5)
         assert.equal(reader:recv(), 'hello')
-    end))
-
-    -- test that fail with invalid arguments
-    assert(act.run(function()
-        local err = assert.throws(act.wait_writable, -1)
-        assert.match(err, 'fd value range')
-    end))
-
-    assert(act.run(function()
-        local ok, err, timeout = act.wait_writable(0, -1)
-        assert.is_false(ok)
-        assert.match(err, 'msec must be unsigned integer')
-        assert.is_nil(timeout)
     end))
 
     -- test that fail by timeout
@@ -466,6 +457,15 @@ function testcase.wait_writable()
         assert.is_nil(again)
     end))
 
+    -- test that fail with invalid arguments
+    assert(act.run(function()
+        local err = assert.throws(act.wait_writable, -1)
+        assert.match(err, 'fd must be unsigned integer')
+
+        err = assert.throws(act.wait_writable, 0, -1)
+        assert.match(err, 'msec must be unsigned integer')
+    end))
+
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.wait_writable)
     assert.match(err, 'outside of execution')
@@ -497,19 +497,6 @@ function testcase.sigwait()
         assert(act.await())
     end))
 
-    -- test that fail with invalid arguments
-    assert(act.run(function()
-        local signo, err, timeout = act.sigwait(-1)
-        assert.is_nil(signo)
-        assert.match(err, 'msec must be unsigned integer')
-        assert.is_nil(timeout)
-    end))
-
-    assert(act.run(function()
-        local err = assert.throws(act.sigwait, nil, -1000)
-        assert.match(err, 'invalid signal number')
-    end))
-
     -- test that fail by timeout
     assert(act.run(function()
         act.spawn(function()
@@ -522,6 +509,15 @@ function testcase.sigwait()
 
         act.later()
         assert(act.await())
+    end))
+
+    -- test that fail with invalid arguments
+    assert(act.run(function()
+        local err = assert.throws(act.sigwait, -1)
+        assert.match(err, 'msec must be unsigned integer')
+
+        err = assert.throws(act.sigwait, nil, -1000)
+        assert.match(err, 'invalid signal number')
     end))
 
     -- test that fail on called from outside of execution context
@@ -568,15 +564,11 @@ function testcase.suspend_resume()
 
     -- test that fail on called with invalid argument
     assert(act.run(function()
-        local ok, err, timeout = act.suspend('abc')
-        assert.is_false(ok)
+        local err = assert.throws(act.suspend, 'abc')
         assert.match(err, 'msec must be unsigned integer')
-        assert.is_nil(timeout)
-    end))
 
-    assert(act.run(function()
-        local ok = act.resume('abc')
-        assert.is_false(ok)
+        err = assert.throws(act.resume, 1)
+        assert.match(err, 'cid must be string')
     end))
 
     -- test that fail on called from outside of execution context
@@ -739,8 +731,8 @@ function testcase.read_lock_unlock()
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
-            assert.greater(elapsed, 17)
-            assert.less(elapsed, 24)
+            assert.greater(elapsed, 10)
+            assert.less(elapsed, 30)
             return 'lock timeout 20'
         end)
 
@@ -752,8 +744,8 @@ function testcase.read_lock_unlock()
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
-            assert.greater(elapsed, 6)
-            assert.less(elapsed, 14)
+            assert.greater(elapsed, 1)
+            assert.less(elapsed, 20)
             return 'lock timeout 10'
         end)
 
@@ -767,6 +759,15 @@ function testcase.read_lock_unlock()
         assert.equal(msg, 'lock ok 30')
     end))
 
+    -- test that fail on called with invalid argument
+    assert(act.run(function()
+        local err = assert.throws(act.read_lock, -1)
+        assert.match(err, 'fd must be unsigned integer')
+
+        err = assert.throws(act.read_lock, 1, {})
+        assert.match(err, 'msec must be unsigned integer')
+    end))
+
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.read_lock)
     assert.match(err, 'outside of execution')
@@ -778,7 +779,7 @@ function testcase.write_lock_unlock()
         local _, writer = socketpair()
 
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(writer:fd(), 30)
+            local ok, err, timeout = act.write_lock(writer:fd(), 30)
 
             act.sleep(5)
             assert.is_true(ok)
@@ -788,7 +789,7 @@ function testcase.write_lock_unlock()
         end)
 
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(writer:fd(), 20)
+            local ok, err, timeout = act.write_lock(writer:fd(), 20)
 
             assert.is_true(ok)
             assert.is_nil(err)
@@ -797,7 +798,7 @@ function testcase.write_lock_unlock()
         end)
 
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(writer:fd(), 10)
+            local ok, err, timeout = act.write_lock(writer:fd(), 10)
 
             assert.is_true(ok)
             assert.is_nil(err)
@@ -820,21 +821,21 @@ function testcase.write_lock_unlock()
         local _, writer = socketpair()
         local locked = false
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(writer:fd(), 30)
+            local ok, err, timeout = act.write_lock(writer:fd(), 30)
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
 
             locked = true
             act.sleep(10)
-            act.read_unlock(writer:fd())
+            act.write_unlock(writer:fd())
             locked = false
             return 'lock 10 msec'
         end)
 
         act.spawn(function()
             local elapsed = nanotime()
-            local ok, err, timeout = act.read_lock(writer:fd(), 1000)
+            local ok, err, timeout = act.write_lock(writer:fd(), 1000)
             elapsed = (nanotime() - elapsed) * 1000
 
             assert.is_false(locked)
@@ -859,12 +860,12 @@ function testcase.write_lock_unlock()
         local sock1, sock2 = socketpair()
 
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(sock1:fd(), 30)
+            local ok, err, timeout = act.write_lock(sock1:fd(), 30)
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
 
-            ok, err, timeout = act.read_lock(sock2:fd(), 30)
+            ok, err, timeout = act.write_lock(sock2:fd(), 30)
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
@@ -875,7 +876,7 @@ function testcase.write_lock_unlock()
         end)
 
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(sock1:fd(), 20)
+            local ok, err, timeout = act.write_lock(sock1:fd(), 20)
 
             assert.is_false(ok)
             assert.is_nil(err)
@@ -884,7 +885,7 @@ function testcase.write_lock_unlock()
         end)
 
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(sock2:fd(), 10)
+            local ok, err, timeout = act.write_lock(sock2:fd(), 10)
 
             assert.is_false(ok)
             assert.is_nil(err)
@@ -907,7 +908,7 @@ function testcase.write_lock_unlock()
         local _, writer = socketpair()
 
         act.spawn(function()
-            local ok, err, timeout = act.read_lock(writer:fd(), 30)
+            local ok, err, timeout = act.write_lock(writer:fd(), 30)
 
             act.sleep(30)
             assert.is_true(ok)
@@ -918,27 +919,27 @@ function testcase.write_lock_unlock()
 
         act.spawn(function()
             local elapsed = nanotime()
-            local ok, err, timeout = act.read_lock(writer:fd(), 20)
+            local ok, err, timeout = act.write_lock(writer:fd(), 20)
             elapsed = (nanotime() - elapsed) * 1000
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
-            assert.greater(elapsed, 17)
-            assert.less(elapsed, 24)
+            assert.greater(elapsed, 10)
+            assert.less(elapsed, 30)
             return 'lock timeout 20'
         end)
 
         act.spawn(function()
             local elapsed = nanotime()
-            local ok, err, timeout = act.read_lock(writer:fd(), 10)
+            local ok, err, timeout = act.write_lock(writer:fd(), 10)
             elapsed = (nanotime() - elapsed) * 1000
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
-            assert.greater(elapsed, 6)
-            assert.less(elapsed, 14)
+            assert.greater(elapsed, 1)
+            assert.less(elapsed, 20)
             return 'lock timeout 10'
         end)
 
@@ -950,6 +951,15 @@ function testcase.write_lock_unlock()
 
         _, msg = assert(act.await())
         assert.equal(msg, 'lock ok 30')
+    end))
+
+    -- test that fail on called with invalid argument
+    assert(act.run(function()
+        local err = assert.throws(act.write_lock, -1)
+        assert.match(err, 'fd must be unsigned integer')
+
+        err = assert.throws(act.write_lock, 1, {})
+        assert.match(err, 'msec must be unsigned integer')
     end))
 
     -- test that fail on called from outside of execution context

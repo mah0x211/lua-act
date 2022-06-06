@@ -33,27 +33,33 @@ local INFINITE = math.huge
 local OP_EVENT = 0
 local OP_RUNQ = 1
 
---- isUInt
--- @param val
--- @return ok
-local function isUInt(val)
-    return type(val) == 'number' and val >= 0 and val < INFINITE and val ==
-               floor(val)
+--- is_str
+--- @param v any
+--- @return boolean ok
+local function is_str(v)
+    return type(v) == 'string'
 end
 
---- isFunction
--- @param fn
--- @return ok
-local function isFunction(fn)
-    return type(fn) == 'function'
+--- is_uint
+--- @param v any
+--- @return boolean ok
+local function is_uint(v)
+    return type(v) == 'number' and v >= 0 and v < INFINITE and v == floor(v)
+end
+
+--- is_func
+--- @param v any
+--- @return boolean ok
+local function is_func(v)
+    return type(v) == 'function'
 end
 
 --- concat
--- @param tbl
--- @param sep
--- @param i
--- @param j
--- @return str
+--- @param tbl table
+--- @param sep string
+--- @param i integer
+--- @param j integer
+--- @return string str
 local function concat(tbl, sep, i, j)
     for pos = i or 1, j or #tbl do
         local arg = tbl[pos]
@@ -69,8 +75,9 @@ end
 return {
     OP_EVENT = OP_EVENT,
     OP_RUNQ = OP_RUNQ,
-    isUInt = isUInt,
-    isFunction = isFunction,
+    is_str = is_str,
+    is_uint = is_uint,
+    is_func = is_func,
     concat = concat,
 }
 

@@ -21,9 +21,9 @@
 --
 --- file scope variables
 local rawset = rawset
-local deque_new = require('deque').new
-local event_new = require('act.event').new
-local runq_new = require('act.runq').new
+local new_deque = require('deque').new
+local new_event = require('act.event').new
+local new_runq = require('act.runq').new
 
 --- @class act.context
 --- @field event act.event
@@ -39,14 +39,14 @@ end
 --- @return act.context
 --- @return string? err
 function Context:init()
-    local event, err = event_new()
+    local event, err = new_event()
     if err then
         return nil, err
     end
 
     rawset(self, 'event', event)
-    rawset(self, 'runq', runq_new())
-    rawset(self, 'pool', deque_new())
+    rawset(self, 'runq', new_runq())
+    rawset(self, 'pool', new_deque())
     return self
 end
 

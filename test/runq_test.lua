@@ -29,13 +29,12 @@ function testcase.push()
     assert.match(err, 'callee must have a call method')
 
     -- test that callee must has a function in call field
-    ok, err = q:push({
+    err = assert.throws(q.push, q, {
         call = function()
 
         end,
     }, -1)
-    assert.is_false(ok)
-    assert.match(err, 'msec must be unsigned integer')
+    assert.match(err, 'unsigned integer expected')
 end
 
 function testcase.remove()
@@ -81,7 +80,11 @@ function testcase.consume()
     q:push(c)
 
     -- test that invoking the callee.call method
-    assert.equal(q:consume(), -1)
+    local msec = q:consume()
+    if msec == 0 then
+        msec = q:consume()
+    end
+    assert.equal(msec, -1)
     assert.equal(q.ref, {})
     assert.equal(res, {
         'a',

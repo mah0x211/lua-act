@@ -28,14 +28,18 @@ require('nosigpipe')
 --- file scope variables
 local pcall = pcall
 local fork = require('fork')
+local aux = require('act.aux')
+local is_str = aux.is_str
+local is_uint = aux.is_uint
+local is_func = aux.is_func
 local Callee = require('act.callee')
-local callee_new = Callee.new
+local new_callee = Callee.new
 local callee_acquire = Callee.acquire
 local callee_resume = Callee.resume
 local callee_unwait_writable = Callee.unwait_writable
 local callee_unwait_readable = Callee.unwait_readable
 local callee_unwait = Callee.unwait
-local context_new = require('act.context').new
+local new_context = require('act.context').new
 --- constants
 --- @type act.context
 local ACT_CTX
@@ -54,7 +58,7 @@ local function spawn(atexit, fn, ...)
         callee:renew(atexit, fn, ...)
     else
         -- create new callee
-        callee = callee_new(ACT_CTX, atexit, fn, ...)
+        callee = new_callee(ACT_CTX, atexit, fn, ...)
     end
 
     -- push to runq if not atexit
@@ -94,6 +98,7 @@ function Act.fork()
 
         return p
     end
+
     error('cannot call fork() from outside of execution context', 2)
 end
 
@@ -104,6 +109,9 @@ end
 --- @return string? err
 function Act.spawn(fn, ...)
     if callee_acquire() then
+        if not is_func(fn) then
+            error('fn must be function', 2)
+        end
         return spawn(false, fn, ...)
     end
 
@@ -114,7 +122,6 @@ end
 --- @vararg ...
 function Act.exit(...)
     local callee = callee_acquire()
-
     if callee then
         callee:exit(...)
     end
@@ -127,7 +134,6 @@ end
 --- @return string? err
 function Act.later()
     local callee = callee_acquire()
-
     if callee then
         return callee:later()
     end
@@ -142,8 +148,11 @@ end
 --- @return string? err
 function Act.atexit(fn, ...)
     if callee_acquire() then
-        local _, err = spawn(true, fn, ...)
+        if not is_func(fn) then
+            error('fn must be function', 2)
+        end
 
+        local _, err = spawn(true, fn, ...)
         return not err, err
     end
 
@@ -155,7 +164,6 @@ end
 --- @return ...
 function Act.await()
     local callee = callee_acquire()
-
     if callee then
         return callee:await()
     end
@@ -170,8 +178,10 @@ end
 --- @return boolean timeout
 function Act.suspend(msec)
     local callee = callee_acquire()
-
     if callee then
+        if msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
         return callee:suspend(msec)
     end
 
@@ -184,6 +194,9 @@ end
 --- @return boolean ok
 function Act.resume(cid, ...)
     if callee_acquire() then
+        if not is_str(cid) then
+            error('cid must be string', 2)
+        end
         return callee_resume(cid, ...)
     end
 
@@ -196,8 +209,10 @@ end
 --- @return string? err
 function Act.sleep(msec)
     local callee = callee_acquire()
-
     if callee then
+        if not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
         return callee:sleep(msec)
     end
 
@@ -212,8 +227,10 @@ end
 --- @return boolean? timeout
 function Act.sigwait(msec, ...)
     local callee = callee_acquire()
-
     if callee then
+        if msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
         return callee:sigwait(msec, ...)
     end
 
@@ -228,8 +245,12 @@ end
 --- @return boolean? timeout
 function Act.read_lock(fd, msec)
     local callee = callee_acquire()
-
     if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        elseif msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
         return callee:read_lock(fd, msec)
     end
 
@@ -240,8 +261,10 @@ end
 --- @param fd integer
 function Act.read_unlock(fd)
     local callee = callee_acquire()
-
     if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        end
         return callee:read_unlock(fd)
     end
 
@@ -256,8 +279,12 @@ end
 --- @return boolean? timeout
 function Act.write_lock(fd, msec)
     local callee = callee_acquire()
-
     if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        elseif msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
         return callee:write_lock(fd, msec)
     end
 
@@ -268,8 +295,10 @@ end
 --- @param fd integer
 function Act.write_unlock(fd)
     local callee = callee_acquire()
-
     if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        end
         return callee:write_unlock(fd)
     end
 
@@ -281,9 +310,13 @@ end
 --- @return boolean ok
 function Act.unwait_readable(fd)
     if callee_acquire() then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        end
         callee_unwait_readable(fd)
         return true
     end
+
     error('cannot call unwait_readable() from outside of execution context', 2)
 end
 
@@ -292,9 +325,13 @@ end
 --- @return boolean ok
 function Act.unwait_writable(fd)
     if callee_acquire() then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        end
         callee_unwait_writable(fd)
         return true
     end
+
     error('cannot call unwait_writable() from outside of execution context', 2)
 end
 
@@ -303,15 +340,19 @@ end
 --- @return boolean ok
 function Act.unwait(fd)
     if callee_acquire() then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        end
         callee_unwait(fd)
         return true
     end
+
     error('cannot call unwait() from outside of execution context', 2)
 end
 
 --- wait_readable
 --- @param fd integer
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
 --- @return string? err
 --- @return boolean? timeout
@@ -319,6 +360,11 @@ function Act.wait_readable(fd, msec)
     local callee = callee_acquire()
 
     if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        elseif msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
         return callee:wait_readable(fd, msec)
     end
 
@@ -327,14 +373,18 @@ end
 
 --- wait_writable
 --- @param fd integer
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
 --- @return string? err
 --- @return boolean? timeout
 function Act.wait_writable(fd, msec)
     local callee = callee_acquire()
-
     if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        elseif msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
         return callee:wait_writable(fd, msec)
     end
 
@@ -345,7 +395,6 @@ end
 --- @return any cid
 function Act.getcid()
     local callee = callee_acquire()
-
     if callee then
         return callee.cid
     end
@@ -359,15 +408,9 @@ end
 --- @return boolean ok
 --- @return string? err
 local function runloop(fn, ...)
-    -- check first argument
-    assert(type(fn) == 'function', 'fn must be function')
-    if ACT_CTX then
-        return false, 'act run already'
-    end
-
     -- create act context
     local err
-    ACT_CTX, err = context_new()
+    ACT_CTX, err = new_context()
     if err then
         return false, err
     end
@@ -415,8 +458,14 @@ end
 --- @return boolean ok
 --- @return string err
 function Act.run(fn, ...)
-    local ok, rv, err = pcall(runloop, fn, ...)
+    -- check first argument
+    if not is_func(fn) then
+        error('fn must be function', 2)
+    elseif ACT_CTX then
+        return false, 'act run already'
+    end
 
+    local ok, rv, err = pcall(runloop, fn, ...)
     ACT_CTX = nil
     if ok then
         return rv, err
