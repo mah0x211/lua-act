@@ -81,7 +81,11 @@ function testcase.consume()
     q:push(c)
 
     -- test that invoking the callee.call method
-    assert.equal(q:consume(), -1)
+    local msec = q:consume()
+    if msec == 0 then
+        msec = q:consume()
+    end
+    assert.equal(msec, -1)
     assert.equal(q.ref, {})
     assert.equal(res, {
         'a',

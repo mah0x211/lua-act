@@ -31,14 +31,28 @@ local unwait_readable = require('act').unwait_readable
 local unwait_writable = require('act').unwait_writable
 local strsub = string.sub
 
---- class Pipe
+--- @class act.pipe
 local Pipe = {}
 
+--- init
+--- @return act.pipe
+function Pipe:init()
+    local reader, writer, err = pipe(true)
+
+    if err then
+        return nil, err
+    end
+
+    self.reader = reader
+    self.writer = writer
+    return self
+end
+
 --- read
--- @param msec
--- @return str
--- @return err
--- @return timeout
+--- @param msec integer
+--- @return string str
+--- @return error err
+--- @return boolean timeout
 function Pipe:read(msec)
     local str, err, again = self.reader:read()
     if not again then
@@ -59,11 +73,11 @@ function Pipe:read(msec)
 end
 
 --- write
--- @param str
--- @param msec
--- @return len
--- @return err
--- @return timeout
+--- @param str string
+--- @param msec integer
+--- @return integer len
+--- @return error err
+--- @return boolean timeout
 function Pipe:write(str, msec)
     local len, err, again = self.writer:write(str)
     if not again then
@@ -99,24 +113,7 @@ function Pipe:close()
     self.writer:close()
 end
 
---- new
--- @return pipe
-local function new()
-    local reader, writer, err = pipe(true)
-
-    if err then
-        return nil, err
-    end
-
-    return setmetatable({
-        reader = reader,
-        writer = writer,
-    }, {
-        __index = Pipe,
-    })
-end
-
 return {
-    new = new,
+    new = require('metamodule').new(Pipe),
 }
 
