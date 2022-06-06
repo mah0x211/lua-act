@@ -24,12 +24,12 @@
 -- Created by Masatoshi Teruya on 18/04/17.
 --
 --- file scope variables
+local strsub = string.sub
 local pipe = require('pipe')
 local wait_readable = require('act').wait_readable
 local wait_writable = require('act').wait_writable
 local unwait_readable = require('act').unwait_readable
 local unwait_writable = require('act').unwait_writable
-local strsub = string.sub
 
 --- @class act.pipe
 local Pipe = {}

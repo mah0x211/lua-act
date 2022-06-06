@@ -26,7 +26,7 @@
 --- file scope variables
 local rawset = rawset
 local setmetatable = setmetatable
-local deque_new = require('deque').new
+local new_deque = require('deque').new
 local new_evm = require('evm').new
 local OP_EVENT = require('act.aux').OP_EVENT
 
@@ -50,7 +50,7 @@ function Event:init()
     end
 
     rawset(self, 'monitor', monitor)
-    rawset(self, 'pool', deque_new())
+    rawset(self, 'pool', new_deque())
     rawset(self, 'used', setmetatable({}, {
         __mode = 'k',
     }))
@@ -68,7 +68,7 @@ function Event:renew()
     end
 
     -- re-create new pool (dispose pooled events)
-    self.pool = deque_new()
+    self.pool = new_deque()
     -- renew used events
     for ev in pairs(self.used) do
         assert(ev:renew())
@@ -158,7 +158,7 @@ end
 --- consume
 --- @param msec integer
 --- @return integer nev
---- @return string? err
+--- @return error? err
 function Event:consume(msec)
     if #self.monitor > 0 then
         local monitor = self.monitor

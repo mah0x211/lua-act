@@ -28,13 +28,12 @@ local yield = coroutine.yield
 local setmetatable = setmetatable
 local tostring = tostring
 local strsub = string.sub
-local argv_new = require('argv').new
-local deque_new = require('deque').new
+local new_argv = require('argv').new
+local new_deque = require('deque').new
 local reco = require('reco')
-local reco_new = reco.new
+local new_reco = reco.new
 local aux = require('act.aux')
 local concat = aux.concat
-local is_uint = aux.is_uint
 -- constants
 local OP_EVENT = aux.OP_EVENT
 local OP_RUNQ = aux.OP_RUNQ
@@ -50,9 +49,11 @@ local SUSPENDED = setmetatable({}, {
 })
 local RLOCKS = {}
 local WLOCKS = {}
-local OPERATORS = {
-    readable = {},
-    writable = {},
+local RWAITS = {}
+local WWAITS = {}
+local RWWAITS = {
+    readable = RWAITS,
+    writable = WWAITS,
 }
 
 --- @type act.callee
@@ -65,8 +66,8 @@ local function acquire()
 end
 
 --- unwaitfd
--- @param operators
--- @param fd
+--- @param operators table<integer, act.callee>
+--- @param fd integer
 local function unwaitfd(operators, fd)
     local callee = operators[fd]
 
@@ -91,28 +92,28 @@ local function unwaitfd(operators, fd)
 end
 
 --- unwait_readable
--- @param fd
+--- @param fd integer
 local function unwait_readable(fd)
-    unwaitfd(OPERATORS.readable, fd)
+    unwaitfd(RWAITS, fd)
 end
 
 --- unwait_writable
--- @param fd
+--- @param fd integer
 local function unwait_writable(fd)
-    unwaitfd(OPERATORS.writable, fd)
+    unwaitfd(WWAITS, fd)
 end
 
 --- unwait
--- @param fd
+--- @param fd integer
 local function unwait(fd)
-    unwaitfd(OPERATORS.readable, fd)
-    unwaitfd(OPERATORS.writable, fd)
+    unwaitfd(RWAITS, fd)
+    unwaitfd(WWAITS, fd)
 end
 
 --- resume
--- @param cid
--- @param ...
--- @return ok
+--- @param cid string
+--- @vararg any
+--- @return boolean ok
 local function resume(cid, ...)
     local callee = SUSPENDED[cid]
 
@@ -131,12 +132,12 @@ local function resume(cid, ...)
 end
 
 --- resumeq
--- @param runq
--- @param cidq
-local function resumeq(runq, cidq)
+--- @param runq act.runq
+--- @param waitq string[]
+local function resumeq(runq, waitq)
     -- first index is used for holding a fd
-    for i = 1, #cidq do
-        local cid = cidq[i]
+    for i = 1, #waitq do
+        local cid = waitq[i]
         local callee = SUSPENDED[cid]
 
         -- found a suspended callee
@@ -170,7 +171,7 @@ function Callee:revoke()
     if self.evfd ~= -1 then
         local ev = self.ev
 
-        OPERATORS[self.evasa][self.evfd] = nil
+        RWWAITS[self.evasa][self.evfd] = nil
         self.ev = nil
         self.evfd = -1
         self.evasa = ''
@@ -204,18 +205,18 @@ function Callee:dispose(ok)
     SUSPENDED[self.cid] = nil
 
     -- resume all suspended callee
-    for fd, cidq in pairs(self.rlock) do
-        -- remove cidq maintained by fd
+    for fd, waitq in pairs(self.rlock) do
+        -- remove waitq maintained by fd
         RLOCKS[fd] = nil
-        resumeq(runq, cidq)
+        resumeq(runq, waitq)
     end
     self.rlock = {}
 
     -- resume all suspended callee
-    for fd, cidq in pairs(self.wlock) do
-        -- remove cidq maintained by fd
+    for fd, waitq in pairs(self.wlock) do
+        -- remove waitq maintained by fd
         WLOCKS[fd] = nil
-        resumeq(runq, cidq)
+        resumeq(runq, waitq)
     end
     self.wlock = {}
 
@@ -301,12 +302,9 @@ end
 --- @return ...
 --- @return boolean timeout
 function Callee:suspend(msec)
-    local cid = self.cid
-
     if msec ~= nil then
         -- suspend until reached to msec
         local ok, err = self.act.runq:push(self, msec)
-
         if not ok then
             return false, err
         end
@@ -315,6 +313,7 @@ function Callee:suspend(msec)
     -- revoke all events currently in use
     self:revoke()
     -- wait until resumed by resume method
+    local cid = self.cid
     SUSPENDED[cid] = self
     if yield() == OP_RUNQ then
         -- resumed by time-out if self exists in suspend list
@@ -337,7 +336,6 @@ end
 --- @return string? err
 function Callee:later()
     local ok, err = self.act.runq:push(self)
-
     if not ok then
         return false, err
     end
@@ -358,14 +356,14 @@ end
 --- @param asa string
 --- @param fd integer
 local function rwunlock(callee, locks, asa, fd)
-    local cidq = callee[asa][fd]
+    local waitq = callee[asa][fd]
 
-    -- resume all suspended callee
-    if cidq then
+    if waitq then
+        -- resume all suspended callee
         callee[asa][fd] = nil
-        -- remove cidq maintained by fd
+        -- remove waitq maintained by fd
         locks[fd] = nil
-        resumeq(callee.act.runq, cidq)
+        resumeq(callee.act.runq, waitq)
     end
 end
 
@@ -391,25 +389,24 @@ end
 --- @return string? err
 --- @return boolean? timeout
 local function rwlock(callee, locks, asa, fd, msec)
-    assert(is_uint(fd), 'fd must be unsigned integer')
     if not callee[asa][fd] then
-        local cidq = locks[fd]
+        local waitq = locks[fd]
 
         -- other callee is waiting
-        if cidq then
-            local idx = #cidq + 1
-            local ok, err, timeout
+        if waitq then
+            local idx = #waitq + 1
 
-            cidq[idx] = callee.cid
-            ok, err, timeout = callee:suspend(msec)
-            cidq[idx] = false
+            waitq[idx] = callee.cid
+            local ok, err, timeout = callee:suspend(msec)
+            waitq[idx] = false
 
             return ok, err, timeout
         end
 
-        -- create read or write queue
-        locks[fd] = {}
-        callee[asa][fd] = locks[fd]
+        -- create read or write lock wait queue
+        waitq = {}
+        locks[fd] = waitq
+        callee[asa][fd] = waitq
     end
 
     return true
@@ -445,17 +442,14 @@ end
 --- @return string? err
 --- @return boolean? timeout
 local function waitable(self, operators, asa, fd, msec)
-    local runq = self.act.runq
     local event = self.act.event
-    local op, fdno, disabled
 
     -- fd is not watching yet
     if self.evfd ~= fd or self.evasa ~= asa then
-        local callee = operators[fd]
-
         -- revoke retained event
         self:revoke()
 
+        local callee = operators[fd]
         -- another callee has an 'asa' event of fd
         if callee then
             -- currently in-use
@@ -494,7 +488,7 @@ local function waitable(self, operators, asa, fd, msec)
 
     -- register to runq
     if msec then
-        local ok, err = runq:push(self, msec)
+        local ok, err = self.act.runq:push(self, msec)
 
         if not ok then
             local ev = self.ev
@@ -510,7 +504,7 @@ local function waitable(self, operators, asa, fd, msec)
 
     self.evuse = true
     -- wait until event fired
-    op, fdno, disabled = yield()
+    local op, fdno, disabled = yield()
     self.evuse = false
 
     -- got io event
@@ -518,7 +512,7 @@ local function waitable(self, operators, asa, fd, msec)
         if fdno == fd then
             -- remove from runq
             if msec then
-                runq:remove(self)
+                self.act.runq:remove(self)
             end
 
             if disabled then
@@ -528,19 +522,19 @@ local function waitable(self, operators, asa, fd, msec)
             return true
         end
     elseif op == OP_RUNQ then
-        -- revoked by unwaitfd
         if self.evasa == 'unwaitfd' then
+            -- revoked by unwaitfd
             self.evasa = ''
             return false
-            -- timed out
         elseif msec then
+            -- timed out
             return false, nil, true
         end
     end
 
     -- remove from runq
     if msec then
-        runq:remove(self)
+        self.act.runq:remove(self)
     end
 
     -- revoke event
@@ -557,7 +551,7 @@ end
 --- @return string? err
 --- @return boolean? timeout
 function Callee:wait_readable(fd, msec)
-    return waitable(self, OPERATORS.readable, 'readable', fd, msec)
+    return waitable(self, RWAITS, 'readable', fd, msec)
 end
 
 --- wait_writable
@@ -567,7 +561,7 @@ end
 --- @return string? err
 --- @return boolean? timeout
 function Callee:wait_writable(fd, msec)
-    return waitable(self, OPERATORS.writable, 'writable', fd, msec)
+    return waitable(self, WWAITS, 'writable', fd, msec)
 end
 
 --- sleep
@@ -576,7 +570,6 @@ end
 --- @return string? err
 function Callee:sleep(msec)
     local ok, err = self.act.runq:push(self, msec)
-
     if not ok then
         return false, err
     end
@@ -598,21 +591,17 @@ end
 --- @return string? err
 --- @return boolean? timeout
 function Callee:sigwait(msec, ...)
-    local runq = self.act.runq
-    local event = self.act.event
-    local sigset, sigmap
-
     -- register to runq with msec
     if msec then
-        local ok, err = runq:push(self, msec)
-
+        local ok, err = self.act.runq:push(self, msec)
         if not ok then
             return nil, err
         end
     end
 
-    sigset = deque_new()
-    sigmap = {}
+    local event = self.act.event
+    local sigset = new_deque()
+    local sigmap = {}
     -- register signal events
     for _, signo in pairs({
         ...,
@@ -624,7 +613,6 @@ function Callee:sigwait(msec, ...)
             for _ = 1, #sigset do
                 event:revoke(sigset:pop())
             end
-
             return nil, err
         end
 
@@ -636,38 +624,34 @@ function Callee:sigwait(msec, ...)
     -- no need to wait signal if empty
     if #sigset == 0 then
         return nil
-        -- wait registered signals
-    else
-        local op, signo
-
-        -- revoke all events currently in use
-        self:revoke()
-        -- wait signal events
-        self.sigset = sigset
-        op, signo = yield()
-        self.sigset = nil
-
-        -- remove from runq
-        if msec then
-            runq:remove(self)
-        end
-
-        -- revoke signal events
-        for _ = 1, #sigset do
-            event:revoke(sigset:pop())
-        end
-
-        -- got signal event
-        if op == OP_EVENT and sigmap[signo] then
-            return signo
-            -- timed out
-        elseif op == OP_RUNQ then
-            return nil, nil, true
-        end
-
-        -- normally unreachable
-        error('invalid implements')
     end
+
+    -- revoke all events currently in use
+    self:revoke()
+    -- wait registered signals
+    self.sigset = sigset
+    local op, signo = yield()
+    self.sigset = nil
+    -- remove from runq if registered
+    if msec then
+        self.act.runq:remove(self)
+    end
+
+    -- revoke signal events
+    for _ = 1, #sigset do
+        event:revoke(sigset:pop())
+    end
+
+    if op == OP_EVENT and sigmap[signo] then
+        -- got signal event
+        return signo
+    elseif op == OP_RUNQ then
+        -- timed out
+        return nil, nil, true
+    end
+
+    -- normally unreachable
+    error('invalid implements')
 end
 
 --- attach2caller
@@ -726,15 +710,15 @@ end
 --- @vararg any
 --- @return act.callee callee
 function Callee:init(act, atexit, fn, ...)
-    local args = argv_new()
+    local args = new_argv()
     args:set(0, ...)
 
     self.act = act
     self.atexit = atexit
-    self.co = reco_new(fn)
+    self.co = new_reco(fn)
     self.args = args
-    self.argv = argv_new()
-    self.node = deque_new()
+    self.argv = new_argv()
+    self.node = new_deque()
     self.rlock = {}
     self.wlock = {}
     -- ev = [event object]

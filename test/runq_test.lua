@@ -29,13 +29,12 @@ function testcase.push()
     assert.match(err, 'callee must have a call method')
 
     -- test that callee must has a function in call field
-    ok, err = q:push({
+    err = assert.throws(q.push, q, {
         call = function()
 
         end,
     }, -1)
-    assert.is_false(ok)
-    assert.match(err, 'msec must be unsigned integer')
+    assert.match(err, 'unsigned integer expected')
 end
 
 function testcase.remove()

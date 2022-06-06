@@ -38,7 +38,7 @@
 
 static int msleep_lua(lua_State *L)
 {
-    lua_Integer deadline = lauxh_checkinteger(L, 1) * 1000000ULL;
+    lua_Integer deadline = lauxh_checkuinteger(L, 1) * 1000000ULL;
     uint64_t now         = hrt_getnsec();
 
     if (deadline < now || hrt_nanosleep(deadline - now) == 0) {
@@ -55,7 +55,7 @@ static int msleep_lua(lua_State *L)
 
 static int nsleep_lua(lua_State *L)
 {
-    lua_Integer deadline = lauxh_checkinteger(L, 1);
+    lua_Integer deadline = lauxh_checkuinteger(L, 1);
     uint64_t now         = hrt_getnsec();
 
     if (deadline < now || hrt_nanosleep(deadline - now) == 0) {
@@ -72,7 +72,7 @@ static int nsleep_lua(lua_State *L)
 
 static int remain_lua(lua_State *L)
 {
-    lua_Integer msec = lauxh_checkinteger(L, 1);
+    lua_Integer msec = lauxh_checkuinteger(L, 1);
     uint64_t now     = hrt_getnsec() / 1000000ULL;
 
     // return a remaining msec
@@ -87,7 +87,7 @@ static int remain_lua(lua_State *L)
 
 static int getmsec_lua(lua_State *L)
 {
-    lua_Integer msec = lauxh_optinteger(L, 1, 0);
+    lua_Integer msec = lauxh_optuinteger(L, 1, 0);
 
     lua_pushinteger(L, hrt_getnsec() / 1000000ULL + (uint64_t)msec);
 
@@ -96,7 +96,7 @@ static int getmsec_lua(lua_State *L)
 
 static int getnsec_lua(lua_State *L)
 {
-    lua_Integer nsec = lauxh_optinteger(L, 1, 0);
+    lua_Integer nsec = lauxh_optuinteger(L, 1, 0);
 
     lua_pushinteger(L, hrt_getnsec() + (uint64_t)nsec);
 

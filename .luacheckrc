@@ -10,6 +10,8 @@ ignore = {
     '212',
     -- unused loop variable
     -- '213',
+    -- local variable is mutated but never accessed
+    '241',
     -- redefining a local variable
     -- '411',
     -- shadowing a local variable

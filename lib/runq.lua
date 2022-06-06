@@ -32,7 +32,6 @@ local hrtimer_getmsec = hrtimer.getmsec
 local hrtimer_remain = hrtimer.remain
 local hrtimer_msleep = hrtimer.msleep
 local aux = require('act.aux')
-local is_uint = aux.is_uint
 local is_func = aux.is_func
 --- constants
 local OP_RUNQ = aux.OP_RUNQ
@@ -58,19 +57,13 @@ end
 --- @return boolean ok
 --- @return string? err
 function RunQ:push(callee, msec)
-    local ref = self.ref
-
     if not callee or not is_func(callee.call) then
         return false, 'callee must have a call method'
-    elseif msec == nil then
-        msec = hrtimer_getmsec()
-    elseif not is_uint(msec) then
-        return false, 'msec must be unsigned integer'
-    else
-        msec = hrtimer_getmsec(msec)
     end
+    msec = hrtimer_getmsec(msec)
 
     -- register callee
+    local ref = self.ref
     if not ref[callee] then
         local queue = ref[msec]
         local qelm
@@ -129,14 +122,13 @@ function RunQ:consume()
 
         if helm then
             local queue = helm.val
-            local nqueue = #queue
             local ref = self.ref
 
             ref[queue] = nil
             ref[helm.pri] = nil
 
             -- consume the current queued callees
-            for _ = 1, nqueue do
+            for _ = 1, #queue do
                 local callee = queue:pop()
 
                 if not callee then
