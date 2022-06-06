@@ -26,14 +26,14 @@
 --- file scope variables
 local rawset = rawset
 local setmetatable = setmetatable
-local deque_new = require('deq').new
-local sentry_new = require('sentry').new
+local deque_new = require('deque').new
+local new_evm = require('evm').new
 local OP_EVENT = require('act.aux').OP_EVENT
 
---- @class act.event.Event
---- @field loop sentry.Loop
+--- @class act.event
+--- @field monitor evm
 --- @field pool Deque
---- @field used table<sentry.Event, boolean>
+--- @field used table<evm.event, boolean>
 local Event = {}
 
 function Event:__newindex()
@@ -41,15 +41,15 @@ function Event:__newindex()
 end
 
 --- init
---- @return act.event.Event ev
---- @return string? err
+--- @return act.event ev
+--- @return error? err
 function Event:init()
-    local loop, err = sentry_new()
+    local monitor, err = new_evm()
     if err then
         return nil, err
     end
 
-    rawset(self, 'loop', loop)
+    rawset(self, 'monitor', monitor)
     rawset(self, 'pool', deque_new())
     rawset(self, 'used', setmetatable({}, {
         __mode = 'k',
@@ -60,9 +60,9 @@ end
 
 --- renew
 --- @return boolean ok
---- @return string? err
+--- @return error? err
 function Event:renew()
-    local ok, err = self.loop:renew()
+    local ok, err = self.monitor:renew()
     if not ok then
         return false, err
     end
@@ -78,28 +78,24 @@ function Event:renew()
 end
 
 --- register
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param asa string
 --- @param val integer|number
 --- @param oneshot? boolean
 --- @param edge? boolean
---- @return sentry.Event ev
---- @return string? err
+--- @return evm.event ev
+--- @return error? err
 function Event:register(callee, asa, val, oneshot, edge)
     local ev = self.pool:pop()
-    local err
 
     -- create new event
     if not ev then
-        ev, err = self.loop:newevent()
-        if err then
-            return nil, err
-        end
+        ev = self.monitor:newevent()
     end
 
     -- register event as a asa
-    err = ev[asa](ev, val, callee, oneshot, edge)
-    if err then
+    local ok, err = ev[asa](ev, val, callee, oneshot, edge)
+    if not ok then
         return nil, err
     end
 
@@ -110,7 +106,7 @@ function Event:register(callee, asa, val, oneshot, edge)
 end
 
 --- revoke
---- @param ev sentry.Event
+--- @param ev evm.event
 function Event:revoke(ev)
     -- release reference of event explicitly
     self.used[ev] = nil
@@ -120,41 +116,41 @@ function Event:revoke(ev)
 end
 
 --- signal
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param signo integer
 --- @param oneshot boolean
---- @return sentry.Event ev
---- @return string? err
+--- @return evm.signal ev
+--- @return error? err
 function Event:signal(callee, signo, oneshot)
     return self:register(callee, 'assignal', signo, oneshot)
 end
 
 --- timer
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param ival number
 --- @param oneshot boolean
---- @return sentry.Event ev
---- @return string? err
+--- @return evm.timer ev
+--- @return error? err
 function Event:timer(callee, ival, oneshot)
     return self:register(callee, 'astimer', ival, oneshot)
 end
 
 --- writable
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param fd integer
 --- @param oneshot boolean
---- @return sentry.Event ev
---- @return string? err
+--- @return evm.writable ev
+--- @return error? err
 function Event:writable(callee, fd, oneshot)
     return self:register(callee, 'aswritable', fd, oneshot)
 end
 
 --- readable
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param fd integer
 --- @param oneshot boolean
---- @return sentry.Event ev
---- @return string? err
+--- @return evm.readable ev
+--- @return error? err
 function Event:readable(callee, fd, oneshot)
     return self:register(callee, 'asreadable', fd, oneshot)
 end
@@ -164,33 +160,33 @@ end
 --- @return integer nev
 --- @return string? err
 function Event:consume(msec)
-    if #self.loop > 0 then
-        local loop = self.loop
+    if #self.monitor > 0 then
+        local monitor = self.monitor
         -- wait events
-        local nev, err = loop:wait(msec)
+        local nev, err = monitor:wait(msec)
 
         if err then
             -- got critical error
             return nil, err
         elseif nev > 0 then
             -- consuming events
-            local ev, callee, disabled = loop:getevent()
+            local ev, callee, disabled = monitor:getevent()
 
             while ev do
                 -- resume
                 callee:call(OP_EVENT, ev:ident(), disabled)
                 -- get next event
-                ev, callee, disabled = loop:getevent()
+                ev, callee, disabled = monitor:getevent()
             end
         end
 
-        return #self.loop
+        return #self.monitor
     end
 
     return 0
 end
 
 return {
-    new = require('metamodule').new.Event(Event),
+    new = require('metamodule').new(Event),
 }
 

@@ -5,6 +5,7 @@ include_files = {
     'test/*_spec.lua',
 }
 ignore = {
+    'assert',
     -- unused argument
     '212',
     -- unused loop variable

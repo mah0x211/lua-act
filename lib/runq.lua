@@ -25,7 +25,7 @@
 --
 --- file scope variables
 local rawset = rawset
-local deque_new = require('deq').new
+local deque_new = require('deque').new
 local minheap_new = require('minheap').new
 local hrtimer = require('act.hrtimer')
 local hrtimer_getmsec = hrtimer.getmsec
@@ -37,7 +37,7 @@ local isFunction = aux.isFunction
 --- constants
 local OP_RUNQ = aux.OP_RUNQ
 
---- @class act.runq.RunQ
+--- @class act.runq
 local RunQ = {}
 
 function RunQ:__newindex()
@@ -45,7 +45,7 @@ function RunQ:__newindex()
 end
 
 --- init
---- @return act.runq.RunQ
+--- @return act.runq
 function RunQ:init()
     rawset(self, 'heap', minheap_new())
     rawset(self, 'ref', {})
@@ -53,7 +53,7 @@ function RunQ:init()
 end
 
 --- push
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param msec integer
 --- @return boolean ok
 --- @return string? err
@@ -98,7 +98,7 @@ function RunQ:push(callee, msec)
 end
 
 --- remove
---- @param callee act.callee.Callee
+--- @param callee act.callee
 function RunQ:remove(callee)
     local ref = self.ref
     local qelm = ref[callee]
@@ -192,6 +192,6 @@ function RunQ:len()
 end
 
 return {
-    new = require('metamodule').new.RunQ(RunQ),
+    new = require('metamodule').new(RunQ),
 }
 

@@ -21,13 +21,13 @@
 --
 --- file scope variables
 local rawset = rawset
-local deque_new = require('deq').new
+local deque_new = require('deque').new
 local event_new = require('act.event').new
 local runq_new = require('act.runq').new
 
---- @class act.context.Context
---- @field event act.event.Event
---- @field runq act.runq.RunQ
+--- @class act.context
+--- @field event act.event
+--- @field runq act.runq
 --- @field pool Deque
 local Context = {}
 
@@ -36,7 +36,7 @@ function Context:__newindex()
 end
 
 --- init
---- @return act.context.Context
+--- @return act.context
 --- @return string? err
 function Context:init()
     local event, err = event_new()
@@ -73,6 +73,6 @@ function Context:pushq(callee)
 end
 
 return {
-    new = require('metamodule').new.Context(Context),
+    new = require('metamodule').new(Context),
 }
 

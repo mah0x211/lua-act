@@ -29,7 +29,7 @@ local setmetatable = setmetatable
 local tostring = tostring
 local strsub = string.sub
 local argv_new = require('argv').new
-local deque_new = require('deq').new
+local deque_new = require('deque').new
 local reco = require('reco')
 local reco_new = reco.new
 local aux = require('act.aux')
@@ -55,11 +55,11 @@ local OPERATORS = {
     writable = {},
 }
 
---- @type act.callee.Callee
+--- @type act.callee
 local CURRENT_CALLEE
 
 --- acquire
---- @return act.callee.Callee callee
+--- @return act.callee callee
 local function acquire()
     return CURRENT_CALLEE
 end
@@ -149,7 +149,7 @@ local function resumeq(runq, cidq)
     end
 end
 
---- @class act.callee.Callee
+--- @class act.callee
 local Callee = {}
 
 --- revoke
@@ -353,7 +353,7 @@ function Callee:later()
 end
 
 --- rwunlock
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param locks table
 --- @param asa string
 --- @param fd integer
@@ -382,7 +382,7 @@ function Callee:write_unlock(fd)
 end
 
 --- rwlock
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @param locks table
 --- @param asa string
 --- @param fd integer
@@ -436,7 +436,7 @@ function Callee:write_lock(fd, msec)
 end
 
 --- waitable
---- @param self act.callee.Callee
+--- @param self act.callee
 --- @param operators table
 --- @param asa string
 --- @param fd integer
@@ -671,8 +671,8 @@ function Callee:sigwait(msec, ...)
 end
 
 --- attach2caller
---- @param caller act.callee.Callee
---- @param callee act.callee.Callee
+--- @param caller act.callee
+--- @param callee act.callee
 --- @param atexit boolean
 local function attach2caller(caller, callee, atexit)
     if caller then
@@ -720,11 +720,11 @@ function Callee:renew(atexit, fn, ...)
 end
 
 --- new
---- @param act act.context.Context
+--- @param act act.context
 --- @param atexit boolean
 --- @param fn function
 --- @vararg any
---- @return act.callee.Callee callee
+--- @return act.callee callee
 function Callee:init(act, atexit, fn, ...)
     local args = argv_new()
     args:set(0, ...)
@@ -752,7 +752,7 @@ function Callee:init(act, atexit, fn, ...)
 end
 
 return {
-    new = require('metamodule').new.Callee(Callee),
+    new = require('metamodule').new(Callee),
     acquire = acquire,
     unwait = unwait,
     unwait_readable = unwait_readable,
