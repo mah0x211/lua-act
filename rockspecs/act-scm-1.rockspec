@@ -2,16 +2,17 @@ rockspec_format = "3.0"
 package = "act"
 version = "scm-1"
 source = {
-    url = "git+https://github.com/mah0x211/lua-act.git"
+    url = "git+https://github.com/mah0x211/lua-act.git",
 }
 description = {
     summary = "coroutine based synchronously non-blocking operations module",
     homepage = "https://github.com/mah0x211/lua-act",
     license = "MIT/X11",
-    maintainer = "Masatoshi Teruya"
+    maintainer = "Masatoshi Fukunaga"
 }
 dependencies = {
     "lua >= 5.1",
+    "lauxhlib >= 0.4.0",
     "mah0x211/argv >= 0.3",
     "mah0x211/deque >= 0.4",
     "mah0x211/fork >= 0.2",
@@ -31,7 +32,6 @@ build = {
         ['act.context'] = "lib/context.lua",
         ['act.event'] = "lib/event.lua",
         ['act.hrtimer'] = {
-            incdirs = { "deps/lauxhlib" },
             sources = { "src/hrtimer.c" }
         },
         ['act.pipe'] = "lib/pipe.lua",
