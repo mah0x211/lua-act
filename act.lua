@@ -278,34 +278,35 @@ end
 
 --- unwait_readable
 --- @param fd integer
+--- @return boolean ok
 function Act.unwait_readable(fd)
     if callee_acquire() then
         callee_unwait_readable(fd)
-    else
-        error('cannot call unwait_readable() from outside of execution context',
-              2)
+        return true
     end
+    error('cannot call unwait_readable() from outside of execution context', 2)
 end
 
 --- unwait_writable
 --- @param fd integer
+--- @return boolean ok
 function Act.unwait_writable(fd)
     if callee_acquire() then
         callee_unwait_writable(fd)
-    else
-        error('cannot call unwait_writable() from outside of execution context',
-              2)
+        return true
     end
+    error('cannot call unwait_writable() from outside of execution context', 2)
 end
 
 --- unwait
 --- @param fd integer
+--- @return boolean ok
 function Act.unwait(fd)
     if callee_acquire() then
         callee_unwait(fd)
-    else
-        error('cannot call unwait() from outside of execution context', 2)
+        return true
     end
+    error('cannot call unwait() from outside of execution context', 2)
 end
 
 --- wait_readable
