@@ -27,10 +27,6 @@ build = {
     modules = {
         act = "act.lua",
         ['act.aux'] = "lib/aux.lua",
-        ['act.aux.syscall'] = {
-            incdirs = { "deps/lauxhlib" },
-            sources = { "src/aux.c" }
-        },
         ['act.callee'] = "lib/callee.lua",
         ['act.context'] = "lib/context.lua",
         ['act.event'] = "lib/event.lua",
