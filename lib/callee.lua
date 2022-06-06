@@ -34,7 +34,7 @@ local reco = require('reco')
 local reco_new = reco.new
 local aux = require('act.aux')
 local concat = aux.concat
-local isUInt = aux.isUInt
+local is_uint = aux.is_uint
 -- constants
 local OP_EVENT = aux.OP_EVENT
 local OP_RUNQ = aux.OP_RUNQ
@@ -391,7 +391,7 @@ end
 --- @return string? err
 --- @return boolean? timeout
 local function rwlock(callee, locks, asa, fd, msec)
-    assert(isUInt(fd), 'fd must be unsigned integer')
+    assert(is_uint(fd), 'fd must be unsigned integer')
     if not callee[asa][fd] then
         local cidq = locks[fd]
 

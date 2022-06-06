@@ -33,18 +33,18 @@ local INFINITE = math.huge
 local OP_EVENT = 0
 local OP_RUNQ = 1
 
---- isUInt
+--- is_uint
 -- @param val
 -- @return ok
-local function isUInt(val)
+local function is_uint(val)
     return type(val) == 'number' and val >= 0 and val < INFINITE and val ==
                floor(val)
 end
 
---- isFunction
+--- is_func
 -- @param fn
 -- @return ok
-local function isFunction(fn)
+local function is_func(fn)
     return type(fn) == 'function'
 end
 
@@ -69,8 +69,8 @@ end
 return {
     OP_EVENT = OP_EVENT,
     OP_RUNQ = OP_RUNQ,
-    isUInt = isUInt,
-    isFunction = isFunction,
+    is_uint = is_uint,
+    is_func = is_func,
     concat = concat,
 }
 
