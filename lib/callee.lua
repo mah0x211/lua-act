@@ -281,11 +281,20 @@ function Callee:exit(...)
     error('invalid implements')
 end
 
---- await
+--- await until the child thread to exit while the specified number of seconds.
+--- @param msec integer
 --- @return boolean ok
 --- @return ...
-function Callee:await()
+function Callee:await(msec)
     if #self.node > 0 then
+        if msec ~= nil then
+            -- register to resume after msec seconds
+            local ok, err = self.act.runq:push(self, msec)
+            if not ok then
+                return false, err
+            end
+        end
+
         -- revoke all events currently in use
         self:revoke()
         self.wait = true
