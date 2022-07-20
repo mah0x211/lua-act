@@ -83,17 +83,17 @@ function testcase.sleep()
             return 'awake 5'
         end)
 
-        local _, msg = assert(act.await())
-        assert(msg == 'awake 5')
+        local res = assert(act.await())
+        assert(res.result[1] == 'awake 5')
 
-        _, msg = assert(act.await())
-        assert(msg == 'awake 10')
+        res = assert(act.await())
+        assert(res.result[1] == 'awake 10')
 
-        _, msg = assert(act.await())
-        assert(msg == 'awake 25')
+        res = assert(act.await())
+        assert(res.result[1] == 'awake 25')
 
-        _, msg = assert(act.await())
-        assert(msg == 'awake 35')
+        res = assert(act.await())
+        assert(res.result[1] == 'awake 35')
     end))
 
     -- test that fail with invalid deadline
@@ -187,10 +187,12 @@ function testcase.atexit()
     -- test that pass a previous error message
     executed = false
     assert(act.run(function()
-        act.atexit(function(a, b, err)
-            assert(a == 'foo')
-            assert(b == 'bar')
-            assert(string.find(err, 'hello'))
+        act.atexit(function(a, b, ok, status, err)
+            assert.equal(a, 'foo')
+            assert.equal(b, 'bar')
+            assert.is_false(ok)
+            assert.equal(status, act.ERRRUN)
+            assert.match(err, 'hello')
             executed = true
         end, 'foo', 'bar')
 
@@ -209,9 +211,8 @@ function testcase.atexit()
             return 'hello'
         end)
 
-        local ok, err = act.await()
-        assert.is_false(ok)
-        assert.match(err, 'world.+traceback', false)
+        local res = assert(act.await())
+        assert.match(res.error, 'world.+traceback', false)
     end))
 
     -- test that return the return values of main function
@@ -223,12 +224,10 @@ function testcase.atexit()
             return 'hello', 'world'
         end)
 
-        local ok, a, b = act.await()
-        assert.is_true(ok)
-        assert.equal({
-            a,
-            b,
-        }, {
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            true,
+            act.OK,
             'hello',
             'world',
         })
@@ -237,15 +236,14 @@ function testcase.atexit()
     -- test that recover the error of main function
     assert(act.run(function()
         act.spawn(function()
-            assert(act.atexit(function(a, b, ...)
+            assert(act.atexit(function(a, b, ok, status, ...)
                 return ...
             end, 'foo', 'bar'))
             error('hello')
         end)
 
-        local ok, err = act.await()
-        assert.is_true(ok)
-        assert.match(err, 'hello.+traceback', false)
+        local res = assert(act.await())
+        assert.match(res.result[1], 'hello.+traceback', false)
     end))
 
     -- test that fail with a non-function argument
@@ -263,13 +261,13 @@ end
 function testcase.await()
     -- test that waiting for spawned coroutines to terminate
     assert(act.run(function()
-        act.spawn(function()
+        local cid1 = act.spawn(function()
             return 'hello'
         end)
-        act.spawn(function()
+        local cid2 = act.spawn(function()
             return 'world'
         end)
-        act.spawn(function()
+        local cid3 = act.spawn(function()
             return error('error occurred')
         end)
 
@@ -282,18 +280,39 @@ function testcase.await()
             },
         }, {
             {
-                true,
-                'hello',
+                {
+                    cid = cid1,
+                    result = {
+                        'hello',
+                    },
+                },
             },
             {
-                true,
-                'world',
+                {
+                    cid = cid2,
+                    result = {
+                        'world',
+                    },
+                },
             },
         })
 
-        local ok, val = act.await()
-        assert.is_false(ok)
-        assert.match(val, 'error occurred')
+        local res = assert(act.await())
+        assert.contains(res, {
+            cid = cid3,
+            status = act.ERRRUN,
+        })
+        assert.match(res.error, 'error occurred')
+
+        -- test that timeout
+        act.spawn(function()
+            act.sleep(1000)
+        end)
+        local err, timeout
+        res, err, timeout = act.await(100)
+        assert.is_nil(res)
+        assert.is_nil(err)
+        assert.is_true(timeout)
     end))
 
     -- test that fail on called from outside of execution context
@@ -303,13 +322,17 @@ end
 
 function testcase.exit()
     -- test that perform coroutine termination
-    assert.is_true(act.run(function()
-        act.spawn(function()
+    assert(act.run(function()
+        local cid = act.spawn(function()
             return act.exit('hello world!')
         end)
-        local ok, val = act.await()
-        assert.is_true(ok)
-        assert.equal(val, 'hello world!')
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {
+                'hello world!',
+            },
+        })
     end))
 
     -- test that fail on called from outside of execution context
@@ -322,7 +345,7 @@ function testcase.wait_readable()
     assert(act.run(function()
         local reader, writer = socketpair()
         local wait = false
-        act.spawn(function()
+        local cid = act.spawn(function()
             wait = true
             assert(act.wait_readable(reader:fd(), 50))
             wait = false
@@ -332,9 +355,13 @@ function testcase.wait_readable()
         act.later()
         assert.is_true(wait)
         writer:send('hello world!')
-        local ok, msg = act.await()
-        assert.is_true(ok)
-        assert.equal(msg, 'hello world!')
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {
+                'hello world!',
+            },
+        })
     end))
 
     -- test that fail by timeout
@@ -349,8 +376,7 @@ function testcase.wait_readable()
     -- test that fail on shutdown
     assert(act.run(function()
         local sock = socketpair()
-
-        act.spawn(function()
+        local cid = act.spawn(function()
             local ok, err, timeout = act.wait_readable(sock:fd(), 50)
             assert.is_true(ok)
             assert.is_nil(err)
@@ -361,11 +387,11 @@ function testcase.wait_readable()
         act.later()
         sock:shutdown(llsocket.SHUT_RDWR)
 
-        local ok, msg, err, again = act.await()
-        assert.is_true(ok)
-        assert.is_nil(msg)
-        assert.is_nil(err)
-        assert.is_nil(again)
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {},
+        })
     end))
 
     -- test that fail with invalid arguments
@@ -386,8 +412,7 @@ function testcase.wait_writable()
     -- test that wait until fd is writable
     assert(act.run(function()
         local reader, writer = socketpair()
-
-        act.spawn(function()
+        local cid = act.spawn(function()
             local ok, err, timeout = act.wait_writable(writer:fd(), 50)
 
             assert.is_true(ok)
@@ -396,10 +421,15 @@ function testcase.wait_writable()
             return writer:send('hello')
         end)
 
-        act.later()
-        local _, len, err = assert(act.await())
-        assert(len, err)
-        assert.equal(len, 5)
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {
+                5,
+                nil,
+                false,
+            },
+        })
         assert.equal(reader:recv(), 'hello')
     end))
 
@@ -410,16 +440,19 @@ function testcase.wait_writable()
         local msg = string.rep('x', sock:sndbuf(5))
         assert(sock:send(msg))
 
-        act.spawn(function()
+        local cid = act.spawn(function()
             local ok, err, timeout = act.wait_writable(sock:fd(), 50)
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
         end)
-        act.later()
-        local ok = act.await()
-        assert.is_true(ok)
+
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {},
+        })
     end))
 
     -- test that fail on shutdown
@@ -429,7 +462,7 @@ function testcase.wait_writable()
         local msg = string.rep('x', sock:sndbuf(5))
         assert(sock:send(msg))
         local wait = false
-        act.spawn(function()
+        local cid = act.spawn(function()
             wait = true
             local elapsed = nanotime()
             local ok, err, timeout = act.wait_writable(sock:fd(), 10)
@@ -450,11 +483,11 @@ function testcase.wait_writable()
         assert.is_true(wait)
         sock:shutdown(llsocket.SHUT_RDWR)
 
-        local ok, len, err, again = act.await()
-        assert.is_true(ok)
-        assert.is_nil(len)
-        assert.equal(err.type, errno.EPIPE)
-        assert.is_nil(again)
+        local res = assert(act.await())
+        assert.equal(res.cid, cid)
+        assert.is_nil(res.result[1])
+        assert.equal(res.result[2].type, errno.EPIPE)
+        assert.is_nil(res.result[3])
     end))
 
     -- test that fail with invalid arguments
@@ -612,14 +645,20 @@ function testcase.read_lock_unlock()
             return 'lock ok 10'
         end)
 
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 30')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 30',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 20')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 20',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 10')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 10',
+        })
     end))
 
     -- test that unlock after locked
@@ -654,11 +693,15 @@ function testcase.read_lock_unlock()
 
         act.later()
         assert.is_true(locked)
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock 10 msec')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 10 msec',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 1000')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 1000',
+        })
     end))
 
     -- test that can handle multiple locks at the same time
@@ -699,14 +742,20 @@ function testcase.read_lock_unlock()
             return 'lock 2 timeout 10'
         end)
 
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock 2 timeout 10')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 2 timeout 10',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock 1 timeout 20')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 1 timeout 20',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock 1 and 2 ok 30')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 1 and 2 ok 30',
+        })
     end))
 
     -- test that wakes up in order of the shortest timeout
@@ -749,14 +798,20 @@ function testcase.read_lock_unlock()
             return 'lock timeout 10'
         end)
 
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock timeout 10')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock timeout 10',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock timeout 20')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock timeout 20',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 30')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 30',
+        })
     end))
 
     -- test that fail on called with invalid argument
@@ -806,14 +861,20 @@ function testcase.write_lock_unlock()
             return 'lock ok 10'
         end)
 
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 30')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 30',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 20')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 20',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 10')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 10',
+        })
     end))
 
     -- test that unlock after locked
@@ -848,11 +909,15 @@ function testcase.write_lock_unlock()
 
         act.later()
         assert.is_true(locked)
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock 10 msec')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 10 msec',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 1000')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 1000',
+        })
     end))
 
     -- test that can handle multiple locks at the same time
@@ -893,14 +958,20 @@ function testcase.write_lock_unlock()
             return 'lock 2 timeout 10'
         end)
 
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock 2 timeout 10')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 2 timeout 10',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock 1 timeout 20')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 1 timeout 20',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock 1 and 2 ok 30')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock 1 and 2 ok 30',
+        })
     end))
 
     -- test that wakes up in order of the shortest timeout
@@ -943,14 +1014,20 @@ function testcase.write_lock_unlock()
             return 'lock timeout 10'
         end)
 
-        local _, msg = assert(act.await())
-        assert.equal(msg, 'lock timeout 10')
+        local res = assert(act.await())
+        assert.equal(res.result, {
+            'lock timeout 10',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock timeout 20')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock timeout 20',
+        })
 
-        _, msg = assert(act.await())
-        assert.equal(msg, 'lock ok 30')
+        res = assert(act.await())
+        assert.equal(res.result, {
+            'lock ok 30',
+        })
     end))
 
     -- test that fail on called with invalid argument

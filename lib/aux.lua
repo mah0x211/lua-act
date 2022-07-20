@@ -32,6 +32,7 @@ local tostring = tostring
 local INFINITE = math.huge
 local OP_EVENT = 0
 local OP_RUNQ = 1
+local OP_AWAIT = 2
 
 --- is_str
 --- @param v any
@@ -75,6 +76,7 @@ end
 return {
     OP_EVENT = OP_EVENT,
     OP_RUNQ = OP_RUNQ,
+    OP_AWAIT = OP_AWAIT,
     is_str = is_str,
     is_uint = is_uint,
     is_func = is_func,

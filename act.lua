@@ -167,12 +167,17 @@ function Act.atexit(fn, ...)
 end
 
 --- await
---- @return boolean ok
---- @return ...
-function Act.await()
+--- @param msec integer
+--- @return table stat
+--- @return error err
+--- @return boolean timeout
+function Act.await(msec)
     local callee = callee_acquire()
     if callee then
-        return callee:await()
+        if msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
+        return callee:await(msec)
     end
 
     error('cannot call await() at outside of execution context', 2)
