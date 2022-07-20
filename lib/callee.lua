@@ -26,12 +26,11 @@
 --- file scope variables
 local yield = coroutine.yield
 local setmetatable = setmetatable
-local tostring = tostring
-local strsub = string.sub
 local new_argv = require('argv').new
 local new_deque = require('deque').new
 local reco = require('reco')
 local new_reco = reco.new
+local getnsec = require('act.hrtimer').getnsec
 local aux = require('act.aux')
 local concat = aux.concat
 -- constants
@@ -723,6 +722,7 @@ function Callee:renew(act, atexit, fn, ...)
     self.atexit = atexit
     self.args:set(0, ...)
     self.co:reset(fn)
+    self.cid = getnsec()
     -- set relationship
     attach2caller(CURRENT_CALLEE, self, atexit)
 end
@@ -751,8 +751,7 @@ function Callee:init(act, atexit, fn, ...)
     self.evuse = false -- true or false
 
     -- set callee-id
-    -- remove 'table: ' prefix
-    self.cid = strsub(tostring(self), 10)
+    self.cid = getnsec()
     -- set relationship
     attach2caller(CURRENT_CALLEE, self, atexit)
 

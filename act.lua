@@ -30,7 +30,6 @@ local pcall = pcall
 local fork = require('fork')
 local reco = require('reco')
 local aux = require('act.aux')
-local is_str = aux.is_str
 local is_uint = aux.is_uint
 local is_func = aux.is_func
 local Callee = require('act.callee')
@@ -199,9 +198,6 @@ end
 --- @return boolean ok
 function Act.resume(cid, ...)
     if callee_acquire() then
-        if not is_str(cid) then
-            error('cid must be string', 2)
-        end
         return callee_resume(cid, ...)
     end
 
