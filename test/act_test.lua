@@ -600,9 +600,6 @@ function testcase.suspend_resume()
     assert(act.run(function()
         local err = assert.throws(act.suspend, 'abc')
         assert.match(err, 'msec must be unsigned integer')
-
-        err = assert.throws(act.resume, 1)
-        assert.match(err, 'cid must be string')
     end))
 
     -- test that fail on called from outside of execution context
