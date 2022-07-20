@@ -28,6 +28,7 @@ require('nosigpipe')
 --- file scope variables
 local pcall = pcall
 local fork = require('fork')
+local reco = require('reco')
 local aux = require('act.aux')
 local is_str = aux.is_str
 local is_uint = aux.is_uint
@@ -73,7 +74,13 @@ local function spawn(atexit, fn, ...)
 end
 
 --- @class Act
-local Act = {}
+local Act = {
+    OK = reco.OK,
+    ERRRUN = reco.ERRRUN,
+    ERRSYNTAX = reco.ERRSYNTAX,
+    ERRMEM = reco.ERRMEM,
+    ERRERR = reco.ERRERR,
+}
 
 --- pollable
 --- @return boolean ok
