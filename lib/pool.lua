@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2021 Masatoshi Fukunaga
+-- Copyright (C) 2022 Masatoshi Teruya
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -20,50 +20,39 @@
 -- THE SOFTWARE.
 --
 --- file scope variables
-local rawset = rawset
-local new_event = require('act.event').new
-local new_runq = require('act.runq').new
+local next = next
+local setmetatable = setmetatable
 
---- @class act.context
---- @field event act.event
---- @field runq act.runq
-local Context = {}
-
-function Context:__newindex()
-    error('attempt to protected value', 2)
-end
+--- @class act.pool
+--- @field store table
+local Pool = {}
 
 --- init
---- @return act.context
---- @return string? err
-function Context:init()
-    local event, err = new_event()
-    if err then
-        return nil, err
-    end
-
-    rawset(self, 'event', event)
-    rawset(self, 'runq', new_runq())
+--- @return act.pool
+function Pool:init()
+    self.store = setmetatable({}, {
+        __mode = 'k',
+    })
     return self
 end
 
---- renew
---- @return boolean ok
---- @return string? err
-function Context:renew()
-    -- child process must be rebuilding event properties
-    return self.event:renew()
+--- push
+--- @param v any
+function Pool:push(v)
+    self.store[v] = true
 end
 
---- pushq pushes a callee to runq
---- @param callee act.callee.Callee
---- @return boolean ok
---- @return string? err
-function Context:pushq(callee)
-    return self.runq:push(callee)
+--- pop
+--- @return any v
+function Pool:pop()
+    local v = next(self.store)
+    if v then
+        self.store[v] = nil
+        return v
+    end
 end
 
 return {
-    new = require('metamodule').new(Context),
+    new = require('metamodule').new(Pool),
 }
 

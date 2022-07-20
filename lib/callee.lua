@@ -57,6 +57,9 @@ local RWWAITS = {
     writable = WWAITS,
 }
 
+--- @type act.pool
+local POOL = require('act.pool').new()
+
 --- @type act.callee
 local CURRENT_CALLEE
 
@@ -279,7 +282,7 @@ function Callee:dispose(ok, status)
     end
 
     -- add to pool for reuse
-    self.act.pool:push(self)
+    POOL:push(self)
 end
 
 --- exit
@@ -717,10 +720,12 @@ local function attach2caller(caller, callee, atexit)
 end
 
 --- renew
+--- @param act act.context
 --- @param atexit boolean
 --- @param fn function
 --- @vararg any
-function Callee:renew(atexit, fn, ...)
+function Callee:renew(act, atexit, fn, ...)
+    self.act = act
     self.atexit = atexit
     self.args:set(0, ...)
     self.co:reset(fn)
@@ -728,7 +733,7 @@ function Callee:renew(atexit, fn, ...)
     attach2caller(CURRENT_CALLEE, self, atexit)
 end
 
---- new
+--- init
 --- @param act act.context
 --- @param atexit boolean
 --- @param fn function
@@ -760,8 +765,24 @@ function Callee:init(act, atexit, fn, ...)
     return self
 end
 
+Callee = require('metamodule').new(Callee)
+
+--- new create new act.callee
+--- @param ... any
+local function new(...)
+    local callee = POOL:pop()
+
+    -- use pooled callee
+    if callee then
+        callee:renew(...)
+        return callee
+    end
+
+    return Callee(...)
+end
+
 return {
-    new = require('metamodule').new(Callee),
+    new = new,
     acquire = acquire,
     unwait = unwait,
     unwait_readable = unwait_readable,

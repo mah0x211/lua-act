@@ -8,5 +8,6 @@ modules = {
     ['act.context'] = "lib/context.lua",
     ['act.event'] = "lib/event.lua",
     ['act.pipe'] = "lib/pipe.lua",
+    ['act.pool'] = "lib/pool.lua",
     ['act.runq'] = "lib/runq.lua",
 }

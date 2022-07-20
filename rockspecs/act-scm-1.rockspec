@@ -42,6 +42,7 @@ build = {
             },
         },
         ['act.pipe'] = "lib/pipe.lua",
+        ['act.pool'] = "lib/pool.lua",
         ['act.runq'] = "lib/runq.lua",
     },
 }

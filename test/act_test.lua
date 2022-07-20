@@ -8,6 +8,7 @@ local signal = require('signal')
 local act = require('act')
 
 local function socketpair()
+    collectgarbage('collect')
     local pair = assert(llsocket.socket.pair(llsocket.SOCK_STREAM, nil, true))
     return pair[1], pair[2]
 end
