@@ -21,14 +21,12 @@
 --
 --- file scope variables
 local rawset = rawset
-local new_deque = require('deque').new
 local new_event = require('act.event').new
 local new_runq = require('act.runq').new
 
 --- @class act.context
 --- @field event act.event
 --- @field runq act.runq
---- @field pool Deque
 local Context = {}
 
 function Context:__newindex()
@@ -46,7 +44,6 @@ function Context:init()
 
     rawset(self, 'event', event)
     rawset(self, 'runq', new_runq())
-    rawset(self, 'pool', new_deque())
     return self
 end
 
@@ -56,12 +53,6 @@ end
 function Context:renew()
     -- child process must be rebuilding event properties
     return self.event:renew()
-end
-
---- pop removes a callee from the pool and return it
---- @return act.callee.Callee? callee
-function Context:pop()
-    return self.pool:pop()
 end
 
 --- pushq pushes a callee to runq

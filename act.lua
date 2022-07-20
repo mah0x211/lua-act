@@ -52,15 +52,8 @@ local ACT_CTX
 --- @return any cid
 --- @return string? err
 local function spawn(atexit, fn, ...)
-    local callee = ACT_CTX:pop()
-
-    -- use pooled callee
-    if callee then
-        callee:renew(atexit, fn, ...)
-    else
-        -- create new callee
-        callee = new_callee(ACT_CTX, atexit, fn, ...)
-    end
+    -- create new callee
+    local callee = new_callee(ACT_CTX, atexit, fn, ...)
 
     -- push to runq if not atexit
     if not atexit then
