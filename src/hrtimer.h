@@ -51,13 +51,7 @@ static inline uint64_t hrt_getnsec(void)
 static inline uint64_t hrt_getnsec(void)
 {
     struct timespec ts = {0};
-
-# if defined(CLOCK_MONOTONIC_COARSE)
-    clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
-# else
     clock_gettime(CLOCK_MONOTONIC, &ts);
-# endif
-
     return (uint64_t)ts.tv_sec * 1000000000 + (uint64_t)ts.tv_nsec;
 }
 
