@@ -135,25 +135,6 @@ local function resume(cid, ...)
     return false
 end
 
---- resumeq
---- @param runq act.runq
---- @param waitq string[]
-local function resumeq(runq, waitq)
-    -- first index is used for holding a fd
-    for i = 1, #waitq do
-        local cid = waitq[i]
-        local callee = SUSPENDED[cid]
-
-        -- found a suspended callee
-        if callee then
-            SUSPENDED[cid] = nil
-            -- resume via runq
-            runq:remove(callee)
-            runq:push(callee)
-        end
-    end
-end
-
 --- @class act.callee
 local Callee = {}
 
@@ -209,19 +190,15 @@ function Callee:dispose(ok, status)
     self.term = nil
     SUSPENDED[self.cid] = nil
 
-    -- resume all suspended callee
-    for fd, waitq in pairs(self.rlock) do
-        -- remove waitq maintained by fd
-        RLOCKS[fd] = nil
-        resumeq(runq, waitq)
+    -- read_unlock
+    for fd in pairs(self.rlock) do
+        self:read_unlock(fd)
     end
     self.rlock = {}
 
-    -- resume all suspended callee
-    for fd, waitq in pairs(self.wlock) do
-        -- remove waitq maintained by fd
-        WLOCKS[fd] = nil
-        resumeq(runq, waitq)
+    -- write_unlock
+    for fd in pairs(self.wlock) do
+        self:write_unlock(fd)
     end
     self.wlock = {}
 
@@ -389,11 +366,24 @@ local function rwunlock(callee, locks, asa, fd)
     local waitq = callee[asa][fd]
 
     if waitq then
-        -- resume all suspended callee
         callee[asa][fd] = nil
-        -- remove waitq maintained by fd
+
+        for i = 1, #waitq do
+            local cid = waitq[i]
+
+            callee = SUSPENDED[cid]
+            if callee then
+                waitq[i] = false
+                SUSPENDED[cid] = nil
+                -- resume suspended callee via runq
+                local runq = callee.act.runq
+                runq:remove(callee)
+                runq:push(callee)
+                return
+            end
+        end
+        -- waitq has been consumed
         locks[fd] = nil
-        resumeq(callee.act.runq, waitq)
     end
 end
 
@@ -429,6 +419,10 @@ local function rwlock(callee, locks, asa, fd, msec)
             waitq[idx] = callee.cid
             local ok, err, timeout = callee:suspend(msec)
             waitq[idx] = false
+            if ok then
+                -- other callee unlocked
+                callee[asa][fd] = waitq
+            end
 
             return ok, err, timeout
         end
