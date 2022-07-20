@@ -25,16 +25,24 @@
 --
 --- file scope variables
 local rawset = rawset
+local floor = math.floor
 local deque_new = require('deque').new
 local minheap_new = require('minheap').new
 local hrtimer = require('act.hrtimer')
-local hrtimer_getmsec = hrtimer.getmsec
+local hrtimer_getnsec = hrtimer.getnsec
 local hrtimer_remain = hrtimer.remain
-local hrtimer_msleep = hrtimer.msleep
+local hrtimer_nsleep = hrtimer.nsleep
 local aux = require('act.aux')
 local is_func = aux.is_func
 --- constants
 local OP_RUNQ = aux.OP_RUNQ
+
+--- nsec2msec
+---@param nsec integer
+---@return integer msec
+local function nsec2msec(nsec)
+    return floor(nsec / 1000000)
+end
 
 --- @class act.runq
 local RunQ = {}
@@ -60,7 +68,8 @@ function RunQ:push(callee, msec)
     if not callee or not is_func(callee.call) then
         return false, 'callee must have a call method'
     end
-    msec = hrtimer_getmsec(msec)
+    local nsec = hrtimer_getnsec(msec and msec * 1000000 or 0)
+    msec = nsec2msec(nsec)
 
     -- register callee
     local ref = self.ref
@@ -68,14 +77,14 @@ function RunQ:push(callee, msec)
         local queue = ref[msec]
         local qelm
 
-        -- create new queue associated for msec
         if not queue then
+            -- create new queue associated for msec
             queue = deque_new()
             -- push callee to queue
             qelm = queue:unshift(callee)
             -- push queue to minheap
             ref[msec] = queue
-            ref[queue] = self.heap:push(msec, queue)
+            ref[queue] = self.heap:push(nsec, queue)
         else
             -- push callee to existing queue
             qelm = queue:unshift(callee)
@@ -106,7 +115,7 @@ function RunQ:remove(callee)
             local helm = ref[queue]
 
             ref[queue] = nil
-            ref[helm.pri] = nil
+            ref[nsec2msec(helm.pri)] = nil
             self.heap:del(helm.idx)
         end
     end
@@ -125,7 +134,7 @@ function RunQ:consume()
             local ref = self.ref
 
             ref[queue] = nil
-            ref[helm.pri] = nil
+            ref[nsec2msec(helm.pri)] = nil
 
             -- consume the current queued callees
             for _ = 1, #queue do
@@ -156,7 +165,7 @@ function RunQ:remain()
 
     -- return remaining msec
     if helm then
-        return hrtimer_remain(helm.pri)
+        return hrtimer_remain(nsec2msec(helm.pri))
     end
 
     return -1
@@ -170,7 +179,7 @@ function RunQ:sleep()
 
     -- sleep until deadline
     if helm then
-        return hrtimer_msleep(helm.pri)
+        return hrtimer_nsleep(helm.pri)
     end
 
     -- no need to sleep
