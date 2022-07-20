@@ -37,6 +37,7 @@ local concat = aux.concat
 -- constants
 local OP_EVENT = aux.OP_EVENT
 local OP_RUNQ = aux.OP_RUNQ
+local OP_AWAIT = aux.OP_AWAIT
 local OK = reco.OK
 -- local CO_YIELD = reco.YIELD
 -- local ERRRUN = reco.ERRRUN
@@ -188,15 +189,16 @@ function Callee:call(...)
     CURRENT_CALLEE = nil
 
     if done then
-        self:dispose(status == OK)
+        self:dispose(status == OK, status)
     elseif self.term then
-        self:dispose(true)
+        self:dispose(true, OK)
     end
 end
 
 --- dispose
 --- @param ok boolean
-function Callee:dispose(ok)
+--- @param status integer
+function Callee:dispose(ok, status)
     local runq = self.act.runq
 
     runq:remove(self)
@@ -246,16 +248,25 @@ function Callee:dispose(ok)
         self.ref = nil
         -- detouch from from root node
         root.node:remove(ref)
-        -- root node waiting for child results
         if root.wait then
+            -- root node waiting for child results
             root.wait = nil
-            -- should not return ok value if atexit function
-            if root.atexit then
-                root.atexit = nil
-                root:call(self.co:results())
+            local stat = {
+                cid = self.cid,
+            }
+            if ok then
+                stat.result = {
+                    self.co:results(),
+                }
             else
-                root:call(ok, self.co:results())
+                stat.status = status
+                stat.error = self.co:results()
             end
+            root:call(OP_AWAIT, stat)
+        elseif root.atexit then
+            -- call atexit node
+            root.atexit = nil
+            root:call(ok, status, self.co:results())
         elseif not ok then
             error(concat({
                 self.co:results(),
@@ -281,18 +292,34 @@ function Callee:exit(...)
     error('invalid implements')
 end
 
---- await
---- @return boolean ok
---- @return ...
-function Callee:await()
+--- await until the child thread to exit while the specified number of seconds.
+--- @param msec integer
+--- @return table res
+--- @return string err
+--- @return boolean timeout
+function Callee:await(msec)
     if #self.node > 0 then
+        if msec ~= nil then
+            -- register to resume after msec seconds
+            local ok, err = self.act.runq:push(self, msec)
+            if not ok then
+                return nil, err
+            end
+        end
+
         -- revoke all events currently in use
         self:revoke()
         self.wait = true
-        return yield()
-    end
+        local op, res = yield()
+        if op == OP_AWAIT then
+            return res
+        elseif op == OP_RUNQ then
+            return nil, nil, true
+        end
 
-    return true
+        -- normally unreachable
+        error('invalid implements')
+    end
 end
 
 --- suspend
@@ -668,9 +695,7 @@ local function attach2caller(caller, callee, atexit)
         end
 
         -- atexit node always await child node
-        callee.wait = true
         callee.atexit = true
-
         -- set as a parent of caller: callee -> caller
         local parent = caller.parent
         if not parent then
