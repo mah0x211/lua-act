@@ -57,7 +57,7 @@ function testcase.sleep()
         local deadline = 10
         local elapsed = nanotime()
 
-        act.sleep(deadline)
+        assert.is_uint(act.sleep(deadline))
         elapsed = (nanotime() - elapsed) * 1000
         assert.less(elapsed, 14)
     end))
