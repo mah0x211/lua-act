@@ -97,6 +97,20 @@ function testcase.sleep()
         assert(res.result[1] == 'awake 35')
     end))
 
+    -- test that resume sleeping thread
+    assert(act.run(function()
+        local cid = act.spawn(function()
+            return act.sleep(35)
+        end)
+
+        act.sleep(10)
+        assert(act.resume(cid))
+        local res = assert(act.await())
+        assert.equal(res.cid, cid)
+        assert.greater_or_equal(res.result[1], 20)
+        assert.less_or_equal(res.result[1], 25)
+    end))
+
     -- test that fail with invalid deadline
     assert(act.run(function()
         local err = assert.throws(act.sleep, -1)

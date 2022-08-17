@@ -602,8 +602,15 @@ function Callee:sleep(msec)
     -- revoke all events currently in use
     self:revoke()
     local deadline = getmsec() + msec
+    -- wait until wake-up or resume by resume method
+    local cid = self.cid
+    SUSPENDED[cid] = self
     if yield() == OP_RUNQ then
         local rem = deadline - getmsec()
+        if SUSPENDED[cid] then
+            -- resumed after sleep
+            SUSPENDED[cid] = nil
+        end
         return rem > 0 and rem or 0
     end
 
