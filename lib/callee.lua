@@ -30,7 +30,9 @@ local new_argv = require('argv').new
 local new_deque = require('deque').new
 local reco = require('reco')
 local new_reco = reco.new
-local getnsec = require('act.hrtimer').getnsec
+local hrtimer = require('act.hrtimer')
+local getnsec = hrtimer.getnsec
+local getmsec = hrtimer.getmsec
 local aux = require('act.aux')
 local concat = aux.concat
 -- constants
@@ -589,7 +591,7 @@ end
 
 --- sleep
 --- @param msec integer
---- @return boolean ok
+--- @return integer rem
 --- @return string? err
 function Callee:sleep(msec)
     local ok, err = self.act.runq:push(self, msec)
@@ -599,8 +601,17 @@ function Callee:sleep(msec)
 
     -- revoke all events currently in use
     self:revoke()
+    local deadline = getmsec() + msec
+    -- wait until wake-up or resume by resume method
+    local cid = self.cid
+    SUSPENDED[cid] = self
     if yield() == OP_RUNQ then
-        return true
+        local rem = deadline - getmsec()
+        if SUSPENDED[cid] then
+            -- resumed after sleep
+            SUSPENDED[cid] = nil
+        end
+        return rem > 0 and rem or 0
     end
 
     -- normally unreachable

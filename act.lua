@@ -206,7 +206,7 @@ end
 
 --- sleep
 --- @param msec integer
---- @return boolean ok
+--- @return integer rem
 --- @return string? err
 function Act.sleep(msec)
     local callee = callee_acquire()
