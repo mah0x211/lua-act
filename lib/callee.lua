@@ -227,7 +227,7 @@ function Callee:dispose(ok, status)
         -- release references
         self.parent = nil
         self.ref = nil
-        -- detouch from from root node
+        -- detach from root node
         root.node:remove(ref)
         if root.wait then
             -- root node waiting for child results
@@ -293,8 +293,12 @@ function Callee:await(msec)
         self.wait = true
         local op, res = yield()
         if op == OP_AWAIT then
+            if msec then
+                self.act.runq:remove(self)
+            end
             return res
         elseif op == OP_RUNQ then
+            self.wait = nil
             return nil, nil, true
         end
 

@@ -288,10 +288,10 @@ function testcase.await()
 
         assert.equal({
             {
-                act.await(),
+                act.await(100),
             },
             {
-                act.await(),
+                act.await(100),
             },
         }, {
             {
