@@ -275,17 +275,13 @@ end
 
 --- await until the child thread to exit while the specified number of seconds.
 --- @param msec integer
---- @return table res
---- @return string err
---- @return boolean timeout
+--- @return table|nil res
+--- @return boolean|nil timeout
 function Callee:await(msec)
     if #self.node > 0 then
         if msec ~= nil then
             -- register to resume after msec seconds
-            local ok, err = self.act.runq:push(self, msec)
-            if not ok then
-                return nil, err
-            end
+            assert(self.act.runq:push(self, msec))
         end
 
         -- revoke all events currently in use
@@ -299,7 +295,7 @@ function Callee:await(msec)
             return res
         elseif op == OP_RUNQ then
             self.wait = nil
-            return nil, nil, true
+            return nil, true
         end
 
         -- normally unreachable

@@ -161,7 +161,6 @@ end
 --- await
 --- @param msec integer
 --- @return table stat
---- @return error err
 --- @return boolean timeout
 function Act.await(msec)
     local callee = callee_acquire()
