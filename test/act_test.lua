@@ -323,10 +323,9 @@ function testcase.await()
         act.spawn(function()
             act.sleep(1000)
         end)
-        local err, timeout
-        res, err, timeout = act.await(100)
+        local timeout
+        res, timeout = act.await(100)
         assert.is_nil(res)
-        assert.is_nil(err)
         assert.is_true(timeout)
     end))
 
