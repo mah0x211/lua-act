@@ -1,4 +1,4 @@
-require('luacov')
+local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
 local nanotime = require('testcase.timer').nanotime
 local getpid = require('testcase.getpid')
@@ -15,22 +15,22 @@ end
 
 function testcase.run()
     -- test that return true with function argument
-    assert(act.run(function()
-    end))
+    assert(act.run(with_luacov(function()
+    end)))
 
     -- test that success with function argument and arugments
-    assert(act.run(function(a, b)
+    assert(act.run(with_luacov(function(a, b)
         assert(a == 'foo', 'a is unknown argument')
         assert(b == 'bar', 'b is unknown argument')
-    end, 'foo', 'bar'))
+    end), 'foo', 'bar'))
 
     -- test that fail when called from the running function
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local ok, err = act.run(function()
         end)
         assert.is_false(ok)
         assert.match(err, 'act run already')
-    end))
+    end)))
 
     -- test that fail with a non-function argument
     local err = assert.throws(act.run)
@@ -39,7 +39,7 @@ end
 
 function testcase.fork()
     -- test that fork process
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local pid = getpid()
         local p = assert(act.fork())
         if p:is_child() then
@@ -48,41 +48,41 @@ function testcase.fork()
         end
         local res = assert(p:wait())
         assert.equal(res.exit, 0)
-    end))
+    end)))
 end
 
 function testcase.sleep()
     -- test that sleep
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local deadline = 10
         local elapsed = nanotime()
 
         assert.is_uint(act.sleep(deadline))
         elapsed = (nanotime() - elapsed) * 1000
         assert.less(elapsed, 14)
-    end))
+    end)))
 
     -- test that get up in order of shortest sleep time
-    assert(act.run(function()
-        act.spawn(function()
+    assert(act.run(with_luacov(function()
+        act.spawn(with_luacov(function()
             act.sleep(35)
             return 'awake 35'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             act.sleep(10)
             return 'awake 10'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             act.sleep(25)
             return 'awake 25'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             act.sleep(5)
             return 'awake 5'
-        end)
+        end))
 
         local res = assert(act.await())
         assert(res.result[1] == 'awake 5')
@@ -95,13 +95,13 @@ function testcase.sleep()
 
         res = assert(act.await())
         assert(res.result[1] == 'awake 35')
-    end))
+    end)))
 
     -- test that resume sleeping thread
-    assert(act.run(function()
-        local cid = act.spawn(function()
+    assert(act.run(with_luacov(function()
+        local cid = act.spawn(with_luacov(function()
             return act.sleep(35)
-        end)
+        end))
 
         act.sleep(10)
         assert(act.resume(cid))
@@ -109,13 +109,13 @@ function testcase.sleep()
         assert.equal(res.cid, cid)
         assert.greater_or_equal(res.result[1], 20)
         assert.less_or_equal(res.result[1], 25)
-    end))
+    end)))
 
     -- test that fail with invalid deadline
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.sleep, -1)
         assert.match(err, 'msec must be unsigned integer')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.sleep, 1000)
@@ -124,20 +124,20 @@ end
 
 function testcase.spawn()
     -- test that spawn new coroutine
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local executed = false
         act.spawn(function()
             executed = true
         end)
         act.sleep(0)
         assert(executed, 'child coroutine did not executed')
-    end))
+    end)))
 
     -- test that fail with a non-function argument
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.spawn, 1)
         assert.match(err, 'fn must be function')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.spawn, function()
@@ -147,7 +147,7 @@ end
 
 function testcase.later()
     -- test that run after execution of other coroutines
-    assert.is_true(act.run(function()
+    assert.is_true(act.run(with_luacov(function()
         local executed = false
 
         act.spawn(function()
@@ -155,7 +155,7 @@ function testcase.later()
         end)
         act.later()
         assert(executed, 'child coroutine did not executed')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.later)
@@ -165,20 +165,20 @@ end
 function testcase.atexit()
     -- test that calling a function on exit
     local executed = false
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         act.atexit(function(a, b)
             assert(a == 'foo')
             assert(b == 'bar')
             executed = true
         end, 'foo', 'bar')
-    end))
+    end)))
     assert(executed, 'could not executed')
 
     -- test that calling functions in reverse order of registration
     executed = {
         count = 0,
     }
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         act.atexit(function()
             executed.count = executed.count + 1
             executed.first = executed.count
@@ -191,7 +191,7 @@ function testcase.atexit()
             executed.count = executed.count + 1
             executed.last = executed.count
         end)
-    end))
+    end)))
     assert.equal(executed, {
         count = 3,
         last = 1,
@@ -201,7 +201,7 @@ function testcase.atexit()
 
     -- test that pass a previous error message
     executed = false
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         act.atexit(function(a, b, ok, status, err)
             assert.equal(a, 'foo')
             assert.equal(b, 'bar')
@@ -214,30 +214,30 @@ function testcase.atexit()
         act.atexit(function()
             error('hello')
         end)
-    end))
+    end)))
     assert(executed, 'could not executed')
 
     -- test that return atexit error
-    assert(act.run(function()
-        act.spawn(function()
+    assert(act.run(with_luacov(function()
+        act.spawn(with_luacov(function()
             assert(act.atexit(function()
                 error('world')
             end))
             return 'hello'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.match(res.error, 'world.+traceback', false)
-    end))
+    end)))
 
     -- test that return the return values of main function
-    assert(act.run(function()
-        act.spawn(function()
+    assert(act.run(with_luacov(function()
+        act.spawn(with_luacov(function()
             assert(act.atexit(function(...)
                 return ...
             end))
             return 'hello', 'world'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res.result, {
@@ -246,26 +246,26 @@ function testcase.atexit()
             'hello',
             'world',
         })
-    end))
+    end)))
 
     -- test that recover the error of main function
-    assert(act.run(function()
-        act.spawn(function()
+    assert(act.run(with_luacov(function()
+        act.spawn(with_luacov(function()
             assert(act.atexit(function(a, b, ok, status, ...)
                 return ...
             end, 'foo', 'bar'))
             error('hello')
-        end)
+        end))
 
         local res = assert(act.await())
         assert.match(res.result[1], 'hello.+traceback', false)
-    end))
+    end)))
 
     -- test that fail with a non-function argument
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.atexit, 1)
         assert.match(err, 'fn must be function')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.atexit, function()
@@ -275,7 +275,7 @@ end
 
 function testcase.await()
     -- test that waiting for spawned coroutines to terminate
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local cid1 = act.spawn(function()
             return 'hello'
         end)
@@ -327,7 +327,7 @@ function testcase.await()
         res, timeout = act.await(100)
         assert.is_nil(res)
         assert.is_true(timeout)
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.await)
@@ -336,10 +336,10 @@ end
 
 function testcase.exit()
     -- test that perform coroutine termination
-    assert(act.run(function()
-        local cid = act.spawn(function()
+    assert(act.run(with_luacov(function()
+        local cid = act.spawn(with_luacov(function()
             return act.exit('hello world!')
-        end)
+        end))
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
@@ -347,7 +347,7 @@ function testcase.exit()
                 'hello world!',
             },
         })
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.exit)
@@ -356,15 +356,15 @@ end
 
 function testcase.wait_readable()
     -- test that wait until fd is readable
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local reader, writer = socketpair()
         local wait = false
-        local cid = act.spawn(function()
+        local cid = act.spawn(with_luacov(function()
             wait = true
             assert(act.wait_readable(reader:fd(), 50))
             wait = false
             return reader:recv()
-        end)
+        end))
 
         act.later()
         assert.is_true(wait)
@@ -376,27 +376,27 @@ function testcase.wait_readable()
                 'hello world!',
             },
         })
-    end))
+    end)))
 
     -- test that fail by timeout
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock = socketpair()
         local ok, err, timeout = act.wait_readable(sock:fd(), 50)
         assert.is_false(ok)
         assert.is_nil(err)
         assert.is_true(timeout)
-    end))
+    end)))
 
     -- test that fail on shutdown
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock = socketpair()
-        local cid = act.spawn(function()
+        local cid = act.spawn(with_luacov(function()
             local ok, err, timeout = act.wait_readable(sock:fd(), 50)
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
             return sock:recv()
-        end)
+        end))
 
         act.later()
         sock:shutdown(llsocket.SHUT_RDWR)
@@ -406,16 +406,16 @@ function testcase.wait_readable()
             cid = cid,
             result = {},
         })
-    end))
+    end)))
 
     -- test that fail with invalid arguments
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.wait_readable, -1)
         assert.match(err, 'fd must be unsigned integer')
 
         err = assert.throws(act.wait_readable, 0, -1)
         assert.match(err, 'msec must be unsigned integer')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.wait_readable)
@@ -424,16 +424,16 @@ end
 
 function testcase.wait_writable()
     -- test that wait until fd is writable
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local reader, writer = socketpair()
-        local cid = act.spawn(function()
+        local cid = act.spawn(with_luacov(function()
             local ok, err, timeout = act.wait_writable(writer:fd(), 50)
 
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
             return writer:send('hello')
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res, {
@@ -445,38 +445,38 @@ function testcase.wait_writable()
             },
         })
         assert.equal(reader:recv(), 'hello')
-    end))
+    end)))
 
     -- test that fail by timeout
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock = socketpair()
         assert(sock:sndbuf(5))
         local msg = string.rep('x', sock:sndbuf(5))
         assert(sock:send(msg))
 
-        local cid = act.spawn(function()
+        local cid = act.spawn(with_luacov(function()
             local ok, err, timeout = act.wait_writable(sock:fd(), 50)
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
             result = {},
         })
-    end))
+    end)))
 
     -- test that fail on shutdown
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock = socketpair()
         assert(sock:sndbuf(5))
         local msg = string.rep('x', sock:sndbuf(5))
         assert(sock:send(msg))
         local wait = false
-        local cid = act.spawn(function()
+        local cid = act.spawn(with_luacov(function()
             wait = true
             local elapsed = nanotime()
             local ok, err, timeout = act.wait_writable(sock:fd(), 10)
@@ -490,7 +490,7 @@ function testcase.wait_writable()
             assert.less(elapsed, 2)
 
             return sock:send('hello')
-        end)
+        end))
 
         sock:send('hello')
         act.later()
@@ -502,16 +502,16 @@ function testcase.wait_writable()
         assert.is_nil(res.result[1])
         assert.equal(res.result[2].type, errno.EPIPE)
         assert.is_nil(res.result[3])
-    end))
+    end)))
 
     -- test that fail with invalid arguments
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.wait_writable, -1)
         assert.match(err, 'fd must be unsigned integer')
 
         err = assert.throws(act.wait_writable, 0, -1)
         assert.match(err, 'msec must be unsigned integer')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.wait_writable)
@@ -520,11 +520,11 @@ end
 
 function testcase.sigwait()
     -- test that wait until signal occurrs
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         signal.block(signal.SIGUSR1)
 
         local wait = false
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             wait = true
             local elapsed = nanotime()
             local signo, err, timeout = act.sigwait(50, signal.SIGUSR1)
@@ -536,36 +536,36 @@ function testcase.sigwait()
             assert.is_nil(timeout)
             -- returned immediately if descriptor changed
             assert.less(elapsed, 2)
-        end)
+        end))
 
         act.later()
         assert.is_true(wait)
         signal.kill(signal.SIGUSR1)
         assert(act.await())
-    end))
+    end)))
 
     -- test that fail by timeout
-    assert(act.run(function()
-        act.spawn(function()
+    assert(act.run(with_luacov(function()
+        act.spawn(with_luacov(function()
             local signo, err, timeout = act.sigwait(50, signal.SIGUSR1)
 
             assert.is_nil(signo)
             assert.is_nil(err)
             assert.is_true(timeout)
-        end)
+        end))
 
         act.later()
         assert(act.await())
-    end))
+    end)))
 
     -- test that fail with invalid arguments
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.sigwait, -1)
         assert.match(err, 'msec must be unsigned integer')
 
         err = assert.throws(act.sigwait, nil, -1000)
         assert.match(err, 'invalid signal number')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.sigwait)
@@ -574,9 +574,9 @@ end
 
 function testcase.suspend_resume()
     -- test that resume a suspended coroutine
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local suspended = false
-        local cid = act.spawn(function()
+        local cid = act.spawn(with_luacov(function()
             suspended = true
             local elapsed = nanotime()
             local ok, val, timeout = act.suspend(100)
@@ -587,16 +587,16 @@ function testcase.suspend_resume()
             assert.is_nil(timeout)
             -- returned immediately if resumed
             assert.less(elapsed, 2)
-        end)
+        end))
 
         act.later()
         assert.is_true(suspended)
         assert(act.resume(cid, 'hello'))
         assert(act.await())
-    end))
+    end)))
 
     -- test that suspend timed out
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local ok, val, timeout = act.suspend()
 
         assert.is_false(ok)
@@ -607,13 +607,13 @@ function testcase.suspend_resume()
         assert.is_false(ok)
         assert.is_nil(val)
         assert.is_true(timeout)
-    end))
+    end)))
 
     -- test that fail on called with invalid argument
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.suspend, 'abc')
         assert.match(err, 'msec must be unsigned integer')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.suspend)
@@ -625,10 +625,10 @@ end
 
 function testcase.read_lock_unlock()
     -- test that wakes up in the order of calling the lock function
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock = socketpair()
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock:fd(), 30)
 
             act.sleep(5)
@@ -636,25 +636,25 @@ function testcase.read_lock_unlock()
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 30'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock:fd(), 20)
 
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 20'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock:fd(), 10)
 
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 10'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res.result, {
@@ -670,13 +670,13 @@ function testcase.read_lock_unlock()
         assert.equal(res.result, {
             'lock ok 10',
         })
-    end))
+    end)))
 
     -- test that unlock after locked
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock = socketpair()
         local locked = false
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock:fd(), 30)
             assert.is_true(ok)
             assert.is_nil(err)
@@ -687,9 +687,9 @@ function testcase.read_lock_unlock()
             act.read_unlock(sock:fd())
             locked = false
             return 'lock 10 msec'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local elapsed = nanotime()
             local ok, err, timeout = act.read_lock(sock:fd(), 1000)
             elapsed = (nanotime() - elapsed) * 1000
@@ -700,7 +700,7 @@ function testcase.read_lock_unlock()
             assert.is_nil(timeout)
             assert.less(elapsed, 15)
             return 'lock ok 1000'
-        end)
+        end))
 
         act.later()
         assert.is_true(locked)
@@ -713,13 +713,13 @@ function testcase.read_lock_unlock()
         assert.equal(res.result, {
             'lock ok 1000',
         })
-    end))
+    end)))
 
     -- test that can handle multiple locks at the same time
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock1, sock2 = socketpair()
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock1:fd(), 30)
             assert.is_true(ok)
             assert.is_nil(err)
@@ -733,25 +733,25 @@ function testcase.read_lock_unlock()
             act.sleep(30)
 
             return 'lock 1 and 2 ok 30'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock1:fd(), 20)
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
             return 'lock 1 timeout 20'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock2:fd(), 10)
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
             return 'lock 2 timeout 10'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res.result, {
@@ -767,13 +767,13 @@ function testcase.read_lock_unlock()
         assert.equal(res.result, {
             'lock 1 and 2 ok 30',
         })
-    end))
+    end)))
 
     -- test that wakes up in order of the shortest timeout
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock = socketpair()
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.read_lock(sock:fd(), 30)
 
             act.sleep(30)
@@ -781,9 +781,9 @@ function testcase.read_lock_unlock()
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 30'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local elapsed = nanotime()
             local ok, err, timeout = act.read_lock(sock:fd(), 20)
             elapsed = (nanotime() - elapsed) * 1000
@@ -794,9 +794,9 @@ function testcase.read_lock_unlock()
             assert.greater(elapsed, 10)
             assert.less(elapsed, 30)
             return 'lock timeout 20'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local elapsed = nanotime()
             local ok, err, timeout = act.read_lock(sock:fd(), 10)
             elapsed = (nanotime() - elapsed) * 1000
@@ -807,7 +807,7 @@ function testcase.read_lock_unlock()
             assert.greater(elapsed, 1)
             assert.less(elapsed, 20)
             return 'lock timeout 10'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res.result, {
@@ -823,16 +823,16 @@ function testcase.read_lock_unlock()
         assert.equal(res.result, {
             'lock ok 30',
         })
-    end))
+    end)))
 
     -- test that fail on called with invalid argument
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.read_lock, -1)
         assert.match(err, 'fd must be unsigned integer')
 
         err = assert.throws(act.read_lock, 1, {})
         assert.match(err, 'msec must be unsigned integer')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.read_lock)
@@ -841,10 +841,10 @@ end
 
 function testcase.write_lock_unlock()
     -- test that wakes up in the order of calling the lock function
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local _, writer = socketpair()
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(writer:fd(), 30)
 
             act.sleep(5)
@@ -852,25 +852,25 @@ function testcase.write_lock_unlock()
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 30'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(writer:fd(), 20)
 
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 20'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(writer:fd(), 10)
 
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 10'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res.result, {
@@ -886,13 +886,13 @@ function testcase.write_lock_unlock()
         assert.equal(res.result, {
             'lock ok 10',
         })
-    end))
+    end)))
 
     -- test that unlock after locked
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local _, writer = socketpair()
         local locked = false
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(writer:fd(), 30)
             assert.is_true(ok)
             assert.is_nil(err)
@@ -903,9 +903,9 @@ function testcase.write_lock_unlock()
             act.write_unlock(writer:fd())
             locked = false
             return 'lock 10 msec'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local elapsed = nanotime()
             local ok, err, timeout = act.write_lock(writer:fd(), 1000)
             elapsed = (nanotime() - elapsed) * 1000
@@ -916,7 +916,7 @@ function testcase.write_lock_unlock()
             assert.is_nil(timeout)
             assert.less(elapsed, 15)
             return 'lock ok 1000'
-        end)
+        end))
 
         act.later()
         assert.is_true(locked)
@@ -929,13 +929,13 @@ function testcase.write_lock_unlock()
         assert.equal(res.result, {
             'lock ok 1000',
         })
-    end))
+    end)))
 
     -- test that can handle multiple locks at the same time
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local sock1, sock2 = socketpair()
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(sock1:fd(), 30)
             assert.is_true(ok)
             assert.is_nil(err)
@@ -949,25 +949,25 @@ function testcase.write_lock_unlock()
             act.sleep(30)
 
             return 'lock 1 and 2 ok 30'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(sock1:fd(), 20)
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
             return 'lock 1 timeout 20'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(sock2:fd(), 10)
 
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
             return 'lock 2 timeout 10'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res.result, {
@@ -983,13 +983,13 @@ function testcase.write_lock_unlock()
         assert.equal(res.result, {
             'lock 1 and 2 ok 30',
         })
-    end))
+    end)))
 
     -- test that wakes up in order of the shortest timeout
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local _, writer = socketpair()
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local ok, err, timeout = act.write_lock(writer:fd(), 30)
 
             act.sleep(30)
@@ -997,9 +997,9 @@ function testcase.write_lock_unlock()
             assert.is_nil(err)
             assert.is_nil(timeout)
             return 'lock ok 30'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local elapsed = nanotime()
             local ok, err, timeout = act.write_lock(writer:fd(), 20)
             elapsed = (nanotime() - elapsed) * 1000
@@ -1010,9 +1010,9 @@ function testcase.write_lock_unlock()
             assert.greater(elapsed, 10)
             assert.less(elapsed, 30)
             return 'lock timeout 20'
-        end)
+        end))
 
-        act.spawn(function()
+        act.spawn(with_luacov(function()
             local elapsed = nanotime()
             local ok, err, timeout = act.write_lock(writer:fd(), 10)
             elapsed = (nanotime() - elapsed) * 1000
@@ -1023,7 +1023,7 @@ function testcase.write_lock_unlock()
             assert.greater(elapsed, 1)
             assert.less(elapsed, 20)
             return 'lock timeout 10'
-        end)
+        end))
 
         local res = assert(act.await())
         assert.equal(res.result, {
@@ -1039,16 +1039,16 @@ function testcase.write_lock_unlock()
         assert.equal(res.result, {
             'lock ok 30',
         })
-    end))
+    end)))
 
     -- test that fail on called with invalid argument
-    assert(act.run(function()
+    assert(act.run(with_luacov(function()
         local err = assert.throws(act.write_lock, -1)
         assert.match(err, 'fd must be unsigned integer')
 
         err = assert.throws(act.write_lock, 1, {})
         assert.match(err, 'msec must be unsigned integer')
-    end))
+    end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.write_lock)

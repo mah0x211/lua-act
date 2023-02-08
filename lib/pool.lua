@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2022 Masatoshi Teruya
+-- Copyright (C) 2022-present Masatoshi Fukunaga
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +22,7 @@
 --- file scope variables
 local next = next
 local setmetatable = setmetatable
+local rawset = rawset
 
 --- @class act.pool
 --- @field store table
@@ -30,9 +31,9 @@ local Pool = {}
 --- init
 --- @return act.pool
 function Pool:init()
-    self.store = setmetatable({}, {
+    rawset(self, 'store', setmetatable({}, {
         __mode = 'k',
-    })
+    }))
     return self
 end
 

@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2016 Masatoshi Teruya
+-- Copyright (C) 2016-present Masatoshi Fukunaga
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -341,7 +341,7 @@ end
 
 --- later
 --- @return boolean ok
---- @return string? err
+--- @return any err
 function Callee:later()
     local ok, err = self.act.runq:push(self)
     if not ok then
@@ -407,7 +407,7 @@ end
 --- @param fd integer
 --- @param msec integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
 local function rwlock(callee, locks, asa, fd, msec)
     if not callee[asa][fd] then
@@ -441,7 +441,7 @@ end
 --- @param fd integer
 --- @param msec integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
 function Callee:read_lock(fd, msec)
     return rwlock(self, RLOCKS, 'rlock', fd, msec)
@@ -451,7 +451,7 @@ end
 --- @param fd integer
 --- @param msec integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
 function Callee:write_lock(fd, msec)
     return rwlock(self, WLOCKS, 'wlock', fd, msec)
@@ -464,7 +464,7 @@ end
 --- @param fd integer
 --- @param msec integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
 local function waitable(self, operators, asa, fd, msec)
     local event = self.act.event
@@ -573,7 +573,7 @@ end
 --- @param fd integer
 --- @param msec integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
 function Callee:wait_readable(fd, msec)
     return waitable(self, RWAITS, 'readable', fd, msec)
@@ -583,7 +583,7 @@ end
 --- @param fd integer
 --- @param msec integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
 function Callee:wait_writable(fd, msec)
     return waitable(self, WWAITS, 'writable', fd, msec)
@@ -592,7 +592,7 @@ end
 --- sleep
 --- @param msec integer
 --- @return integer rem
---- @return string? err
+--- @return any err
 function Callee:sleep(msec)
     local ok, err = self.act.runq:push(self, msec)
     if not ok then
@@ -621,8 +621,8 @@ end
 --- sigwait
 --- @param msec integer
 --- @vararg integer signo
---- @return integer signo
---- @return string? err
+--- @return integer? signo
+--- @return any err
 --- @return boolean? timeout
 function Callee:sigwait(msec, ...)
     -- register to runq with msec
@@ -773,6 +773,7 @@ Callee = require('metamodule').new(Callee)
 
 --- new create new act.callee
 --- @param ... any
+--- @return act.callee
 local function new(...)
     local callee = POOL:pop()
 

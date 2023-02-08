@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2021 Masatoshi Fukunaga
+-- Copyright (C) 2021-present Masatoshi Fukunaga
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -34,8 +34,8 @@ function Context:__newindex()
 end
 
 --- init
---- @return act.context
---- @return string? err
+--- @return act.context? ctx
+--- @return any err
 function Context:init()
     local event, err = new_event()
     if err then
@@ -49,7 +49,7 @@ end
 
 --- renew
 --- @return boolean ok
---- @return string? err
+--- @return any err
 function Context:renew()
     -- child process must be rebuilding event properties
     return self.event:renew()
@@ -58,7 +58,7 @@ end
 --- pushq pushes a callee to runq
 --- @param callee act.callee.Callee
 --- @return boolean ok
---- @return string? err
+--- @return any err
 function Context:pushq(callee)
     return self.runq:push(callee)
 end
