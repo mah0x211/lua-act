@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2018 Masatoshi Teruya
+-- Copyright (C) 2018-present Masatoshi Fukunaga
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 --
 --- file scope variables
 local strsub = string.sub
+local rawset = rawset
 local pipe = require('pipe')
 local wait_readable = require('act').wait_readable
 local wait_writable = require('act').wait_writable
@@ -32,10 +33,13 @@ local unwait_readable = require('act').unwait_readable
 local unwait_writable = require('act').unwait_writable
 
 --- @class act.pipe
+--- @field reader pipe.reader
+--- @field writer pipe.writer
 local Pipe = {}
 
 --- init
---- @return act.pipe
+--- @return act.pipe? pipe
+--- @return any err
 function Pipe:init()
     local reader, writer, err = pipe(true)
 
@@ -43,16 +47,16 @@ function Pipe:init()
         return nil, err
     end
 
-    self.reader = reader
-    self.writer = writer
+    rawset(self, 'reader', reader)
+    rawset(self, 'writer', writer)
     return self
 end
 
 --- read
 --- @param msec integer
 --- @return string str
---- @return error err
---- @return boolean timeout
+--- @return any err
+--- @return boolean? timeout
 function Pipe:read(msec)
     local str, err, again = self.reader:read()
     if not again then
@@ -76,8 +80,8 @@ end
 --- @param str string
 --- @param msec integer
 --- @return integer len
---- @return error err
---- @return boolean timeout
+--- @return any err
+--- @return boolean? timeout
 function Pipe:write(str, msec)
     local len, err, again = self.writer:write(str)
     if not again then

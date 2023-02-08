@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2016 Masatoshi Teruya
+-- Copyright (C) 2016-present Masatoshi Fukunaga
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -45,6 +45,8 @@ local function nsec2msec(nsec)
 end
 
 --- @class act.runq
+--- @field heap minheap
+--- @field ref table
 local RunQ = {}
 
 function RunQ:__newindex()
@@ -63,7 +65,7 @@ end
 --- @param callee act.callee
 --- @param msec integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 function RunQ:push(callee, msec)
     if not callee or not is_func(callee.call) then
         return false, 'callee must have a call method'
@@ -173,7 +175,7 @@ end
 
 --- sleep
 --- @return boolean ok
---- @return string? err
+--- @return any err
 function RunQ:sleep()
     local helm = self.heap:peek()
 

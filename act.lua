@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2016 Masatoshi Teruya
+-- Copyright (C) 2016-present Masatoshi Fukunaga
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -44,13 +44,13 @@ local new_context = require('act.context').new
 --- @type act.context
 local ACT_CTX
 
---- spawn
+--- spawn_child
 --- @param atexit boolean
 --- @param fn function
 --- @vararg any
 --- @return any cid
 --- @return string? err
-local function spawn(atexit, fn, ...)
+local function spawn_child(atexit, fn, ...)
     -- create new callee
     local callee = new_callee(ACT_CTX, atexit, fn, ...)
 
@@ -65,26 +65,17 @@ local function spawn(atexit, fn, ...)
     return callee.cid
 end
 
---- @class Act
-local Act = {
-    OK = reco.OK,
-    ERRRUN = reco.ERRRUN,
-    ERRSYNTAX = reco.ERRSYNTAX,
-    ERRMEM = reco.ERRMEM,
-    ERRERR = reco.ERRERR,
-}
-
 --- pollable
 --- @return boolean ok
-function Act.pollable()
+local function pollable()
     return callee_acquire() and true or false
 end
 
---- fork
---- @return fork.process pid
+--- pfork
+--- @return fork.process p
 --- @return error? err
 --- @return boolean? again
-function Act.fork()
+local function pfork()
     if callee_acquire() then
         local p, err, again = fork()
 
@@ -106,12 +97,12 @@ end
 --- @vararg ...
 --- @return any cid
 --- @return string? err
-function Act.spawn(fn, ...)
+local function spawn(fn, ...)
     if callee_acquire() then
         if not is_func(fn) then
             error('fn must be function', 2)
         end
-        return spawn(false, fn, ...)
+        return spawn_child(false, fn, ...)
     end
 
     error('cannot call spawn() from outside of execution context', 2)
@@ -119,7 +110,7 @@ end
 
 --- exit
 --- @vararg ...
-function Act.exit(...)
+local function exit(...)
     local callee = callee_acquire()
     if callee then
         callee:exit(...)
@@ -131,7 +122,7 @@ end
 --- later
 --- @return boolean ok
 --- @return string? err
-function Act.later()
+local function later()
     local callee = callee_acquire()
     if callee then
         return callee:later()
@@ -145,13 +136,13 @@ end
 --- @vararg any
 --- @return boolean ok
 --- @return string? err
-function Act.atexit(fn, ...)
+local function atexit(fn, ...)
     if callee_acquire() then
         if not is_func(fn) then
             error('fn must be function', 2)
         end
 
-        local _, err = spawn(true, fn, ...)
+        local _, err = spawn_child(true, fn, ...)
         return not err, err
     end
 
@@ -162,7 +153,7 @@ end
 --- @param msec integer
 --- @return table stat
 --- @return boolean timeout
-function Act.await(msec)
+local function await(msec)
     local callee = callee_acquire()
     if callee then
         if msec ~= nil and not is_uint(msec) then
@@ -179,7 +170,7 @@ end
 --- @return boolean ok
 --- @return any ...
 --- @return boolean timeout
-function Act.suspend(msec)
+local function suspend(msec)
     local callee = callee_acquire()
     if callee then
         if msec ~= nil and not is_uint(msec) then
@@ -195,7 +186,7 @@ end
 --- @param cid any
 --- @vararg ...
 --- @return boolean ok
-function Act.resume(cid, ...)
+local function resume(cid, ...)
     if callee_acquire() then
         return callee_resume(cid, ...)
     end
@@ -207,7 +198,7 @@ end
 --- @param msec integer
 --- @return integer rem
 --- @return string? err
-function Act.sleep(msec)
+local function sleep(msec)
     local callee = callee_acquire()
     if callee then
         if not is_uint(msec) then
@@ -225,7 +216,7 @@ end
 --- @return integer signo
 --- @return string? err
 --- @return boolean? timeout
-function Act.sigwait(msec, ...)
+local function sigwait(msec, ...)
     local callee = callee_acquire()
     if callee then
         if msec ~= nil and not is_uint(msec) then
@@ -243,7 +234,7 @@ end
 --- @return boolean ok
 --- @return string? err
 --- @return boolean? timeout
-function Act.read_lock(fd, msec)
+local function read_lock(fd, msec)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
@@ -259,7 +250,7 @@ end
 
 --- read_unlock
 --- @param fd integer
-function Act.read_unlock(fd)
+local function read_unlock(fd)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
@@ -273,11 +264,11 @@ end
 
 --- write_lock
 --- @param fd integer
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
-function Act.write_lock(fd, msec)
+local function write_lock(fd, msec)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
@@ -293,7 +284,7 @@ end
 
 --- write_unlock
 --- @param fd integer
-function Act.write_unlock(fd)
+local function write_unlock(fd)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
@@ -308,7 +299,7 @@ end
 --- unwait_readable
 --- @param fd integer
 --- @return boolean ok
-function Act.unwait_readable(fd)
+local function unwait_readable(fd)
     if callee_acquire() then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
@@ -323,7 +314,7 @@ end
 --- unwait_writable
 --- @param fd integer
 --- @return boolean ok
-function Act.unwait_writable(fd)
+local function unwait_writable(fd)
     if callee_acquire() then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
@@ -338,7 +329,7 @@ end
 --- unwait
 --- @param fd integer
 --- @return boolean ok
-function Act.unwait(fd)
+local function unwait(fd)
     if callee_acquire() then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
@@ -354,9 +345,9 @@ end
 --- @param fd integer
 --- @param msec? integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
-function Act.wait_readable(fd, msec)
+local function wait_readable(fd, msec)
     local callee = callee_acquire()
 
     if callee then
@@ -375,9 +366,9 @@ end
 --- @param fd integer
 --- @param msec? integer
 --- @return boolean ok
---- @return string? err
+--- @return any err
 --- @return boolean? timeout
-function Act.wait_writable(fd, msec)
+local function wait_writable(fd, msec)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
@@ -393,7 +384,7 @@ end
 
 --- getcid
 --- @return any cid
-function Act.getcid()
+local function getcid()
     local callee = callee_acquire()
     if callee then
         return callee.cid
@@ -406,7 +397,7 @@ end
 --- @param fn function
 --- @vararg any
 --- @return boolean ok
---- @return string? err
+--- @return any err
 local function runloop(fn, ...)
     -- create act context
     local err
@@ -417,7 +408,7 @@ local function runloop(fn, ...)
 
     -- create main coroutine
     local ok
-    ok, err = spawn(false, fn, ...)
+    ok, err = spawn_child(false, fn, ...)
     if not ok then
         return false, err
     end
@@ -456,8 +447,8 @@ end
 --- @param fn function
 --- @vararg any
 --- @return boolean ok
---- @return string err
-function Act.run(fn, ...)
+--- @return any err
+local function run(fn, ...)
     -- check first argument
     if not is_func(fn) then
         error('fn must be function', 2)
@@ -475,4 +466,32 @@ function Act.run(fn, ...)
 end
 
 -- exports
-return Act
+return {
+    OK = reco.OK,
+    ERRRUN = reco.ERRRUN,
+    ERRSYNTAX = reco.ERRSYNTAX,
+    ERRMEM = reco.ERRMEM,
+    ERRERR = reco.ERRERR,
+    run = run,
+    getcid = getcid,
+    wait_writable = wait_writable,
+    wait_readable = wait_readable,
+    unwait = unwait,
+    unwait_writable = unwait_writable,
+    unwait_readable = unwait_readable,
+    write_unlock = write_unlock,
+    write_lock = write_lock,
+    read_unlock = read_unlock,
+    read_lock = read_lock,
+    sigwait = sigwait,
+    sleep = sleep,
+    resume = resume,
+    suspend = suspend,
+    await = await,
+    atexit = atexit,
+    later = later,
+    exit = exit,
+    spawn = spawn,
+    fork = pfork,
+    pollable = pollable,
+}

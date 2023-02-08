@@ -1,5 +1,5 @@
 --
--- Copyright (C) 2016 Masatoshi Teruya
+-- Copyright (C) 2016-present Masatoshi Fukunaga
 --
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
@@ -41,8 +41,8 @@ function Event:__newindex()
 end
 
 --- init
---- @return act.event ev
---- @return error? err
+--- @return act.event? ev
+--- @return any err
 function Event:init()
     local monitor, err = new_evm()
     if err then
@@ -60,7 +60,7 @@ end
 
 --- renew
 --- @return boolean ok
---- @return error? err
+--- @return any err
 function Event:renew()
     local ok, err = self.monitor:renew()
     if not ok then
@@ -83,8 +83,8 @@ end
 --- @param val integer|number
 --- @param oneshot? boolean
 --- @param edge? boolean
---- @return evm.event ev
---- @return error? err
+--- @return evm.event? ev
+--- @return any err
 function Event:register(callee, asa, val, oneshot, edge)
     local ev = self.pool:pop()
 
@@ -120,7 +120,7 @@ end
 --- @param signo integer
 --- @param oneshot boolean
 --- @return evm.signal ev
---- @return error? err
+--- @return any err
 function Event:signal(callee, signo, oneshot)
     return self:register(callee, 'assignal', signo, oneshot)
 end
@@ -130,7 +130,7 @@ end
 --- @param ival number
 --- @param oneshot boolean
 --- @return evm.timer ev
---- @return error? err
+--- @return any err
 function Event:timer(callee, ival, oneshot)
     return self:register(callee, 'astimer', ival, oneshot)
 end
@@ -140,7 +140,7 @@ end
 --- @param fd integer
 --- @param oneshot boolean
 --- @return evm.writable ev
---- @return error? err
+--- @return any err
 function Event:writable(callee, fd, oneshot)
     return self:register(callee, 'aswritable', fd, oneshot)
 end
@@ -150,15 +150,15 @@ end
 --- @param fd integer
 --- @param oneshot boolean
 --- @return evm.readable ev
---- @return error? err
+--- @return any err
 function Event:readable(callee, fd, oneshot)
     return self:register(callee, 'asreadable', fd, oneshot)
 end
 
 --- consume
 --- @param msec integer
---- @return integer nev
---- @return error? err
+--- @return integer? nev
+--- @return any err
 function Event:consume(msec)
     if #self.monitor > 0 then
         local monitor = self.monitor
