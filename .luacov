@@ -1,13 +1,12 @@
 codefromstrings = false
 runreport = true
-deletestats = false
+deletestats = true
 modules = {
     act = "act.lua",
     ['act.aux'] = "lib/aux.lua",
     ['act.callee'] = "lib/callee.lua",
     ['act.context'] = "lib/context.lua",
     ['act.event'] = "lib/event.lua",
-    ['act.pipe'] = "lib/pipe.lua",
     ['act.pool'] = "lib/pool.lua",
     ['act.runq'] = "lib/runq.lua",
 }
