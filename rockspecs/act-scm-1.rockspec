@@ -12,12 +12,12 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "lauxhlib >= 0.4.0",
+    "lauxhlib >= 0.5",
     "mah0x211/argv >= 0.3",
     "mah0x211/deque >= 0.4",
     "mah0x211/evm >= 0.10",
     "mah0x211/fork >= 0.2",
-    "mah0x211/metamodule >= 0.2",
+    "mah0x211/metamodule >= 0.4",
     "mah0x211/minheap >= 0.2",
     "mah0x211/nosigpipe >= 0.1",
     "mah0x211/reco >= 1.5",
