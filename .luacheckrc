@@ -2,7 +2,7 @@ std = 'max'
 include_files = {
     'act.lua',
     'lib/*.lua',
-    'test/*_spec.lua',
+    'test/*_test.lua',
 }
 ignore = {
     'assert',

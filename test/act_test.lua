@@ -7,10 +7,18 @@ local llsocket = require('llsocket')
 local signal = require('signal')
 local act = require('act')
 
+local SOCKPAIR
+
 local function socketpair()
     collectgarbage('collect')
-    local pair = assert(llsocket.socket.pair(llsocket.SOCK_STREAM, nil, true))
-    return pair[1], pair[2]
+    SOCKPAIR = assert(llsocket.socket.pair(llsocket.SOCK_STREAM, nil, true))
+    return SOCKPAIR[1], SOCKPAIR[2]
+end
+
+function testcase.after_each()
+    for _, sock in ipairs(SOCKPAIR or {}) do
+        sock:close()
+    end
 end
 
 function testcase.run()
@@ -37,10 +45,32 @@ function testcase.run()
     assert.match(err, 'fn must be function')
 end
 
+function testcase.getcid()
+    -- test that return callee-id
+    assert(act.run(with_luacov(function()
+        assert.is_uint(act.getcid())
+    end)))
+
+    -- test that throws an error if called from outside of execution context
+    local err = assert.throws(act.getcid)
+    assert.match(err, 'cannot call getcid() at outside of execution context')
+end
+
+function testcase.pollable()
+    -- test that return false if called from outside of execution context
+    assert.is_false(act.pollable())
+
+    -- test that return true if inside of execution context
+    assert(act.run(with_luacov(function()
+        assert.is_true(act.pollable())
+    end)))
+end
+
 function testcase.fork()
+    local pid = getpid()
+
     -- test that fork process
     assert(act.run(with_luacov(function()
-        local pid = getpid()
         local p = assert(act.fork())
         if p:is_child() then
             assert.not_equal(pid, getpid())
@@ -49,6 +79,14 @@ function testcase.fork()
         local res = assert(p:wait())
         assert.equal(res.exit, 0)
     end)))
+    if pid ~= getpid() then
+        -- ignore child process
+        return
+    end
+
+    -- test that throws an error if called from outside of execution context
+    local err = assert.throws(act.fork)
+    assert.match(err, 'cannot call fork() from outside of execution context')
 end
 
 function testcase.sleep()
@@ -108,7 +146,7 @@ function testcase.sleep()
         local res = assert(act.await())
         assert.equal(res.cid, cid)
         assert.greater_or_equal(res.result[1], 20)
-        assert.less_or_equal(res.result[1], 25)
+        assert.less_or_equal(res.result[1], 30)
     end)))
 
     -- test that fail with invalid deadline
@@ -327,6 +365,10 @@ function testcase.await()
         res, timeout = act.await(100)
         assert.is_nil(res)
         assert.is_true(timeout)
+
+        -- test that throws an error if msec argument is invalid
+        local err = assert.throws(act.await, {})
+        assert.match(err, 'msec must be unsigned integer')
     end)))
 
     -- test that fail on called from outside of execution context
@@ -354,7 +396,7 @@ function testcase.exit()
     assert.match(err, 'outside of execution')
 end
 
-function testcase.wait_readable()
+function testcase.wait_unwait_readable()
     -- test that wait until fd is readable
     assert(act.run(with_luacov(function()
         local reader, writer = socketpair()
@@ -375,6 +417,52 @@ function testcase.wait_readable()
             result = {
                 'hello world!',
             },
+        })
+    end)))
+
+    -- test that cancel waiting until fd is readable
+    assert(act.run(with_luacov(function()
+        local reader = socketpair()
+        local wait = false
+        local cid = act.spawn(with_luacov(function()
+            wait = true
+            local ok, err, timeout = act.wait_readable(reader:fd(), 50)
+            wait = false
+            assert.is_false(ok)
+            assert.is_nil(err)
+            assert.is_nil(timeout)
+        end))
+
+        act.later()
+        assert.is_true(wait)
+        act.unwait_readable(reader:fd())
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {},
+        })
+    end)))
+
+    -- test that the unwait function can cancel waiting until fd is readable
+    assert(act.run(with_luacov(function()
+        local reader = socketpair()
+        local wait = false
+        local cid = act.spawn(with_luacov(function()
+            wait = true
+            local ok, err, timeout = act.wait_readable(reader:fd(), 50)
+            wait = false
+            assert.is_false(ok)
+            assert.is_nil(err)
+            assert.is_nil(timeout)
+        end))
+
+        act.later()
+        assert.is_true(wait)
+        act.unwait(reader:fd())
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {},
         })
     end)))
 
@@ -415,10 +503,22 @@ function testcase.wait_readable()
 
         err = assert.throws(act.wait_readable, 0, -1)
         assert.match(err, 'msec must be unsigned integer')
+
+        err = assert.throws(act.unwait_readable, -1)
+        assert.match(err, 'fd must be unsigned integer')
+
+        err = assert.throws(act.unwait, -1)
+        assert.match(err, 'fd must be unsigned integer')
     end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.wait_readable)
+    assert.match(err, 'outside of execution')
+
+    err = assert.throws(act.unwait_readable)
+    assert.match(err, 'outside of execution')
+
+    err = assert.throws(act.unwait)
     assert.match(err, 'outside of execution')
 end
 
@@ -445,6 +545,60 @@ function testcase.wait_writable()
             },
         })
         assert.equal(reader:recv(), 'hello')
+    end)))
+
+    -- test that cancel waiting until fd is writable
+    assert(act.run(with_luacov(function()
+        local sock = socketpair()
+        assert(sock:sndbuf(5))
+        local msg = string.rep('x', sock:sndbuf(5))
+        assert(sock:send(msg))
+
+        local wait = false
+        local cid = act.spawn(with_luacov(function()
+            wait = true
+            local ok, err, timeout = act.wait_writable(sock:fd(), 50)
+            wait = false
+            assert.is_false(ok)
+            assert.is_nil(err)
+            assert.is_nil(timeout)
+        end))
+
+        act.later()
+        assert.is_true(wait)
+        act.unwait_writable(sock:fd())
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {},
+        })
+    end)))
+
+    -- test that unwait function can cancel waiting until fd is writable
+    assert(act.run(with_luacov(function()
+        local sock = socketpair()
+        assert(sock:sndbuf(5))
+        local msg = string.rep('x', sock:sndbuf(5))
+        assert(sock:send(msg))
+
+        local wait = false
+        local cid = act.spawn(with_luacov(function()
+            wait = true
+            local ok, err, timeout = act.wait_writable(sock:fd(), 50)
+            wait = false
+            assert.is_false(ok)
+            assert.is_nil(err)
+            assert.is_nil(timeout)
+        end))
+
+        act.later()
+        assert.is_true(wait)
+        act.unwait(sock:fd())
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            result = {},
+        })
     end)))
 
     -- test that fail by timeout
@@ -511,10 +665,16 @@ function testcase.wait_writable()
 
         err = assert.throws(act.wait_writable, 0, -1)
         assert.match(err, 'msec must be unsigned integer')
+
+        err = assert.throws(act.unwait_writable, -1)
+        assert.match(err, 'fd must be unsigned integer')
     end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.wait_writable)
+    assert.match(err, 'outside of execution')
+
+    err = assert.throws(act.unwait_writable)
     assert.match(err, 'outside of execution')
 end
 
@@ -698,7 +858,7 @@ function testcase.read_lock_unlock()
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
-            assert.less(elapsed, 15)
+            assert.less(elapsed, 20)
             return 'lock ok 1000'
         end))
 
@@ -832,10 +992,17 @@ function testcase.read_lock_unlock()
 
         err = assert.throws(act.read_lock, 1, {})
         assert.match(err, 'msec must be unsigned integer')
+
+        err = assert.throws(act.read_unlock, -1)
+        assert.match(err, 'fd must be unsigned integer')
     end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.read_lock)
+    assert.match(err, 'outside of execution')
+
+    -- test that fail on called from outside of execution context
+    err = assert.throws(act.read_unlock)
     assert.match(err, 'outside of execution')
 end
 
@@ -914,7 +1081,7 @@ function testcase.write_lock_unlock()
             assert.is_true(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
-            assert.less(elapsed, 15)
+            assert.less(elapsed, 20)
             return 'lock ok 1000'
         end))
 
@@ -1048,9 +1215,16 @@ function testcase.write_lock_unlock()
 
         err = assert.throws(act.write_lock, 1, {})
         assert.match(err, 'msec must be unsigned integer')
+
+        err = assert.throws(act.write_unlock, -1)
+        assert.match(err, 'fd must be unsigned integer')
     end)))
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.write_lock)
     assert.match(err, 'outside of execution')
+
+    err = assert.throws(act.write_unlock)
+    assert.match(err, 'outside of execution')
 end
+

@@ -13,6 +13,6 @@ coroutine based synchronously non-blocking operations module.
 ## Installation
 
 ```
-luarocks install act --server=https://luarocks.org/dev
+luarocks install act
 ```
 
