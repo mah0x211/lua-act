@@ -723,8 +723,8 @@ function testcase.sigwait()
         local err = assert.throws(act.sigwait, -1)
         assert.match(err, 'msec must be unsigned integer')
 
-        err = assert.throws(act.sigwait, nil, -1000)
-        assert.match(err, 'invalid signal number')
+        err = assert.throws(act.sigwait, nil, 'SIGUSR1')
+        assert.match(err, 'number expected')
     end)))
 
     -- test that fail on called from outside of execution context

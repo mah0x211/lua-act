@@ -27,13 +27,14 @@
 local rawset = rawset
 local setmetatable = setmetatable
 local new_deque = require('deque').new
-local new_evm = require('evm').new
+local poller = require('act.poller')
+local new_errno = require('errno').new
 local OP_EVENT = require('act.aux').OP_EVENT
 
 --- @class act.event
---- @field monitor evm
+--- @field monitor poller
 --- @field pool Deque
---- @field used table<evm.event, boolean>
+--- @field used table<poller.event, boolean>
 local Event = {}
 
 function Event:__newindex()
@@ -44,9 +45,10 @@ end
 --- @return act.event? ev
 --- @return any err
 function Event:init()
-    local monitor, err = new_evm()
+    -- create event monitor
+    local monitor, err, errno = poller()
     if err then
-        return nil, err
+        return nil, new_errno(errno, err)
     end
 
     rawset(self, 'monitor', monitor)
@@ -62,9 +64,9 @@ end
 --- @return boolean ok
 --- @return any err
 function Event:renew()
-    local ok, err = self.monitor:renew()
+    local ok, err, errno = self.monitor:renew()
     if not ok then
-        return false, err
+        return false, new_errno(errno, err)
     end
 
     -- re-create new pool (dispose pooled events)
@@ -77,26 +79,48 @@ function Event:renew()
     return true
 end
 
+--- revoke
+--- @param ev poller.event
+function Event:revoke(ev)
+    -- release reference of event explicitly
+    self.used[ev] = nil
+    assert(ev:revert())
+    -- push to event pool
+    self.pool:push(ev)
+end
+
 --- register
 --- @param callee act.callee
 --- @param asa string
 --- @param val integer|number
 --- @param oneshot? boolean
 --- @param edge? boolean
---- @return evm.event? ev
+--- @return poller.event? ev
 --- @return any err
 function Event:register(callee, asa, val, oneshot, edge)
     local ev = self.pool:pop()
 
     -- create new event
     if not ev then
-        ev = self.monitor:newevent()
+        ev = self.monitor:new_event()
+    end
+
+    if oneshot then
+        ev:as_oneshot()
+    elseif edge then
+        ev:as_edge()
     end
 
     -- register event as a asa
-    local ok, err = ev[asa](ev, val, callee, oneshot, edge)
-    if not ok then
-        return nil, err
+    local err, errno
+    if asa == 'as_timer' then
+        ev, err, errno = ev:as_timer(val, val, callee)
+    else
+        ev, err, errno = ev[asa](ev, val, callee)
+    end
+
+    if not ev then
+        return nil, new_errno(errno, err)
     end
 
     -- retain reference of event object in use
@@ -105,54 +129,44 @@ function Event:register(callee, asa, val, oneshot, edge)
     return ev
 end
 
---- revoke
---- @param ev evm.event
-function Event:revoke(ev)
-    -- release reference of event explicitly
-    self.used[ev] = nil
-    ev:revert()
-    -- push to event pool
-    self.pool:push(ev)
-end
-
 --- signal
 --- @param callee act.callee
 --- @param signo integer
 --- @param oneshot boolean
---- @return evm.signal ev
+--- @return poller.event? ev
 --- @return any err
 function Event:signal(callee, signo, oneshot)
-    return self:register(callee, 'assignal', signo, oneshot)
+    return self:register(callee, 'as_signal', signo, oneshot)
 end
 
 --- timer
 --- @param callee act.callee
 --- @param ival number
 --- @param oneshot boolean
---- @return evm.timer ev
+--- @return poller.event? ev
 --- @return any err
 function Event:timer(callee, ival, oneshot)
-    return self:register(callee, 'astimer', ival, oneshot)
+    return self:register(callee, 'as_timer', ival, oneshot)
 end
 
 --- writable
 --- @param callee act.callee
 --- @param fd integer
 --- @param oneshot boolean
---- @return evm.writable ev
+--- @return poller.event? ev
 --- @return any err
 function Event:writable(callee, fd, oneshot)
-    return self:register(callee, 'aswritable', fd, oneshot)
+    return self:register(callee, 'as_write', fd, oneshot)
 end
 
 --- readable
 --- @param callee act.callee
 --- @param fd integer
 --- @param oneshot boolean
---- @return evm.readable ev
+--- @return poller.event? ev
 --- @return any err
 function Event:readable(callee, fd, oneshot)
-    return self:register(callee, 'asreadable', fd, oneshot)
+    return self:register(callee, 'as_read', fd, oneshot)
 end
 
 --- consume
@@ -163,20 +177,20 @@ function Event:consume(msec)
     if #self.monitor > 0 then
         local monitor = self.monitor
         -- wait events
-        local nev, err = monitor:wait(msec)
+        local nev, err, errno = monitor:wait(msec)
 
         if err then
             -- got critical error
-            return nil, err
+            return nil, new_errno(errno, err)
         elseif nev > 0 then
             -- consuming events
-            local ev, callee, disabled = monitor:getevent()
+            local ev, callee, disabled = monitor:consume()
 
             while ev do
                 -- resume
                 callee:call(OP_EVENT, ev:ident(), disabled)
                 -- get next event
-                ev, callee, disabled = monitor:getevent()
+                ev, callee, disabled = monitor:consume()
             end
         end
 
