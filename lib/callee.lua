@@ -487,7 +487,7 @@ local function waitable(self, operators, asa, fd, msec)
             self.evfd = fd
             self.evasa = asa
             operators[fd] = self
-            self.ev:context(self)
+            self.ev:udata(self)
 
             -- remove ev and related info
             callee.ev = nil
