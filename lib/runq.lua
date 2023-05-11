@@ -63,7 +63,7 @@ end
 
 --- push
 --- @param callee act.callee
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
 --- @return any err
 function RunQ:push(callee, msec)

@@ -643,6 +643,10 @@ function Callee:sigwait(msec, ...)
         local ev, err = event:signal(self, signo, true)
 
         if err then
+            if msec then
+                self.act.runq:remove(self)
+            end
+
             -- revoke signal events
             for _ = 1, #sigset do
                 event:revoke(sigset:pop())
@@ -657,6 +661,9 @@ function Callee:sigwait(msec, ...)
 
     -- no need to wait signal if empty
     if #sigset == 0 then
+        if msec then
+            self.act.runq:remove(self)
+        end
         return nil
     end
 
@@ -666,6 +673,7 @@ function Callee:sigwait(msec, ...)
     self.sigset = sigset
     local op, signo = yield()
     self.sigset = nil
+
     -- remove from runq if registered
     if msec then
         self.act.runq:remove(self)

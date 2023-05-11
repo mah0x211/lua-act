@@ -56,7 +56,7 @@ function Context:renew()
 end
 
 --- pushq pushes a callee to runq
---- @param callee act.callee.Callee
+--- @param callee act.callee
 --- @return boolean ok
 --- @return any err
 function Context:pushq(callee)
