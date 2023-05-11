@@ -594,10 +594,7 @@ end
 --- @return integer rem
 --- @return any err
 function Callee:sleep(msec)
-    local ok, err = self.act.runq:push(self, msec)
-    if not ok then
-        return false, err
-    end
+    assert(self.act.runq:push(self, msec))
 
     local cid = self.cid
     local deadline = getmsec() + msec
