@@ -626,11 +626,8 @@ end
 --- @return boolean? timeout
 function Callee:sigwait(msec, ...)
     -- register to runq with msec
-    if msec then
-        local ok, err = self.act.runq:push(self, msec)
-        if not ok then
-            return nil, err
-        end
+    if msec ~= nil then
+        assert(self.act.runq:push(self, msec))
     end
 
     local event = self.act.event
