@@ -664,8 +664,6 @@ function Callee:sigwait(msec, ...)
         return nil
     end
 
-    -- revoke all events currently in use
-    self:revoke()
     -- wait registered signals
     self.sigset = sigset
     local op, signo = yield()
