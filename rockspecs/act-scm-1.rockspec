@@ -41,6 +41,7 @@ build = {
                 "src/hrtimer.c",
             },
         },
+        ['act.lockq'] = "lib/lockq.lua",
         ['act.poller'] = "lib/poller.lua",
         ['act.pool'] = "lib/pool.lua",
         ['act.runq'] = "lib/runq.lua",

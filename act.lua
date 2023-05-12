@@ -41,7 +41,7 @@ local callee_unwait_readable = Callee.unwait_readable
 local callee_unwait = Callee.unwait
 local new_context = require('act.context').new
 --- constants
---- @type act.context
+--- @type act.context?
 local ACT_CTX
 
 --- spawn_child
@@ -150,7 +150,7 @@ local function atexit(fn, ...)
 end
 
 --- await
---- @param msec integer
+--- @param msec? integer
 --- @return table stat
 --- @return boolean timeout
 local function await(msec)
@@ -230,7 +230,7 @@ end
 
 --- read_lock
 --- @param fd integer
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
 --- @return string? err
 --- @return boolean? timeout
@@ -240,7 +240,7 @@ local function read_lock(fd, msec)
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
         elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+            error('msec must be unsigned integer or nil', 2)
         end
         return callee:read_lock(fd, msec)
     end
@@ -274,7 +274,7 @@ local function write_lock(fd, msec)
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
         elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+            error('msec must be unsigned integer or nil', 2)
         end
         return callee:write_lock(fd, msec)
     end

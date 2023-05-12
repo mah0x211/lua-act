@@ -49,8 +49,6 @@ local OK = reco.OK
 local SUSPENDED = setmetatable({}, {
     __mode = 'v',
 })
-local RLOCKS = {}
-local WLOCKS = {}
 local RWAITS = {}
 local WWAITS = {}
 local RWWAITS = {
@@ -187,21 +185,12 @@ function Callee:dispose(ok, status)
     local runq = self.act.runq
 
     runq:remove(self)
+    -- release from lockq
+    self.act.lockq:release(self)
+
     -- remove state properties
     self.term = nil
     SUSPENDED[self.cid] = nil
-
-    -- read_unlock
-    for fd in pairs(self.rlock) do
-        self:read_unlock(fd)
-    end
-    self.rlock = {}
-
-    -- write_unlock
-    for fd in pairs(self.wlock) do
-        self:write_unlock(fd)
-    end
-    self.wlock = {}
 
     -- revoke all events currently in use
     self:revoke()
@@ -358,83 +347,18 @@ function Callee:later()
     error('invalid implements')
 end
 
---- rwunlock
---- @param callee act.callee
---- @param locks table
---- @param asa string
---- @param fd integer
-local function rwunlock(callee, locks, asa, fd)
-    local waitq = callee[asa][fd]
-
-    if waitq then
-        callee[asa][fd] = nil
-
-        for i = 1, #waitq do
-            local cid = waitq[i]
-
-            callee = SUSPENDED[cid]
-            if callee then
-                waitq[i] = false
-                SUSPENDED[cid] = nil
-                -- resume suspended callee via runq
-                local runq = callee.act.runq
-                runq:remove(callee)
-                runq:push(callee)
-                return
-            end
-        end
-        -- waitq has been consumed
-        locks[fd] = nil
-    end
-end
-
 --- read_unlock
 --- @param fd integer
+--- @return boolean ok
 function Callee:read_unlock(fd)
-    rwunlock(self, RLOCKS, 'rlock', fd)
+    return self.act.lockq:read_unlock(self, fd)
 end
 
 --- write_unlock
 --- @param fd integer
-function Callee:write_unlock(fd)
-    rwunlock(self, WLOCKS, 'wlock', fd)
-end
-
---- rwlock
---- @param callee act.callee
---- @param locks table
---- @param asa string
---- @param fd integer
---- @param msec integer
 --- @return boolean ok
---- @return any err
---- @return boolean? timeout
-local function rwlock(callee, locks, asa, fd, msec)
-    if not callee[asa][fd] then
-        local waitq = locks[fd]
-
-        -- other callee is waiting
-        if waitq then
-            local idx = #waitq + 1
-
-            waitq[idx] = callee.cid
-            local ok, err, timeout = callee:suspend(msec)
-            waitq[idx] = false
-            if ok then
-                -- other callee unlocked
-                callee[asa][fd] = waitq
-            end
-
-            return ok, err, timeout
-        end
-
-        -- create read or write lock wait queue
-        waitq = {}
-        locks[fd] = waitq
-        callee[asa][fd] = waitq
-    end
-
-    return true
+function Callee:write_unlock(fd)
+    return self.act.lockq:write_unlock(self, fd)
 end
 
 --- read_lock
@@ -444,7 +368,7 @@ end
 --- @return any err
 --- @return boolean? timeout
 function Callee:read_lock(fd, msec)
-    return rwlock(self, RLOCKS, 'rlock', fd, msec)
+    return self.act.lockq:read_lock(self, fd, msec)
 end
 
 --- write_lock
@@ -454,7 +378,7 @@ end
 --- @return any err
 --- @return boolean? timeout
 function Callee:write_lock(fd, msec)
-    return rwlock(self, WLOCKS, 'wlock', fd, msec)
+    return self.act.lockq:write_lock(self, fd, msec)
 end
 
 --- waitable
@@ -750,8 +674,6 @@ function Callee:init(act, atexit, fn, ...)
     self.args = args
     self.argv = new_argv()
     self.node = new_deque()
-    self.rlock = {}
-    self.wlock = {}
     -- ev = [event object]
     self.evfd = -1
     self.evasa = '' -- '', 'readable' or 'writable'
