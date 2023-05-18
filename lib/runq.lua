@@ -26,7 +26,7 @@
 --- file scope variables
 local rawset = rawset
 local floor = math.floor
-local minheap_new = require('minheap').new
+local new_minheap = require('act.minheap')
 local new_deque = require('act.deque')
 local hrtimer = require('act.hrtimer')
 local hrtimer_getnsec = hrtimer.getnsec
@@ -56,7 +56,7 @@ end
 --- init
 --- @return act.runq
 function RunQ:init()
-    rawset(self, 'heap', minheap_new())
+    rawset(self, 'heap', new_minheap())
     rawset(self, 'ref', {})
     return self
 end

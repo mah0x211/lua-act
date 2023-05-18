@@ -43,6 +43,7 @@ build = {
             },
         },
         ['act.lockq'] = "lib/lockq.lua",
+        ['act.minheap'] = "lib/minheap.lua",
         ['act.poller'] = "lib/poller.lua",
         ['act.pool'] = "lib/pool.lua",
         ['act.runq'] = "lib/runq.lua",
