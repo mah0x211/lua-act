@@ -474,13 +474,9 @@ function Callee:sleep(msec)
     SUSPENDED[cid] = self
     local op = yield()
     SUSPENDED[cid] = nil
-    if op == OP_RUNQ then
-        local rem = deadline - getmsec()
-        return rem > 0 and rem or 0
-    end
-
-    -- normally unreachable
-    error('invalid implements')
+    assert(op == OP_RUNQ)
+    local rem = deadline - getmsec()
+    return rem > 0 and rem or 0
 end
 
 --- sigwait
