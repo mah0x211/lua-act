@@ -27,9 +27,9 @@
 local yield = coroutine.yield
 local setmetatable = setmetatable
 local new_argv = require('argv').new
-local new_deque = require('deque').new
 local reco = require('reco')
 local new_reco = reco.new
+local new_deque = require('act.deque')
 local hrtimer = require('act.hrtimer')
 local getnsec = hrtimer.getnsec
 local getmsec = hrtimer.getmsec
@@ -135,6 +135,8 @@ local function resume(cid, ...)
 end
 
 --- @class act.callee
+--- @field act act.context
+--- @field sigset deque
 local Callee = {}
 
 --- revoke

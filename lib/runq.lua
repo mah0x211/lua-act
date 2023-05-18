@@ -26,8 +26,8 @@
 --- file scope variables
 local rawset = rawset
 local floor = math.floor
-local deque_new = require('deque').new
 local minheap_new = require('minheap').new
+local new_deque = require('act.deque')
 local hrtimer = require('act.hrtimer')
 local hrtimer_getnsec = hrtimer.getnsec
 local hrtimer_remain = hrtimer.remain
@@ -46,7 +46,7 @@ end
 
 --- @class act.runq
 --- @field heap minheap
---- @field ref table
+--- @field ref table<act.callee, deque.element>|table<integer, deque>|table<deque, minheap.element>
 local RunQ = {}
 
 function RunQ:__newindex()
@@ -81,7 +81,7 @@ function RunQ:push(callee, msec)
 
         if not queue then
             -- create new queue associated for msec
-            queue = deque_new()
+            queue = new_deque() --- @type deque
             -- push callee to queue
             qelm = queue:unshift(callee)
             -- push queue to minheap

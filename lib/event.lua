@@ -26,14 +26,14 @@
 --- file scope variables
 local rawset = rawset
 local setmetatable = setmetatable
-local new_deque = require('deque').new
+local new_deque = require('act.deque')
 local poller = require('act.poller')
 local new_errno = require('errno').new
 local OP_EVENT = require('act.aux').OP_EVENT
 
 --- @class act.event
 --- @field monitor poller
---- @field pool Deque
+--- @field pool deque
 --- @field used table<poller.event, boolean>
 local Event = {}
 

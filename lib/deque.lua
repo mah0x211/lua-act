@@ -1,0 +1,36 @@
+--
+-- Copyright (C) 2023 Masatoshi Fukunaga
+--
+-- Permission is hereby granted, free of charge, to any person obtaining a copy
+-- of this software and associated documentation files (the "Software"), to deal
+-- in the Software without restriction, including without limitation the rights
+-- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+-- copies of the Software, and to permit persons to whom the Software is
+-- furnished to do so, subject to the following conditions:
+--
+-- The above copyright notice and this permission notice shall be included in
+-- all copies or substantial portions of the Software.
+--
+-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+-- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+-- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+-- THE SOFTWARE.
+--
+--- @class deque
+--- @field __len fun(self):integer
+--- @field unshift fun(self, data:any):(elm:deque.element)
+--- @field shift fun(self):(data:any)
+--- @field push fun(self, data:any):(elm:deque.element)
+--- @field pop fun(self):(data:any)
+--- @field head fun(self):(elm:deque.element?)
+--- @field tail fun(self):(elm:deque.element?)
+--- @field remove fun(self, elm:deque.element):(data:any)
+--- @class deque.element
+--- @field data fun(self, newdata?:any):(data:any)
+--- @field prev fun(self):(elm:deque.element?)
+--- @field next fun(self):(elm:deque.element?)
+--- @field remove fun(self):(data:any)
+return require('deque').new
