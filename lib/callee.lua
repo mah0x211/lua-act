@@ -51,10 +51,6 @@ local SUSPENDED = setmetatable({}, {
 })
 local RWAITS = {}
 local WWAITS = {}
-local RWWAITS = {
-    readable = RWAITS,
-    writable = WWAITS,
-}
 
 --- @type act.pool
 local POOL = require('act.pool').new()
@@ -77,20 +73,14 @@ local function unwaitfd(operators, fd)
     -- found
     if callee then
         operators[fd] = nil
+
+        local ev = callee.fdev
+        callee.fdev = nil
+        callee.is_cancel = true
+        callee.act.event:revoke(ev)
+        -- requeue without timeout
         callee.act.runq:remove(callee)
-        callee.act.event:revoke(callee.ev)
-        -- reset event properties
-        callee.ev = nil
-        callee.evfd = -1
-        -- currently in-use
-        if callee.evuse then
-            callee.evuse = false
-            callee.evasa = 'unwaitfd'
-            -- requeue without timeout
-            assert(callee.act.runq:push(callee))
-        else
-            callee.evasa = ''
-        end
+        assert(callee.act.runq:push(callee))
     end
 end
 
@@ -135,34 +125,39 @@ local function resume(cid, ...)
 end
 
 --- @class act.callee
+--- @field cid integer
+--- @field co thread
 --- @field act act.context
---- @field sigset deque
+--- @field is_cancel boolean?
+--- @field fdev poller.event?
+--- @field sigset deque?
 local Callee = {}
 
 --- revoke
 function Callee:revoke()
     local event = self.act.event
 
+    -- revoke io event
+    if self.fdev then
+        local ev = self.fdev
+        self.fdev = nil
+
+        local fd = ev:ident()
+        if RWAITS[fd] == self then
+            RWAITS[fd] = nil
+        elseif WWAITS[fd] == self then
+            WWAITS[fd] = nil
+        end
+        event:revoke(ev)
+    end
+
     -- revoke signal events
     if self.sigset then
         local sigset = self.sigset
-
         for _ = 1, #sigset do
             event:revoke(sigset:pop())
         end
         self.sigset = nil
-    end
-
-    -- revoke io event
-    if self.evfd ~= -1 then
-        local ev = self.ev
-
-        RWWAITS[self.evasa][self.evfd] = nil
-        self.ev = nil
-        self.evfd = -1
-        self.evasa = ''
-        self.evuse = false
-        event:revoke(ev)
     end
 end
 
@@ -393,106 +388,57 @@ end
 --- @return any err
 --- @return boolean? timeout
 local function waitable(self, operators, asa, fd, msec)
+    -- register to runq with msec
+    if msec ~= nil then
+        assert(self.act.runq:push(self, msec))
+    end
+
+    -- operation already in progress in another callee
+    if operators[fd] then
+        if msec then
+            self.act.runq:remove(self)
+        end
+        return false, 'operation already in progress'
+    end
+
+    -- register io(readable or writable) event as oneshot event
     local event = self.act.event
-
-    -- fd is not watching yet
-    if self.evfd ~= fd or self.evasa ~= asa then
-        -- revoke retained event
-        self:revoke()
-
-        local callee = operators[fd]
-        -- another callee has an 'asa' event of fd
-        if callee then
-            -- currently in-use
-            if callee.evuse then
-                return false, 'operation already in progress'
-            end
-
-            -- retain ev and related info
-            self.ev = callee.ev
-            self.evfd = fd
-            self.evasa = asa
-            operators[fd] = self
-            self.ev:udata(self)
-
-            -- remove ev and related info
-            callee.ev = nil
-            callee.evfd = -1
-            callee.evasa = ''
+    local ev, err = event[asa](event, self, fd, true)
+    if err then
+        if msec then
+            self.act.runq:remove(self)
         end
-
-        -- register io(readable or writable) event
-        if not self.ev then
-            local ev, err = event[asa](event, self, fd)
-
-            if err then
-                return false, err
-            end
-
-            -- retain ev and related info
-            self.ev = ev
-            self.evfd = fd
-            self.evasa = asa
-            operators[fd] = self
-        end
+        return false, err
     end
 
-    -- register to runq
-    if msec then
-        local ok, err = self.act.runq:push(self, msec)
-
-        if not ok then
-            local ev = self.ev
-            -- revoke io event
-            self.ev = nil
-            self.evfd = -1
-            self.evasa = ''
-            operators[fd] = nil
-            event:revoke(ev)
-            return false, err
-        end
-    end
-
-    self.evuse = true
+    -- retain ev and related info
+    self.is_cancel = nil
+    self.fdev = ev
+    operators[fd] = self
     -- wait until event fired
-    local op, fdno, disabled = yield()
-    self.evuse = false
+    local op, fdno = yield()
+    operators[fd] = nil
+    self.fdev = nil
+    self.fd = nil
 
-    -- got io event
-    if op == OP_EVENT then
-        if fdno == fd then
-            -- remove from runq
-            if msec then
-                self.act.runq:remove(self)
-            end
-
-            if disabled then
-                self:revoke()
-            end
-
-            return true
-        end
-    elseif op == OP_RUNQ then
-        if self.evasa == 'unwaitfd' then
-            -- revoked by unwaitfd
-            self.evasa = ''
-            return false
-        elseif msec then
-            -- timed out
-            return false, nil, true
-        end
+    -- canceled by cancel method
+    if self.is_cancel then
+        self.is_cancel = nil
+        return false
     end
+    event:revoke(ev)
 
-    -- remove from runq
-    if msec then
+    if op == OP_RUNQ then
+        assert(msec ~= nil, 'invalid implements')
         self.act.runq:remove(self)
+        -- timed out
+        return false, nil, true
     end
 
-    -- revoke event
-    self:revoke()
-
-    -- normally unreachable
-    error('invalid implements')
+    -- opertion type must be OP_EVENT
+    assert(op == OP_EVENT, 'invalid implements')
+    assert(fdno == fd, 'invalid implements')
+    return true
 end
 
 --- wait_readable
@@ -676,10 +622,6 @@ function Callee:init(act, atexit, fn, ...)
     self.args = args
     self.argv = new_argv()
     self.node = new_deque()
-    -- ev = [event object]
-    self.evfd = -1
-    self.evasa = '' -- '', 'readable' or 'writable'
-    self.evuse = false -- true or false
 
     -- set callee-id
     self.cid = getnsec()
