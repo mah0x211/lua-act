@@ -113,12 +113,7 @@ function Event:register(callee, asa, val, oneshot, edge)
 
     -- register event as a asa
     local err, errno
-    if asa == 'as_timer' then
-        ev, err, errno = ev:as_timer(val, val, callee)
-    else
-        ev, err, errno = ev[asa](ev, val, callee)
-    end
-
+    ev, err, errno = ev[asa](ev, val, callee)
     if not ev then
         return nil, new_errno(errno, err)
     end
@@ -137,16 +132,6 @@ end
 --- @return any err
 function Event:signal(callee, signo, oneshot)
     return self:register(callee, 'as_signal', signo, oneshot)
-end
-
---- timer
---- @param callee act.callee
---- @param ival number
---- @param oneshot boolean
---- @return poller.event? ev
---- @return any err
-function Event:timer(callee, ival, oneshot)
-    return self:register(callee, 'as_timer', ival, oneshot)
 end
 
 --- writable
