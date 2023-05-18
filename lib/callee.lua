@@ -326,22 +326,9 @@ function Callee:suspend(msec)
 end
 
 --- later
---- @return boolean ok
---- @return any err
 function Callee:later()
-    local ok, err = self.act.runq:push(self)
-    if not ok then
-        return false, err
-    end
-
-    -- revoke all events currently in use
-    self:revoke()
-    if yield() == OP_RUNQ then
-        return true
-    end
-
-    -- normally unreachable
-    error('invalid implements')
+    assert(self.act.runq:push(self))
+    assert(yield() == OP_RUNQ, 'invalid implements')
 end
 
 --- read_unlock

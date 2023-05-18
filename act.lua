@@ -120,15 +120,12 @@ local function exit(...)
 end
 
 --- later
---- @return boolean ok
---- @return string? err
 local function later()
     local callee = callee_acquire()
-    if callee then
-        return callee:later()
+    if not callee then
+        error('cannot call later() from outside of execution context', 2)
     end
-
-    error('cannot call later() from outside of execution context', 2)
+    callee:later()
 end
 
 --- atexit
