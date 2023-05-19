@@ -128,9 +128,12 @@ end
 --- @field cid integer
 --- @field co thread
 --- @field act act.context
---- @field is_cancel boolean?
---- @field fdev poller.event?
---- @field sigset deque?
+--- @field node deque
+--- @field parent? act.callee
+--- @field is_await? boolean
+--- @field is_cancel? boolean
+--- @field fdev? poller.event
+--- @field sigset? deque
 local Callee = {}
 
 --- revoke
@@ -138,10 +141,9 @@ function Callee:revoke()
     local event = self.act.event
 
     -- revoke io event
-    if self.fdev then
-        local ev = self.fdev
+    local ev = self.fdev
+    if ev then
         self.fdev = nil
-
         local fd = ev:ident()
         if RWAITS[fd] == self then
             RWAITS[fd] = nil
@@ -152,12 +154,12 @@ function Callee:revoke()
     end
 
     -- revoke signal events
-    if self.sigset then
-        local sigset = self.sigset
+    local sigset = self.sigset
+    if sigset then
+        self.sigset = nil
         for _ = 1, #sigset do
             event:revoke(sigset:pop())
         end
-        self.sigset = nil
     end
 end
 
@@ -215,9 +217,9 @@ function Callee:dispose(ok, status)
         self.ref = nil
         -- detach from root node
         root.node:remove(ref)
-        if root.wait then
+        if root.is_await then
             -- root node waiting for child results
-            root.wait = nil
+            root.is_await = nil
             local stat = {
                 cid = self.cid,
             }
@@ -261,31 +263,27 @@ end
 
 --- await until the child thread to exit while the specified number of seconds.
 --- @param msec integer
---- @return table|nil res
---- @return boolean|nil timeout
+--- @return table? res
+--- @return boolean? timeout
 function Callee:await(msec)
     if #self.node > 0 then
         if msec ~= nil then
-            -- register to resume after msec seconds
             assert(self.act.runq:push(self, msec))
         end
 
-        -- revoke all events currently in use
-        self:revoke()
-        self.wait = true
+        self.is_await = true
         local op, res = yield()
         if op == OP_AWAIT then
             if msec then
                 self.act.runq:remove(self)
             end
             return res
-        elseif op == OP_RUNQ then
-            self.wait = nil
-            return nil, true
         end
-
-        -- normally unreachable
-        error('invalid implements')
+        -- timeout
+        self.is_await = nil
+        assert(op == OP_RUNQ, 'invalid implements')
+        assert(msec ~= nil, 'invalid implements')
+        return nil, true
     end
 end
 
