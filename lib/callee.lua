@@ -136,33 +136,6 @@ end
 --- @field sigset? deque
 local Callee = {}
 
---- revoke
-function Callee:revoke()
-    local event = self.act.event
-
-    -- revoke io event
-    local ev = self.fdev
-    if ev then
-        self.fdev = nil
-        local fd = ev:ident()
-        if RWAITS[fd] == self then
-            RWAITS[fd] = nil
-        elseif WWAITS[fd] == self then
-            WWAITS[fd] = nil
-        end
-        event:revoke(ev)
-    end
-
-    -- revoke signal events
-    local sigset = self.sigset
-    if sigset then
-        self.sigset = nil
-        for _ = 1, #sigset do
-            event:revoke(sigset:pop())
-        end
-    end
-end
-
 --- call
 function Callee:call(...)
     CURRENT_CALLEE = self
@@ -192,7 +165,28 @@ function Callee:dispose(ok, status)
     SUSPENDED[self.cid] = nil
 
     -- revoke all events currently in use
-    self:revoke()
+    local event = self.act.event
+    -- revoke io event
+    local ev = self.fdev
+    if ev then
+        self.fdev = nil
+        local fd = ev:ident()
+        if RWAITS[fd] == self then
+            RWAITS[fd] = nil
+        elseif WWAITS[fd] == self then
+            WWAITS[fd] = nil
+        end
+        event:revoke(ev)
+    end
+
+    -- revoke signal events
+    local sigset = self.sigset
+    if sigset then
+        self.sigset = nil
+        for _ = 1, #sigset do
+            event:revoke(sigset:pop())
+        end
+    end
 
     -- dispose child coroutines
     for _ = 1, #self.node do
