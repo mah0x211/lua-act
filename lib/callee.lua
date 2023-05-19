@@ -294,35 +294,27 @@ end
 --- @return boolean ok
 --- @return string? err
 --- @return ...
---- @return boolean timeout
 function Callee:suspend(msec)
     if msec ~= nil then
-        -- suspend until reached to msec
-        local ok, err = self.act.runq:push(self, msec)
-        if not ok then
-            return false, err
-        end
+        assert(self.act.runq:push(self, msec))
     end
 
-    -- revoke all events currently in use
-    self:revoke()
     -- wait until resumed by resume method
     local cid = self.cid
     SUSPENDED[cid] = self
-    if yield() == OP_RUNQ then
-        -- resumed by time-out if self exists in suspend list
-        if SUSPENDED[cid] then
-            SUSPENDED[cid] = nil
-            self.act.runq:remove(self)
-            return false, nil, true
-        end
+    local op = yield()
+    assert(op == OP_RUNQ, 'invalid implements')
 
-        -- resumed
-        return true, self.argv:select()
+    -- resumed by time-out
+    if SUSPENDED[cid] then
+        assert(msec ~= nil, 'invalid implements')
+        self.act.runq:remove(self)
+        SUSPENDED[cid] = nil
+        return false
     end
 
-    -- normally unreachable
-    error('invalid implements')
+    -- resumed
+    return true, self.argv:select()
 end
 
 --- later

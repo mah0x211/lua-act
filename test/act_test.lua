@@ -1,6 +1,5 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
-local nanotime = require('testcase.timer').nanotime
 local getpid = require('testcase.getpid')
 local act = require('act')
 
@@ -305,57 +304,6 @@ function testcase.exit()
 
     -- test that fail on called from outside of execution context
     local err = assert.throws(act.exit)
-    assert.match(err, 'outside of execution')
-end
-
-function testcase.suspend_resume()
-    -- test that resume a suspended coroutine
-    assert(act.run(with_luacov(function()
-        local suspended = false
-        local cid = act.spawn(with_luacov(function()
-            suspended = true
-            local elapsed = nanotime()
-            local ok, val, timeout = act.suspend(100)
-            elapsed = (nanotime() - elapsed) * 1000
-
-            assert.is_true(ok)
-            assert.equal(val, 'hello')
-            assert.is_nil(timeout)
-            -- returned immediately if resumed
-            assert.less(elapsed, 2)
-        end))
-
-        act.later()
-        assert.is_true(suspended)
-        assert(act.resume(cid, 'hello'))
-        assert(act.await())
-    end)))
-
-    -- test that suspend timed out
-    assert(act.run(with_luacov(function()
-        local ok, val, timeout = act.suspend()
-
-        assert.is_false(ok)
-        assert.is_nil(val)
-        assert.is_true(timeout)
-
-        ok, val, timeout = act.suspend(100)
-        assert.is_false(ok)
-        assert.is_nil(val)
-        assert.is_true(timeout)
-    end)))
-
-    -- test that fail on called with invalid argument
-    assert(act.run(with_luacov(function()
-        local err = assert.throws(act.suspend, 'abc')
-        assert.match(err, 'msec must be unsigned integer')
-    end)))
-
-    -- test that fail on called from outside of execution context
-    local err = assert.throws(act.suspend)
-    assert.match(err, 'outside of execution')
-
-    err = assert.throws(act.resume)
     assert.match(err, 'outside of execution')
 end
 

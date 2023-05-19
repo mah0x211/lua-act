@@ -163,10 +163,9 @@ local function await(msec)
 end
 
 --- suspend
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
 --- @return any ...
---- @return boolean timeout
 local function suspend(msec)
     local callee = callee_acquire()
     if callee then
