@@ -509,26 +509,21 @@ function Callee:sigwait(msec, ...)
     local op, signo = yield()
     self.sigset = nil
 
-    -- remove from runq if registered
-    if msec then
-        self.act.runq:remove(self)
-    end
-
     -- revoke signal events
     for _ = 1, #sigset do
         event:revoke(sigset:pop())
     end
 
-    if op == OP_EVENT and sigmap[signo] then
-        -- got signal event
-        return signo
-    elseif op == OP_RUNQ then
+    if op == OP_RUNQ then
         -- timed out
+        assert(msec ~= nil, 'invalid implements')
+        self.act.runq:remove(self)
         return nil, nil, true
     end
 
-    -- normally unreachable
-    error('invalid implements')
+    assert(op == OP_EVENT and sigmap[signo], 'invalid implements')
+    -- got signal event
+    return signo
 end
 
 --- attach2caller
