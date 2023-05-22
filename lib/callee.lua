@@ -26,9 +26,9 @@
 --- file scope variables
 local yield = coroutine.yield
 local setmetatable = setmetatable
-local new_argv = require('argv').new
 local reco = require('reco')
 local new_reco = reco.new
+local new_stack = require('act.stack')
 local new_deque = require('act.deque')
 local hrtimer = require('act.hrtimer')
 local getnsec = hrtimer.getnsec
@@ -55,7 +55,7 @@ local WWAITS = {}
 --- @type act.pool
 local POOL = require('act.pool').new()
 
---- @type act.callee
+--- @type act.callee?
 local CURRENT_CALLEE
 
 --- acquire
@@ -113,7 +113,7 @@ local function resume(cid, ...)
     -- found a suspended callee
     if callee then
         SUSPENDED[cid] = nil
-        callee.argv:set(0, ...)
+        callee.argv:set(...)
         -- resume via runq
         callee.act.runq:remove(callee)
         callee.act.runq:push(callee)
@@ -140,7 +140,7 @@ local Callee = {}
 function Callee:call(...)
     CURRENT_CALLEE = self
     -- call with passed arguments
-    local done, status = self.co(self.args:select(#self.args, ...))
+    local done, status = self.co(self.args:clear(...))
     CURRENT_CALLEE = nil
 
     if done then
@@ -306,7 +306,7 @@ function Callee:suspend(msec)
     end
 
     -- resumed
-    return true, self.argv:select()
+    return true, self.argv:clear()
 end
 
 --- later
@@ -519,7 +519,7 @@ function Callee:sigwait(msec, ...)
 end
 
 --- attach2caller
---- @param caller act.callee
+--- @param caller? act.callee
 --- @param callee act.callee
 --- @param atexit boolean
 local function attach2caller(caller, callee, atexit)
@@ -561,7 +561,7 @@ end
 function Callee:renew(act, atexit, fn, ...)
     self.act = act
     self.atexit = atexit
-    self.args:set(0, ...)
+    self.args:set(...)
     self.co:reset(fn)
     self.cid = getnsec()
     -- set relationship
@@ -575,14 +575,11 @@ end
 --- @vararg any
 --- @return act.callee callee
 function Callee:init(act, atexit, fn, ...)
-    local args = new_argv()
-    args:set(0, ...)
-
     self.act = act
     self.atexit = atexit
     self.co = new_reco(fn)
-    self.args = args
-    self.argv = new_argv()
+    self.args = new_stack(...)
+    self.argv = new_stack()
     self.node = new_deque()
 
     -- set callee-id

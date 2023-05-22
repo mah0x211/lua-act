@@ -13,7 +13,6 @@ description = {
 dependencies = {
     "lua >= 5.1",
     "lauxhlib >= 0.5",
-    "argv >= 0.3",
     "mah0x211/deque >= 0.5",
     "fork >= 0.2",
     "metamodule >= 0.4",
@@ -47,5 +46,10 @@ build = {
         ['act.poller'] = "lib/poller.lua",
         ['act.pool'] = "lib/pool.lua",
         ['act.runq'] = "lib/runq.lua",
+        ['act.stack'] = {
+            sources = {
+                "src/stack.c",
+            },
+        },
     },
 }
