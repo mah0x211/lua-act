@@ -24,11 +24,13 @@ local rawset = rawset
 local new_event = require('act.event').new
 local new_runq = require('act.runq').new
 local new_lockq = require('act.lockq').new
+local new_pool = require('act.pool').new
 
 --- @class act.context
 --- @field event act.event
 --- @field runq act.runq
 --- @field lockq act.lockq
+--- @field pool act.pool
 local Context = {}
 
 function Context:__newindex()
@@ -47,6 +49,7 @@ function Context:init()
     rawset(self, 'event', event)
     rawset(self, 'runq', new_runq())
     rawset(self, 'lockq', new_lockq(self.runq))
+    rawset(self, 'pool', new_pool())
     return self
 end
 
@@ -64,6 +67,18 @@ end
 --- @return any err
 function Context:pushq(callee)
     return self.runq:push(callee)
+end
+
+--- pool_get
+--- @return act.callee
+function Context:pool_get()
+    return self.pool:pop()
+end
+
+--- pool_set
+--- @param callee act.callee
+function Context:pool_set(callee)
+    self.pool:push(callee)
 end
 
 return {
