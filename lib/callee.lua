@@ -61,8 +61,8 @@ local function unwaitfd(operators, fd)
         callee.is_cancel = true
         callee.ctx.event:revoke(ev)
         -- requeue without timeout
-        callee.ctx.runq:remove(callee)
-        assert(callee.ctx.runq:push(callee))
+        callee.ctx:removeq(callee)
+        assert(callee.ctx:pushq(callee))
     end
 end
 
@@ -97,8 +97,8 @@ local function resume(cid, ...)
         SUSPENDED[cid] = nil
         callee.argv:set(...)
         -- resume via runq
-        callee.ctx.runq:remove(callee)
-        callee.ctx.runq:push(callee)
+        callee.ctx:removeq(callee)
+        callee.ctx:pushq(callee)
 
         return true
     end
@@ -124,10 +124,9 @@ local Callee = {}
 --- @param ok boolean
 --- @param status integer
 function Callee:dispose(ok, status)
-    local runq = self.ctx.runq
-
-    runq:remove(self)
-    -- release from lockq
+    -- remove from runq
+    self.ctx:removeq(self)
+    -- release locks
     self.ctx:release_locks(self)
 
     -- remove state properties
@@ -233,14 +232,14 @@ end
 function Callee:await(msec)
     if #self.children > 0 then
         if msec ~= nil then
-            assert(self.ctx.runq:push(self, msec))
+            assert(self.ctx:pushq(self, msec))
         end
 
         self.is_await = true
         local op, res = yield()
         if op == OP_AWAIT then
             if msec then
-                self.ctx.runq:remove(self)
+                self.ctx:removeq(self)
             end
             return res
         end
@@ -259,7 +258,7 @@ end
 --- @return ...
 function Callee:suspend(msec)
     if msec ~= nil then
-        assert(self.ctx.runq:push(self, msec))
+        assert(self.ctx:pushq(self, msec))
     end
 
     -- wait until resumed by resume method
@@ -271,7 +270,7 @@ function Callee:suspend(msec)
     -- resumed by time-out
     if SUSPENDED[cid] then
         assert(msec ~= nil, 'invalid implements')
-        self.ctx.runq:remove(self)
+        self.ctx:removeq(self)
         SUSPENDED[cid] = nil
         return false
     end
@@ -282,7 +281,7 @@ end
 
 --- later
 function Callee:later()
-    assert(self.ctx.runq:push(self))
+    assert(self.ctx:pushq(self))
     assert(yield() == OP_RUNQ, 'invalid implements')
 end
 
@@ -332,13 +331,13 @@ end
 local function waitable(self, operators, asa, fd, msec)
     -- register to runq with msec
     if msec ~= nil then
-        assert(self.ctx.runq:push(self, msec))
+        assert(self.ctx:pushq(self, msec))
     end
 
     -- operation already in progress in another callee
     if operators[fd] then
         if msec then
-            self.ctx.runq:remove(self)
+            self.ctx:removeq(self)
         end
         return false, 'operation already in progress'
     end
@@ -348,7 +347,7 @@ local function waitable(self, operators, asa, fd, msec)
     local ev, err = event[asa](event, self, fd, true)
     if err then
         if msec then
-            self.ctx.runq:remove(self)
+            self.ctx:removeq(self)
         end
         return false, err
     end
@@ -372,7 +371,7 @@ local function waitable(self, operators, asa, fd, msec)
 
     if op == OP_RUNQ then
         assert(msec ~= nil, 'invalid implements')
-        self.ctx.runq:remove(self)
+        self.ctx:removeq(self)
         -- timed out
         return false, nil, true
     end
@@ -408,7 +407,7 @@ end
 --- @return integer rem
 --- @return any err
 function Callee:sleep(msec)
-    assert(self.ctx.runq:push(self, msec))
+    assert(self.ctx:pushq(self, msec))
 
     local cid = self.cid
     local deadline = getmsec() + msec
@@ -430,7 +429,7 @@ end
 function Callee:sigwait(msec, ...)
     -- register to runq with msec
     if msec ~= nil then
-        assert(self.ctx.runq:push(self, msec))
+        assert(self.ctx:pushq(self, msec))
     end
 
     local event = self.ctx.event
@@ -444,7 +443,7 @@ function Callee:sigwait(msec, ...)
 
         if err then
             if msec then
-                self.ctx.runq:remove(self)
+                self.ctx:removeq(self)
             end
 
             -- revoke signal events
@@ -462,7 +461,7 @@ function Callee:sigwait(msec, ...)
     -- no need to wait signal if empty
     if #sigset == 0 then
         if msec then
-            self.ctx.runq:remove(self)
+            self.ctx:removeq(self)
         end
         return nil
     end
@@ -480,7 +479,7 @@ function Callee:sigwait(msec, ...)
     if op == OP_RUNQ then
         -- timed out
         assert(msec ~= nil, 'invalid implements')
-        self.ctx.runq:remove(self)
+        self.ctx:removeq(self)
         return nil, nil, true
     end
 

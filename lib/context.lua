@@ -63,10 +63,17 @@ end
 
 --- pushq pushes a callee to runq
 --- @param callee act.callee
+--- @param msec? integer
 --- @return boolean ok
 --- @return any err
-function Context:pushq(callee)
-    return self.runq:push(callee)
+function Context:pushq(callee, msec)
+    return self.runq:push(callee, msec)
+end
+
+--- removeq remove a callee from runq
+--- @param callee act.callee
+function Context:removeq(callee)
+    self.runq:remove(callee)
 end
 
 --- read_lock
