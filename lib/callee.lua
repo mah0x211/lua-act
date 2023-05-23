@@ -124,6 +124,7 @@ end
 --- @field is_await? boolean
 --- @field is_cancel? boolean
 --- @field is_atexit? boolean
+--- @field is_exit? boolean
 --- @field fdev? poller.event
 --- @field sigset? deque
 local Callee = {}
@@ -139,7 +140,7 @@ function Callee:dispose(ok, status)
     self.act.lockq:release(self)
 
     -- remove state properties
-    self.term = nil
+    self.is_exit = nil
     SUSPENDED[self.cid] = nil
 
     -- revoke all events currently in use
@@ -224,9 +225,8 @@ end
 --- exit
 --- @vararg any
 function Callee:exit(...)
-    self.term = true
+    self.is_exit = true
     yield(...)
-
     -- normally unreachable
     error('invalid implements')
 end
@@ -506,7 +506,7 @@ function Callee:call(...)
 
     if done then
         self:dispose(status == OK, status)
-    elseif self.term then
+    elseif self.is_exit then
         self:dispose(true, OK)
     end
 end
