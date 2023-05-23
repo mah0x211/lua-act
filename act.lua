@@ -45,17 +45,17 @@ local new_context = require('act.context').new
 local ACT_CTX
 
 --- spawn_child
---- @param atexit boolean
+--- @param is_atexit boolean
 --- @param fn function
 --- @vararg any
 --- @return any cid
 --- @return string? err
-local function spawn_child(atexit, fn, ...)
+local function spawn_child(is_atexit, fn, ...)
     -- create new callee
-    local callee = new_callee(ACT_CTX, atexit, fn, ...)
+    local callee = new_callee(ACT_CTX, is_atexit, fn, ...)
 
     -- push to runq if not atexit
-    if not atexit then
+    if not is_atexit then
         local ok, err = ACT_CTX:pushq(callee)
         if not ok then
             return nil, err

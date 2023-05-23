@@ -55,15 +55,6 @@ local WWAITS = {}
 --- @type act.pool
 local POOL = require('act.pool').new()
 
---- @type act.callee?
-local CURRENT_CALLEE
-
---- acquire
---- @return act.callee callee
-local function acquire()
-    return CURRENT_CALLEE
-end
-
 --- unwaitfd
 --- @param operators table<integer, act.callee>
 --- @param fd integer
@@ -128,27 +119,14 @@ end
 --- @field cid integer
 --- @field co thread
 --- @field act act.context
---- @field node deque
+--- @field children deque
 --- @field parent? act.callee
 --- @field is_await? boolean
 --- @field is_cancel? boolean
+--- @field is_atexit? boolean
 --- @field fdev? poller.event
 --- @field sigset? deque
 local Callee = {}
-
---- call
-function Callee:call(...)
-    CURRENT_CALLEE = self
-    -- call with passed arguments
-    local done, status = self.co(self.args:clear(...))
-    CURRENT_CALLEE = nil
-
-    if done then
-        self:dispose(status == OK, status)
-    elseif self.term then
-        self:dispose(true, OK)
-    end
-end
 
 --- dispose
 --- @param ok boolean
@@ -189,11 +167,8 @@ function Callee:dispose(ok, status)
     end
 
     -- dispose child coroutines
-    for _ = 1, #self.node do
-        local child = self.node:pop()
-
-        -- remove from runq
-        runq:remove(child)
+    for _ = 1, #self.children do
+        local child = self.children:pop()
         -- release references
         child.parent = nil
         child.ref = nil
@@ -201,19 +176,19 @@ function Callee:dispose(ok, status)
         child:dispose(true)
     end
 
-    -- call parent node
-    if self.parent then
-        local root = self.parent
+    -- call parent
+    local parent = self.parent
+    if parent then
         local ref = self.ref
 
         -- release references
         self.parent = nil
         self.ref = nil
-        -- detach from root node
-        root.node:remove(ref)
-        if root.is_await then
-            -- root node waiting for child results
-            root.is_await = nil
+        -- detach from parent
+        ref:remove()
+        if parent.is_await then
+            -- parent waiting for child results
+            parent.is_await = nil
             local stat = {
                 cid = self.cid,
             }
@@ -225,12 +200,13 @@ function Callee:dispose(ok, status)
                 stat.status = status
                 stat.error = self.co:results()
             end
-            root:call(OP_AWAIT, stat)
-        elseif root.atexit then
-            -- call atexit node
-            root.atexit = nil
-            root:call(ok, status, self.co:results())
+            parent:call(OP_AWAIT, stat)
+        elseif parent.is_atexit then
+            -- call atexit callee
+            parent.is_atexit = nil
+            parent:call(ok, status, self.co:results())
         elseif not ok then
+            -- throws an error on failure
             error(concat({
                 self.co:results(),
             }, '\n'))
@@ -260,7 +236,7 @@ end
 --- @return table? res
 --- @return boolean? timeout
 function Callee:await(msec)
-    if #self.node > 0 then
+    if #self.children > 0 then
         if msec ~= nil then
             assert(self.act.runq:push(self, msec))
         end
@@ -518,74 +494,90 @@ function Callee:sigwait(msec, ...)
     return signo
 end
 
---- attach2caller
---- @param caller? act.callee
---- @param callee act.callee
---- @param atexit boolean
-local function attach2caller(caller, callee, atexit)
-    if caller then
-        -- set as a child: caller -> callee
-        if not atexit then
-            callee.parent = caller
-            callee.ref = caller.node:push(callee)
-            return
-        end
+--- @type act.callee?
+local CURRENT_CALLEE
 
-        -- atexit node always await child node
-        callee.atexit = true
-        -- set as a parent of caller: callee -> caller
-        local parent = caller.parent
-        if not parent then
-            caller.parent = callee
-            caller.ref = callee.node:push(caller)
-            return
-        end
+--- call
+function Callee:call(...)
+    CURRENT_CALLEE = self
+    -- call with passed arguments
+    local done, status = self.co(self.args:clear(...))
+    CURRENT_CALLEE = nil
 
-        -- change parent of caller: caller_parent -> callee -> caller
-        parent.node:remove(caller.ref)
-        caller.parent = callee
-        caller.ref = callee.node:push(caller)
-        callee.parent = parent
-        callee.ref = parent.node:push(callee)
-
-    elseif atexit then
-        error('root callee cannot be run at exit')
+    if done then
+        self:dispose(status == OK, status)
+    elseif self.term then
+        self:dispose(true, OK)
     end
+end
+
+--- attach
+--- @param callee act.callee
+local function attach(callee)
+    if not CURRENT_CALLEE then
+        assert(not callee.is_atexit, 'root callee cannot be run at exit')
+        return
+    end
+
+    -- set as a child of the current callee
+    if not callee.is_atexit then
+        callee.parent = CURRENT_CALLEE
+        callee.ref = CURRENT_CALLEE.children:push(callee)
+        return
+    end
+
+    -- set as a child of the parent of the current callee
+    local parent = CURRENT_CALLEE.parent
+    if parent then
+        CURRENT_CALLEE.ref:remove()
+        callee.parent = parent
+        callee.ref = parent.children:push(callee)
+    end
+
+    -- set as a parent of the current callee
+    CURRENT_CALLEE.parent = callee
+    CURRENT_CALLEE.ref = callee.children:push(CURRENT_CALLEE)
+end
+
+--- acquire
+--- @return act.callee? callee
+local function acquire()
+    return CURRENT_CALLEE
 end
 
 --- renew
 --- @param act act.context
---- @param atexit boolean
+--- @param is_atexit boolean
 --- @param fn function
 --- @vararg any
-function Callee:renew(act, atexit, fn, ...)
+function Callee:renew(act, is_atexit, fn, ...)
     self.act = act
-    self.atexit = atexit
+    self.is_atexit = is_atexit
     self.args:set(...)
     self.co:reset(fn)
     self.cid = getnsec()
     -- set relationship
-    attach2caller(CURRENT_CALLEE, self, atexit)
+    attach(self)
 end
 
 --- init
 --- @param act act.context
---- @param atexit boolean
+--- @param is_atexit boolean
 --- @param fn function
 --- @vararg any
 --- @return act.callee callee
-function Callee:init(act, atexit, fn, ...)
+function Callee:init(act, is_atexit, fn, ...)
     self.act = act
-    self.atexit = atexit
+    self.is_atexit = is_atexit
     self.co = new_reco(fn)
     self.args = new_stack(...)
     self.argv = new_stack()
-    self.node = new_deque()
+    self.children = new_deque()
 
     -- set callee-id
     self.cid = getnsec()
-    -- set relationship
-    attach2caller(CURRENT_CALLEE, self, atexit)
+    -- attach to the current callee
+    attach(self)
 
     return self
 end
