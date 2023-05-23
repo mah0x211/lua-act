@@ -26,10 +26,9 @@
 --- file scope variables
 local yield = coroutine.yield
 local setmetatable = setmetatable
-local new_argv = require('argv').new
-local new_deque = require('deque').new
-local reco = require('reco')
-local new_reco = reco.new
+local new_coro = require('act.coro').new
+local new_stack = require('act.stack')
+local new_deque = require('act.deque')
 local hrtimer = require('act.hrtimer')
 local getnsec = hrtimer.getnsec
 local getmsec = hrtimer.getmsec
@@ -39,36 +38,13 @@ local concat = aux.concat
 local OP_EVENT = aux.OP_EVENT
 local OP_RUNQ = aux.OP_RUNQ
 local OP_AWAIT = aux.OP_AWAIT
-local OK = reco.OK
--- local CO_YIELD = reco.YIELD
--- local ERRRUN = reco.ERRRUN
--- local ERRSYNTAX = reco.ERRSYNTAX
--- local ERRMEM = reco.ERRMEM
--- local ERRERR = reco.ERRERR
+local OK = require('act.coro').OK
 --- static variables
 local SUSPENDED = setmetatable({}, {
     __mode = 'v',
 })
-local RLOCKS = {}
-local WLOCKS = {}
 local RWAITS = {}
 local WWAITS = {}
-local RWWAITS = {
-    readable = RWAITS,
-    writable = WWAITS,
-}
-
---- @type act.pool
-local POOL = require('act.pool').new()
-
---- @type act.callee
-local CURRENT_CALLEE
-
---- acquire
---- @return act.callee callee
-local function acquire()
-    return CURRENT_CALLEE
-end
 
 --- unwaitfd
 --- @param operators table<integer, act.callee>
@@ -79,20 +55,14 @@ local function unwaitfd(operators, fd)
     -- found
     if callee then
         operators[fd] = nil
-        callee.act.runq:remove(callee)
-        callee.act.event:revoke(callee.ev)
-        -- reset event properties
-        callee.ev = nil
-        callee.evfd = -1
-        -- currently in-use
-        if callee.evuse then
-            callee.evuse = false
-            callee.evasa = 'unwaitfd'
-            -- requeue without timeout
-            assert(callee.act.runq:push(callee))
-        else
-            callee.evasa = ''
-        end
+
+        local ev = callee.fdev
+        callee.fdev = nil
+        callee.is_cancel = true
+        callee.ctx.event:revoke(ev)
+        -- requeue without timeout
+        callee.ctx:removeq(callee)
+        assert(callee.ctx:pushq(callee))
     end
 end
 
@@ -125,10 +95,10 @@ local function resume(cid, ...)
     -- found a suspended callee
     if callee then
         SUSPENDED[cid] = nil
-        callee.argv:set(0, ...)
+        callee.argv:set(...)
         -- resume via runq
-        callee.act.runq:remove(callee)
-        callee.act.runq:push(callee)
+        callee.ctx:removeq(callee)
+        callee.ctx:pushq(callee)
 
         return true
     end
@@ -137,81 +107,59 @@ local function resume(cid, ...)
 end
 
 --- @class act.callee
+--- @field ctx act.context
+--- @field cid integer
+--- @field co reco
+--- @field children deque
+--- @field parent? act.callee
+--- @field is_await? boolean
+--- @field is_cancel? boolean
+--- @field is_atexit? boolean
+--- @field is_exit? boolean
+--- @field fdev? poller.event
+--- @field sigset? deque
 local Callee = {}
-
---- revoke
-function Callee:revoke()
-    local event = self.act.event
-
-    -- revoke signal events
-    if self.sigset then
-        local sigset = self.sigset
-
-        for _ = 1, #sigset do
-            event:revoke(sigset:pop())
-        end
-        self.sigset = nil
-    end
-
-    -- revoke io event
-    if self.evfd ~= -1 then
-        local ev = self.ev
-
-        RWWAITS[self.evasa][self.evfd] = nil
-        self.ev = nil
-        self.evfd = -1
-        self.evasa = ''
-        self.evuse = false
-        event:revoke(ev)
-    end
-end
-
---- call
-function Callee:call(...)
-    CURRENT_CALLEE = self
-    -- call with passed arguments
-    local done, status = self.co(self.args:select(#self.args, ...))
-    CURRENT_CALLEE = nil
-
-    if done then
-        self:dispose(status == OK, status)
-    elseif self.term then
-        self:dispose(true, OK)
-    end
-end
 
 --- dispose
 --- @param ok boolean
 --- @param status integer
 function Callee:dispose(ok, status)
-    local runq = self.act.runq
+    -- remove from runq
+    self.ctx:removeq(self)
+    -- release locks
+    self.ctx:release_locks(self)
 
-    runq:remove(self)
     -- remove state properties
-    self.term = nil
+    self.is_exit = nil
     SUSPENDED[self.cid] = nil
 
-    -- read_unlock
-    for fd in pairs(self.rlock) do
-        self:read_unlock(fd)
-    end
-    self.rlock = {}
-
-    -- write_unlock
-    for fd in pairs(self.wlock) do
-        self:write_unlock(fd)
-    end
-    self.wlock = {}
-
     -- revoke all events currently in use
-    self:revoke()
+    local event = self.ctx.event
+    -- revoke io event
+    local ev = self.fdev
+    if ev then
+        self.fdev = nil
+        local fd = ev:ident()
+        if RWAITS[fd] == self then
+            RWAITS[fd] = nil
+        elseif WWAITS[fd] == self then
+            WWAITS[fd] = nil
+        end
+        event:revoke(ev)
+    end
+
+    -- revoke signal events
+    local sigset = self.sigset
+    if sigset then
+        self.sigset = nil
+        for _ = 1, #sigset do
+            event:revoke(sigset:pop())
+        end
+    end
 
     -- dispose child coroutines
-    for _ = 1, #self.node do
-        local child = self.node:pop()
-
-        -- remove from runq
-        runq:remove(child)
+    for _ = 1, #self.children do
+        local child = self.children:pop()
         -- release references
         child.parent = nil
         child.ref = nil
@@ -219,19 +167,19 @@ function Callee:dispose(ok, status)
         child:dispose(true)
     end
 
-    -- call parent node
-    if self.parent then
-        local root = self.parent
+    -- call parent
+    local parent = self.parent
+    if parent then
         local ref = self.ref
 
         -- release references
         self.parent = nil
         self.ref = nil
-        -- detach from root node
-        root.node:remove(ref)
-        if root.wait then
-            -- root node waiting for child results
-            root.wait = nil
+        -- detach from parent
+        ref:remove()
+        if parent.is_await then
+            -- parent waiting for child results
+            parent.is_await = nil
             local stat = {
                 cid = self.cid,
             }
@@ -243,12 +191,13 @@ function Callee:dispose(ok, status)
                 stat.status = status
                 stat.error = self.co:results()
             end
-            root:call(OP_AWAIT, stat)
-        elseif root.atexit then
-            -- call atexit node
-            root.atexit = nil
-            root:call(ok, status, self.co:results())
+            parent:call(OP_AWAIT, stat)
+        elseif parent.is_atexit then
+            -- call atexit callee
+            parent.is_atexit = nil
+            parent:call(ok, status, self.co:results())
         elseif not ok then
+            -- throws an error on failure
             error(concat({
                 self.co:results(),
             }, '\n'))
@@ -259,47 +208,46 @@ function Callee:dispose(ok, status)
         }, '\n'))
     end
 
+    -- delete stacked values
+    self.args:clear()
+    self.argv:clear()
+
     -- add to pool for reuse
-    POOL:push(self)
+    self.ctx:pool_set(self)
 end
 
 --- exit
 --- @vararg any
 function Callee:exit(...)
-    self.term = true
+    self.is_exit = true
     yield(...)
-
     -- normally unreachable
     error('invalid implements')
 end
 
 --- await until the child thread to exit while the specified number of seconds.
 --- @param msec integer
---- @return table|nil res
---- @return boolean|nil timeout
+--- @return table? res
+--- @return boolean? timeout
 function Callee:await(msec)
-    if #self.node > 0 then
+    if #self.children > 0 then
         if msec ~= nil then
-            -- register to resume after msec seconds
-            assert(self.act.runq:push(self, msec))
+            assert(self.ctx:pushq(self, msec))
         end
 
-        -- revoke all events currently in use
-        self:revoke()
-        self.wait = true
+        self.is_await = true
         local op, res = yield()
         if op == OP_AWAIT then
             if msec then
-                self.act.runq:remove(self)
+                self.ctx:removeq(self)
             end
             return res
-        elseif op == OP_RUNQ then
-            self.wait = nil
-            return nil, true
         end
-
-        -- normally unreachable
-        error('invalid implements')
+        -- timeout
+        self.is_await = nil
+        assert(op == OP_RUNQ, 'invalid implements')
+        assert(msec ~= nil, 'invalid implements')
+        return nil, true
     end
 end
 
@@ -308,133 +256,33 @@ end
 --- @return boolean ok
 --- @return string? err
 --- @return ...
---- @return boolean timeout
 function Callee:suspend(msec)
     if msec ~= nil then
-        -- suspend until reached to msec
-        local ok, err = self.act.runq:push(self, msec)
-        if not ok then
-            return false, err
-        end
+        assert(self.ctx:pushq(self, msec))
     end
 
-    -- revoke all events currently in use
-    self:revoke()
     -- wait until resumed by resume method
     local cid = self.cid
     SUSPENDED[cid] = self
-    if yield() == OP_RUNQ then
-        -- resumed by time-out if self exists in suspend list
-        if SUSPENDED[cid] then
-            SUSPENDED[cid] = nil
-            self.act.runq:remove(self)
-            return false, nil, true
-        end
+    local op = yield()
+    assert(op == OP_RUNQ, 'invalid implements')
 
-        -- resumed
-        return true, self.argv:select()
+    -- resumed by time-out
+    if SUSPENDED[cid] then
+        assert(msec ~= nil, 'invalid implements')
+        self.ctx:removeq(self)
+        SUSPENDED[cid] = nil
+        return false
     end
 
-    -- normally unreachable
-    error('invalid implements')
+    -- resumed
+    return true, self.argv:clear()
 end
 
 --- later
---- @return boolean ok
---- @return any err
 function Callee:later()
-    local ok, err = self.act.runq:push(self)
-    if not ok then
-        return false, err
-    end
-
-    -- revoke all events currently in use
-    self:revoke()
-    if yield() == OP_RUNQ then
-        return true
-    end
-
-    -- normally unreachable
-    error('invalid implements')
-end
-
---- rwunlock
---- @param callee act.callee
---- @param locks table
---- @param asa string
---- @param fd integer
-local function rwunlock(callee, locks, asa, fd)
-    local waitq = callee[asa][fd]
-
-    if waitq then
-        callee[asa][fd] = nil
-
-        for i = 1, #waitq do
-            local cid = waitq[i]
-
-            callee = SUSPENDED[cid]
-            if callee then
-                waitq[i] = false
-                SUSPENDED[cid] = nil
-                -- resume suspended callee via runq
-                local runq = callee.act.runq
-                runq:remove(callee)
-                runq:push(callee)
-                return
-            end
-        end
-        -- waitq has been consumed
-        locks[fd] = nil
-    end
-end
-
---- read_unlock
---- @param fd integer
-function Callee:read_unlock(fd)
-    rwunlock(self, RLOCKS, 'rlock', fd)
-end
-
---- write_unlock
---- @param fd integer
-function Callee:write_unlock(fd)
-    rwunlock(self, WLOCKS, 'wlock', fd)
-end
-
---- rwlock
---- @param callee act.callee
---- @param locks table
---- @param asa string
---- @param fd integer
---- @param msec integer
---- @return boolean ok
---- @return any err
---- @return boolean? timeout
-local function rwlock(callee, locks, asa, fd, msec)
-    if not callee[asa][fd] then
-        local waitq = locks[fd]
-
-        -- other callee is waiting
-        if waitq then
-            local idx = #waitq + 1
-
-            waitq[idx] = callee.cid
-            local ok, err, timeout = callee:suspend(msec)
-            waitq[idx] = false
-            if ok then
-                -- other callee unlocked
-                callee[asa][fd] = waitq
-            end
-
-            return ok, err, timeout
-        end
-
-        -- create read or write lock wait queue
-        waitq = {}
-        locks[fd] = waitq
-        callee[asa][fd] = waitq
-    end
-
-    return true
+    assert(self.ctx:pushq(self))
+    assert(yield() == OP_RUNQ, 'invalid implements')
 end
 
 --- read_lock
@@ -444,7 +292,14 @@ end
 --- @return any err
 --- @return boolean? timeout
 function Callee:read_lock(fd, msec)
-    return rwlock(self, RLOCKS, 'rlock', fd, msec)
+    return self.ctx:read_lock(self, fd, msec)
+end
+
+--- read_unlock
+--- @param fd integer
+--- @return boolean ok
+function Callee:read_unlock(fd)
+    return self.ctx:read_unlock(self, fd)
 end
 
 --- write_lock
@@ -454,7 +309,14 @@ end
 --- @return any err
 --- @return boolean? timeout
 function Callee:write_lock(fd, msec)
-    return rwlock(self, WLOCKS, 'wlock', fd, msec)
+    return self.ctx:write_lock(self, fd, msec)
+end
+
+--- write_unlock
+--- @param fd integer
+--- @return boolean ok
+function Callee:write_unlock(fd)
+    return self.ctx:write_unlock(self, fd)
 end
 
 --- waitable
@@ -467,106 +329,57 @@ end
 --- @return any err
 --- @return boolean? timeout
 local function waitable(self, operators, asa, fd, msec)
-    local event = self.act.event
-
-    -- fd is not watching yet
-    if self.evfd ~= fd or self.evasa ~= asa then
-        -- revoke retained event
-        self:revoke()
-
-        local callee = operators[fd]
-        -- another callee has an 'asa' event of fd
-        if callee then
-            -- currently in-use
-            if callee.evuse then
-                return false, 'operation already in progress'
-            end
-
-            -- retain ev and related info
-            self.ev = callee.ev
-            self.evfd = fd
-            self.evasa = asa
-            operators[fd] = self
-            self.ev:udata(self)
-
-            -- remove ev and related info
-            callee.ev = nil
-            callee.evfd = -1
-            callee.evasa = ''
-        end
-
-        -- register io(readable or writable) event
-        if not self.ev then
-            local ev, err = event[asa](event, self, fd)
-
-            if err then
-                return false, err
-            end
-
-            -- retain ev and related info
-            self.ev = ev
-            self.evfd = fd
-            self.evasa = asa
-            operators[fd] = self
-        end
+    -- register to runq with msec
+    if msec ~= nil then
+        assert(self.ctx:pushq(self, msec))
     end
 
-    -- register to runq
-    if msec then
-        local ok, err = self.act.runq:push(self, msec)
-
-        if not ok then
-            local ev = self.ev
-            -- revoke io event
-            self.ev = nil
-            self.evfd = -1
-            self.evasa = ''
-            operators[fd] = nil
-            event:revoke(ev)
-            return false, err
+    -- operation already in progress in another callee
+    if operators[fd] then
+        if msec then
+            self.ctx:removeq(self)
         end
+        return false, 'operation already in progress'
     end
 
-    self.evuse = true
+    -- register io(readable or writable) event as oneshot event
+    local event = self.ctx.event
+    local ev, err = event[asa](event, self, fd, true)
+    if err then
+        if msec then
+            self.ctx:removeq(self)
+        end
+        return false, err
+    end
+
+    -- retain ev and related info
+    self.is_cancel = nil
+    self.fdev = ev
+    operators[fd] = self
     -- wait until event fired
-    local op, fdno, disabled = yield()
-    self.evuse = false
+    local op, fdno = yield()
+    operators[fd] = nil
+    self.fdev = nil
+    self.fd = nil
 
-    -- got io event
-    if op == OP_EVENT then
-        if fdno == fd then
-            -- remove from runq
-            if msec then
-                self.act.runq:remove(self)
-            end
+    -- canceled by cancel method
+    if self.is_cancel then
+        self.is_cancel = nil
+        return false
+    end
+    event:revoke(ev)
 
-            if disabled then
-                self:revoke()
-            end
-
-            return true
-        end
-    elseif op == OP_RUNQ then
-        if self.evasa == 'unwaitfd' then
-            -- revoked by unwaitfd
-            self.evasa = ''
-            return false
-        elseif msec then
-            -- timed out
-            return false, nil, true
-        end
+    if op == OP_RUNQ then
+        assert(msec ~= nil, 'invalid implements')
+        self.ctx:removeq(self)
+        -- timed out
+        return false, nil, true
     end
 
-    -- remove from runq
-    if msec then
-        self.act.runq:remove(self)
-    end
-
-    -- revoke event
-    self:revoke()
-
-    -- normally unreachable
-    error('invalid implements')
+    -- opertion type must be OP_EVENT
+    assert(op == OP_EVENT, 'invalid implements')
+    assert(fdno == fd, 'invalid implements')
+    return true
 end
 
 --- wait_readable
@@ -594,28 +407,17 @@ end
 --- @return integer rem
 --- @return any err
 function Callee:sleep(msec)
-    local ok, err = self.act.runq:push(self, msec)
-    if not ok then
-        return false, err
-    end
+    assert(self.ctx:pushq(self, msec))
 
-    -- revoke all events currently in use
-    self:revoke()
+    local cid = self.cid
     local deadline = getmsec() + msec
     -- wait until wake-up or resume by resume method
-    local cid = self.cid
     SUSPENDED[cid] = self
-    if yield() == OP_RUNQ then
-        local rem = deadline - getmsec()
-        if SUSPENDED[cid] then
-            -- resumed after sleep
-            SUSPENDED[cid] = nil
-        end
-        return rem > 0 and rem or 0
-    end
-
-    -- normally unreachable
-    error('invalid implements')
+    local op = yield()
+    SUSPENDED[cid] = nil
+    assert(op == OP_RUNQ)
+    local rem = deadline - getmsec()
+    return rem > 0 and rem or 0
 end
 
 --- sigwait
@@ -626,14 +428,11 @@ end
 --- @return boolean? timeout
 function Callee:sigwait(msec, ...)
     -- register to runq with msec
-    if msec then
-        local ok, err = self.act.runq:push(self, msec)
-        if not ok then
-            return nil, err
-        end
+    if msec ~= nil then
+        assert(self.ctx:pushq(self, msec))
     end
 
-    local event = self.act.event
+    local event = self.ctx.event
     local sigset = new_deque()
     local sigmap = {}
     -- register signal events
@@ -643,6 +442,10 @@ function Callee:sigwait(msec, ...)
         local ev, err = event:signal(self, signo, true)
 
         if err then
+            if msec then
+                self.ctx:removeq(self)
+            end
+
             -- revoke signal events
             for _ = 1, #sigset do
                 event:revoke(sigset:pop())
@@ -657,133 +460,136 @@ function Callee:sigwait(msec, ...)
 
     -- no need to wait signal if empty
     if #sigset == 0 then
+        if msec then
+            self.ctx:removeq(self)
+        end
         return nil
     end
 
-    -- revoke all events currently in use
-    self:revoke()
     -- wait registered signals
     self.sigset = sigset
     local op, signo = yield()
     self.sigset = nil
-    -- remove from runq if registered
-    if msec then
-        self.act.runq:remove(self)
-    end
 
     -- revoke signal events
     for _ = 1, #sigset do
         event:revoke(sigset:pop())
     end
 
-    if op == OP_EVENT and sigmap[signo] then
-        -- got signal event
-        return signo
-    elseif op == OP_RUNQ then
+    if op == OP_RUNQ then
         -- timed out
+        assert(msec ~= nil, 'invalid implements')
+        self.ctx:removeq(self)
         return nil, nil, true
     end
 
-    -- normally unreachable
-    error('invalid implements')
+    assert(op == OP_EVENT and sigmap[signo], 'invalid implements')
+    -- got signal event
+    return signo
 end
 
---- attach2caller
---- @param caller act.callee
---- @param callee act.callee
---- @param atexit boolean
-local function attach2caller(caller, callee, atexit)
-    if caller then
-        -- set as a child: caller -> callee
-        if not atexit then
-            callee.parent = caller
-            callee.ref = caller.node:push(callee)
-            return
-        end
+--- @type act.callee?
+local CURRENT_CALLEE
 
-        -- atexit node always await child node
-        callee.atexit = true
-        -- set as a parent of caller: callee -> caller
-        local parent = caller.parent
-        if not parent then
-            caller.parent = callee
-            caller.ref = callee.node:push(caller)
-            return
-        end
+--- call
+function Callee:call(...)
+    CURRENT_CALLEE = self
+    -- call with passed arguments
+    local done, status = self.co(self.args:clear(...)) --- @type boolean,integer
+    CURRENT_CALLEE = nil
 
-        -- change parent of caller: caller_parent -> callee -> caller
-        parent.node:remove(caller.ref)
-        caller.parent = callee
-        caller.ref = callee.node:push(caller)
-        callee.parent = parent
-        callee.ref = parent.node:push(callee)
-
-    elseif atexit then
-        error('root callee cannot be run at exit')
+    if done then
+        self:dispose(status == OK, status)
+    elseif self.is_exit then
+        self:dispose(true, OK)
     end
 end
 
+--- attach
+--- @param callee act.callee
+local function attach(callee)
+    if not CURRENT_CALLEE then
+        assert(not callee.is_atexit, 'root callee cannot be run at exit')
+        return
+    end
+
+    -- set as a child of the current callee
+    if not callee.is_atexit then
+        callee.parent = CURRENT_CALLEE
+        callee.ref = CURRENT_CALLEE.children:push(callee)
+        return
+    end
+
+    -- set as a child of the parent of the current callee
+    local parent = CURRENT_CALLEE.parent
+    if parent then
+        CURRENT_CALLEE.ref:remove()
+        callee.parent = parent
+        callee.ref = parent.children:push(callee)
+    end
+
+    -- set as a parent of the current callee
+    CURRENT_CALLEE.parent = callee
+    CURRENT_CALLEE.ref = callee.children:push(CURRENT_CALLEE)
+end
+
 --- renew
---- @param act act.context
---- @param atexit boolean
+--- @param ctx act.context
+--- @param is_atexit boolean
 --- @param fn function
 --- @vararg any
-function Callee:renew(act, atexit, fn, ...)
-    self.act = act
-    self.atexit = atexit
-    self.args:set(0, ...)
+function Callee:renew(ctx, is_atexit, fn, ...)
+    self.ctx = ctx
+    self.is_atexit = is_atexit
+    self.args:set(...)
     self.co:reset(fn)
     self.cid = getnsec()
-    -- set relationship
-    attach2caller(CURRENT_CALLEE, self, atexit)
+    -- attach to the current callee
+    attach(self)
 end
 
 --- init
---- @param act act.context
---- @param atexit boolean
+--- @param ctx act.context
+--- @param is_atexit boolean
 --- @param fn function
---- @vararg any
+--- @param ... any
 --- @return act.callee callee
-function Callee:init(act, atexit, fn, ...)
-    local args = new_argv()
-    args:set(0, ...)
-
-    self.act = act
-    self.atexit = atexit
-    self.co = new_reco(fn)
-    self.args = args
-    self.argv = new_argv()
-    self.node = new_deque()
-    self.rlock = {}
-    self.wlock = {}
-    -- ev = [event object]
-    self.evfd = -1
-    self.evasa = '' -- '', 'readable' or 'writable'
-    self.evuse = false -- true or false
-
-    -- set callee-id
+function Callee:init(ctx, is_atexit, fn, ...)
+    self.ctx = ctx
+    self.is_atexit = is_atexit
+    self.co = new_coro(fn)
+    self.args = new_stack(...)
+    self.argv = new_stack()
+    self.children = new_deque()
     self.cid = getnsec()
-    -- set relationship
-    attach2caller(CURRENT_CALLEE, self, atexit)
-
+    -- attach to the current callee
+    attach(self)
     return self
+end
+
+--- acquire
+--- @return act.callee? callee
+local function acquire()
+    return CURRENT_CALLEE
 end
 
 Callee = require('metamodule').new(Callee)
 
 --- new create new act.callee
+--- @param ctx act.context
+--- @param is_atexit boolean
+--- @param fn function
 --- @param ... any
 --- @return act.callee
-local function new(...)
-    local callee = POOL:pop()
-
-    -- use pooled callee
+local function new(ctx, is_atexit, fn, ...)
+    local callee = ctx:pool_get()
     if callee then
-        callee:renew(...)
+        -- use pooled callee
+        callee:renew(ctx, is_atexit, fn, ...)
         return callee
     end
 
-    return Callee(...)
+    return Callee(ctx, is_atexit, fn, ...)
 end
 
 return {

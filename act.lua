@@ -28,7 +28,6 @@ require('nosigpipe')
 --- file scope variables
 local pcall = pcall
 local fork = require('fork')
-local reco = require('reco')
 local aux = require('act.aux')
 local is_uint = aux.is_uint
 local is_func = aux.is_func
@@ -41,21 +40,21 @@ local callee_unwait_readable = Callee.unwait_readable
 local callee_unwait = Callee.unwait
 local new_context = require('act.context').new
 --- constants
---- @type act.context
+--- @type act.context?
 local ACT_CTX
 
 --- spawn_child
---- @param atexit boolean
+--- @param is_atexit boolean
 --- @param fn function
 --- @vararg any
 --- @return any cid
 --- @return string? err
-local function spawn_child(atexit, fn, ...)
+local function spawn_child(is_atexit, fn, ...)
     -- create new callee
-    local callee = new_callee(ACT_CTX, atexit, fn, ...)
+    local callee = new_callee(ACT_CTX, is_atexit, fn, ...)
 
     -- push to runq if not atexit
-    if not atexit then
+    if not is_atexit then
         local ok, err = ACT_CTX:pushq(callee)
         if not ok then
             return nil, err
@@ -120,15 +119,12 @@ local function exit(...)
 end
 
 --- later
---- @return boolean ok
---- @return string? err
 local function later()
     local callee = callee_acquire()
-    if callee then
-        return callee:later()
+    if not callee then
+        error('cannot call later() from outside of execution context', 2)
     end
-
-    error('cannot call later() from outside of execution context', 2)
+    callee:later()
 end
 
 --- atexit
@@ -150,7 +146,7 @@ local function atexit(fn, ...)
 end
 
 --- await
---- @param msec integer
+--- @param msec? integer
 --- @return table stat
 --- @return boolean timeout
 local function await(msec)
@@ -166,10 +162,9 @@ local function await(msec)
 end
 
 --- suspend
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
 --- @return any ...
---- @return boolean timeout
 local function suspend(msec)
     local callee = callee_acquire()
     if callee then
@@ -230,7 +225,7 @@ end
 
 --- read_lock
 --- @param fd integer
---- @param msec integer
+--- @param msec? integer
 --- @return boolean ok
 --- @return string? err
 --- @return boolean? timeout
@@ -240,7 +235,7 @@ local function read_lock(fd, msec)
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
         elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+            error('msec must be unsigned integer or nil', 2)
         end
         return callee:read_lock(fd, msec)
     end
@@ -274,7 +269,7 @@ local function write_lock(fd, msec)
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
         elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+            error('msec must be unsigned integer or nil', 2)
         end
         return callee:write_lock(fd, msec)
     end
@@ -466,12 +461,13 @@ local function run(fn, ...)
 end
 
 -- exports
+local coro = require('act.coro')
 return {
-    OK = reco.OK,
-    ERRRUN = reco.ERRRUN,
-    ERRSYNTAX = reco.ERRSYNTAX,
-    ERRMEM = reco.ERRMEM,
-    ERRERR = reco.ERRERR,
+    OK = coro.OK,
+    ERRRUN = coro.ERRRUN,
+    ERRSYNTAX = coro.ERRSYNTAX,
+    ERRMEM = coro.ERRMEM,
+    ERRERR = coro.ERRERR,
     run = run,
     getcid = getcid,
     wait_writable = wait_writable,

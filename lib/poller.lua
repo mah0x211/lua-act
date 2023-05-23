@@ -62,12 +62,10 @@ local kqueue = require('kqueue')
 --- @return string? err
 --- @return number? errno
 local function new()
-    if epoll.usable() then
-        return epoll.new()
-    elseif kqueue.usable() then
-        return kqueue.new()
-    end
-    error('act is not supported on this platform')
+    local newfn = assert(epoll.usable() and epoll.new or kqueue.usable() and
+                             kqueue.new,
+                         'neither epoll nor kqueue is available: act is not supported on this platform')
+    return newfn()
 end
 
 return new
