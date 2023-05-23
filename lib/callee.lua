@@ -26,8 +26,7 @@
 --- file scope variables
 local yield = coroutine.yield
 local setmetatable = setmetatable
-local reco = require('reco')
-local new_reco = reco.new
+local new_coro = require('act.coro').new
 local new_stack = require('act.stack')
 local new_deque = require('act.deque')
 local hrtimer = require('act.hrtimer')
@@ -39,12 +38,7 @@ local concat = aux.concat
 local OP_EVENT = aux.OP_EVENT
 local OP_RUNQ = aux.OP_RUNQ
 local OP_AWAIT = aux.OP_AWAIT
-local OK = reco.OK
--- local CO_YIELD = reco.YIELD
--- local ERRRUN = reco.ERRRUN
--- local ERRSYNTAX = reco.ERRSYNTAX
--- local ERRMEM = reco.ERRMEM
--- local ERRERR = reco.ERRERR
+local OK = require('act.coro').OK
 --- static variables
 local SUSPENDED = setmetatable({}, {
     __mode = 'v',
@@ -117,7 +111,7 @@ end
 
 --- @class act.callee
 --- @field cid integer
---- @field co thread
+--- @field co reco
 --- @field act act.context
 --- @field children deque
 --- @field parent? act.callee
@@ -501,7 +495,7 @@ local CURRENT_CALLEE
 function Callee:call(...)
     CURRENT_CALLEE = self
     -- call with passed arguments
-    local done, status = self.co(self.args:clear(...))
+    local done, status = self.co(self.args:clear(...)) --- @type boolean,integer
     CURRENT_CALLEE = nil
 
     if done then
@@ -569,7 +563,7 @@ end
 function Callee:init(act, is_atexit, fn, ...)
     self.act = act
     self.is_atexit = is_atexit
-    self.co = new_reco(fn)
+    self.co = new_coro(fn)
     self.args = new_stack(...)
     self.argv = new_stack()
     self.children = new_deque()

@@ -28,7 +28,6 @@ require('nosigpipe')
 --- file scope variables
 local pcall = pcall
 local fork = require('fork')
-local reco = require('reco')
 local aux = require('act.aux')
 local is_uint = aux.is_uint
 local is_func = aux.is_func
@@ -462,12 +461,13 @@ local function run(fn, ...)
 end
 
 -- exports
+local coro = require('act.coro')
 return {
-    OK = reco.OK,
-    ERRRUN = reco.ERRRUN,
-    ERRSYNTAX = reco.ERRSYNTAX,
-    ERRMEM = reco.ERRMEM,
-    ERRERR = reco.ERRERR,
+    OK = coro.OK,
+    ERRRUN = coro.ERRRUN,
+    ERRSYNTAX = coro.ERRSYNTAX,
+    ERRMEM = coro.ERRMEM,
+    ERRERR = coro.ERRERR,
     run = run,
     getcid = getcid,
     wait_writable = wait_writable,

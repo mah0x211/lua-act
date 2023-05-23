@@ -29,6 +29,7 @@ build = {
         ['act.aux'] = "lib/aux.lua",
         ['act.callee'] = "lib/callee.lua",
         ['act.context'] = "lib/context.lua",
+        ['act.coro'] = "lib/coro.lua",
         ['act.deque'] = "lib/deque.lua",
         ['act.event'] = "lib/event.lua",
         ['act.getcpus'] = {
