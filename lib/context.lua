@@ -69,6 +69,51 @@ function Context:pushq(callee)
     return self.runq:push(callee)
 end
 
+--- read_lock
+--- @param callee act.callee
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return any err
+--- @return boolean? timeout
+function Context:read_lock(callee, fd, msec)
+    return self.lockq:read_lock(callee, fd, msec)
+end
+
+--- read_unlock
+--- @param callee act.callee
+--- @param fd integer
+--- @return boolean ok
+function Context:read_unlock(callee, fd)
+    return self.lockq:read_unlock(callee, fd)
+end
+
+--- write_lock
+--- @param callee act.callee
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return any err
+--- @return boolean? timeout
+function Context:write_lock(callee, fd, msec)
+    return self.lockq:write_lock(callee, fd, msec)
+end
+
+--- write_unlock
+--- @param callee act.callee
+--- @param fd integer
+--- @return boolean ok
+function Context:write_unlock(callee, fd)
+    return self.lockq:write_unlock(callee, fd)
+end
+
+--- release_locks release the callee from the lockq
+--- @param callee act.callee
+--- @return integer nrelease
+function Context:release_locks(callee)
+    return self.lockq:release(callee)
+end
+
 --- pool_get
 --- @return act.callee
 function Context:pool_get()

@@ -128,7 +128,7 @@ function Callee:dispose(ok, status)
 
     runq:remove(self)
     -- release from lockq
-    self.ctx.lockq:release(self)
+    self.ctx:release_locks(self)
 
     -- remove state properties
     self.is_exit = nil
@@ -286,20 +286,6 @@ function Callee:later()
     assert(yield() == OP_RUNQ, 'invalid implements')
 end
 
---- read_unlock
---- @param fd integer
---- @return boolean ok
-function Callee:read_unlock(fd)
-    return self.ctx.lockq:read_unlock(self, fd)
-end
-
---- write_unlock
---- @param fd integer
---- @return boolean ok
-function Callee:write_unlock(fd)
-    return self.ctx.lockq:write_unlock(self, fd)
-end
-
 --- read_lock
 --- @param fd integer
 --- @param msec integer
@@ -307,7 +293,14 @@ end
 --- @return any err
 --- @return boolean? timeout
 function Callee:read_lock(fd, msec)
-    return self.ctx.lockq:read_lock(self, fd, msec)
+    return self.ctx:read_lock(self, fd, msec)
+end
+
+--- read_unlock
+--- @param fd integer
+--- @return boolean ok
+function Callee:read_unlock(fd)
+    return self.ctx:read_unlock(self, fd)
 end
 
 --- write_lock
@@ -317,7 +310,14 @@ end
 --- @return any err
 --- @return boolean? timeout
 function Callee:write_lock(fd, msec)
-    return self.ctx.lockq:write_lock(self, fd, msec)
+    return self.ctx:write_lock(self, fd, msec)
+end
+
+--- write_unlock
+--- @param fd integer
+--- @return boolean ok
+function Callee:write_unlock(fd)
+    return self.ctx:write_unlock(self, fd)
 end
 
 --- waitable
