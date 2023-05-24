@@ -31,14 +31,16 @@ typedef struct {
 
 static int unshift_lua(lua_State *L)
 {
+    int argc       = lua_gettop(L) - 1;
     act_stack_t *s = luaL_checkudata(L, 1, MODULE_MT);
 
-    if (lua_gettop(s->L)) {
-        lua_pushvalue(s->L, 1);
-        lua_xmove(s->L, L, 1);
-        lua_remove(s->L, 1);
+    // prepend all arguments to stack
+    if (argc > 0) {
+        lua_xmove(s->L, L, lua_gettop(s->L));
+        lua_xmove(L, s->L, lua_gettop(L) - 1);
     }
-    return lua_gettop(L) - 1;
+
+    return 0;
 }
 
 static int pop_lua(lua_State *L)
@@ -55,9 +57,8 @@ static int push_lua(lua_State *L)
     int argc       = lua_gettop(L) - 1;
     act_stack_t *s = luaL_checkudata(L, 1, MODULE_MT);
 
-    // do nothing without value arguments
+    // append all arguments to stack
     if (argc > 0) {
-        // insert values to tail
         lua_xmove(L, s->L, argc);
     }
 
@@ -86,12 +87,13 @@ static int clear_lua(lua_State *L)
     int n          = lua_gettop(L) - 1;
 
     if (n) {
-        // push all arguments to stack
+        // append all arguments to stack
         lua_xmove(L, s->L, n);
     }
     // return all stack values
-    lua_xmove(s->L, L, lua_gettop(s->L));
-    return lua_gettop(L) - 1;
+    n = lua_gettop(s->L);
+    lua_xmove(s->L, L, n);
+    return n;
 }
 
 static int len_lua(lua_State *L)
