@@ -426,8 +426,14 @@ function Callee:sleep(msec)
     -- wait until wake-up or resume by resume method
     SUSPENDED[cid] = self
     assert(yield() == nil, 'invalid implements')
-    SUSPENDED[cid] = nil
     assert(self.op == OP_RUNQ)
+
+    -- timeout
+    if SUSPENDED[cid] then
+        SUSPENDED[cid] = nil
+        assert(msec ~= nil, 'invalid implements')
+    end
+
     local rem = deadline - getmsec()
     return rem > 0 and rem or 0
 end
