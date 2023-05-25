@@ -115,11 +115,22 @@ function testcase.atexit()
     -- test that calling a function on exit
     local executed = false
     assert(act.run(with_luacov(function()
-        act.atexit(function(a, b)
-            assert(a == 'foo')
-            assert(b == 'bar')
+        act.atexit(function(stat, a, b)
+            assert.is_table(stat)
+            assert.is_int(stat.cid)
+            stat.cid = nil
+            assert.equal(stat, {
+                status = act.OK,
+                result = {
+                    'hello',
+                    'world',
+                },
+            })
+            assert.equal(a, 'foo')
+            assert.equal(b, 'bar')
             executed = true
         end, 'foo', 'bar')
+        return 'hello', 'world'
     end)))
     assert(executed, 'could not executed')
 
@@ -151,12 +162,14 @@ function testcase.atexit()
     -- test that pass a previous error message
     executed = false
     assert(act.run(with_luacov(function()
-        act.atexit(function(a, b, ok, status, err)
+        act.atexit(function(stat, a, b)
+            assert.is_table(stat)
+            assert.is_int(stat.cid)
+            assert.is_nil(stat.result)
+            assert.equal(stat.status, act.ERRRUN)
+            assert.match(stat.error, 'hello')
             assert.equal(a, 'foo')
             assert.equal(b, 'bar')
-            assert.is_false(ok)
-            assert.equal(status, act.ERRRUN)
-            assert.match(err, 'hello')
             executed = true
         end, 'foo', 'bar')
 
@@ -184,30 +197,44 @@ function testcase.atexit()
         act.spawn(with_luacov(function()
             assert(act.atexit(function(...)
                 return ...
-            end))
+            end, 'foo', 'bar'))
             return 'hello', 'world'
         end))
 
         local res = assert(act.await())
+        assert.is_table(res)
+        assert.is_int(res.cid)
+        assert.is_table(res.result)
+        local stat = res.result[1]
+        assert.is_int(stat.cid)
+        stat.cid = nil
         assert.equal(res.result, {
-            true,
-            act.OK,
-            'hello',
-            'world',
+            {
+                result = {
+                    'hello',
+                    'world',
+                },
+                status = act.OK,
+            },
+            'foo',
+            'bar',
         })
     end)))
 
     -- test that recover the error of main function
     assert(act.run(with_luacov(function()
         act.spawn(with_luacov(function()
-            assert(act.atexit(function(a, b, ok, status, ...)
+            assert(act.atexit(function(...)
                 return ...
             end, 'foo', 'bar'))
             error('hello')
         end))
 
         local res = assert(act.await())
-        assert.match(res.result[1], 'hello.+traceback', false)
+        assert.is_nil(res.result[1].result)
+        assert.equal(res.result[2], 'foo')
+        assert.equal(res.result[3], 'bar')
+        assert.match(res.result[1].error, 'hello.+traceback', false)
     end)))
 
     -- test that fail with a non-function argument

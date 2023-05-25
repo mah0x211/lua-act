@@ -195,7 +195,20 @@ function Callee:dispose(ok, status)
         elseif parent.is_atexit then
             -- call atexit callee
             parent.is_atexit = nil
-            parent:call(ok, status, self.co:results())
+            local stat = {
+                cid = self.cid,
+                status = status,
+            }
+            if ok then
+                stat.result = {
+                    self.co:results(),
+                }
+            else
+                stat.error = self.co:results()
+            end
+            parent.args:insert(2, stat)
+            parent.ctx:removeq(parent)
+            parent.ctx:pushq(parent)
         elseif not ok then
             -- throws an error on failure
             error(concat({
@@ -492,10 +505,12 @@ end
 local CURRENT_CALLEE
 
 --- call
-function Callee:call(...)
+--- @param op integer
+--- @param ... any
+function Callee:call(op, ...)
     CURRENT_CALLEE = self
     -- call with passed arguments
-    local done, status = self.co(self.args:clear(...)) --- @type boolean,integer
+    local done, status = self.co(op, self.args:clear(...)) --- @type boolean,integer
     CURRENT_CALLEE = nil
 
     if done then
