@@ -189,11 +189,14 @@ function Callee:sigwait(msec, ...)
         event:revoke(sigset:pop())
     end
 
+    -- timeout
     if self.op == OP_RUNQ then
-        -- timed out
         assert(msec ~= nil, 'invalid implements')
-        self.ctx:removeq(self)
         return nil, nil, true
+    end
+
+    if msec then
+        self.ctx:removeq(self)
     end
 
     assert(self.op == OP_EVENT and sigmap[signo], 'invalid implements')
@@ -251,11 +254,14 @@ local function waitable(self, operators, asa, fd, msec)
     end
     event:revoke(ev)
 
+    -- timed out
     if self.op == OP_RUNQ then
         assert(msec ~= nil, 'invalid implements')
-        self.ctx:removeq(self)
-        -- timed out
         return false, nil, true
+    end
+
+    if msec then
+        self.ctx:removeq(self)
     end
 
     -- opertion type must be OP_EVENT
