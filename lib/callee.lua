@@ -279,11 +279,10 @@ function Callee:suspend(msec)
     assert(yield() == nil, 'invalid implements')
     assert(self.op == OP_RUNQ, 'invalid implements')
 
-    -- resumed by time-out
+    -- timeout
     if SUSPENDED[cid] then
-        assert(msec ~= nil, 'invalid implements')
-        self.ctx:removeq(self)
         SUSPENDED[cid] = nil
+        assert(msec ~= nil, 'invalid implements')
         return false
     end
 
