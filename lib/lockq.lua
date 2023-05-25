@@ -162,11 +162,11 @@ local function lock(runq, lockq, callee, fd, msec)
     waitq[idx] = callee
     waitq[callee] = idx
     -- wait until resumed by resume method
-    local op = yield()
+    assert(yield() == nil, 'invalid implements')
     waitq[callee] = nil
     waitq[idx] = false
 
-    assert(op == OP_RUNQ, 'invalid implements')
+    assert(callee.op == OP_RUNQ, 'invalid implements')
 
     -- resumed by time-out if locker is not callee
     if waitq.locker ~= callee then

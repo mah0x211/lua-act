@@ -110,6 +110,7 @@ end
 --- @field cid integer
 --- @field co reco
 --- @field children deque
+--- @field op? integer
 --- @field parent? act.callee
 --- @field is_await? boolean
 --- @field is_cancel? boolean
@@ -203,7 +204,7 @@ function Callee:dispose(ok, status)
         else
             -- call atexit callee via runq
             parent.is_atexit = nil
-            parent.args:insert(2, stat)
+            parent.args:insert(1, stat)
             parent.ctx:removeq(parent)
             parent.ctx:pushq(parent)
         end
@@ -246,7 +247,8 @@ function Callee:await(msec)
         end
 
         self.is_await = true
-        assert(yield() == OP_RUNQ, 'invalid implements')
+        assert(yield() == nil, 'invalid implements')
+        assert(self.op == OP_RUNQ, 'invalid implements')
         if self.is_await then
             -- timeout
             self.is_await = nil
@@ -274,7 +276,8 @@ function Callee:suspend(msec)
     -- wait until resumed by resume method
     local cid = self.cid
     SUSPENDED[cid] = self
-    assert(yield() == OP_RUNQ, 'invalid implements')
+    assert(yield() == nil, 'invalid implements')
+    assert(self.op == OP_RUNQ, 'invalid implements')
 
     -- resumed by time-out
     if SUSPENDED[cid] then
@@ -291,7 +294,8 @@ end
 --- later
 function Callee:later()
     assert(self.ctx:pushq(self))
-    assert(yield() == OP_RUNQ, 'invalid implements')
+    assert(yield() == nil, 'invalid implements')
+    assert(self.op == OP_RUNQ, 'invalid implements')
 end
 
 --- read_lock
@@ -366,7 +370,7 @@ local function waitable(self, operators, asa, fd, msec)
     self.fdev = ev
     operators[fd] = self
     -- wait until event fired
-    local op, fdno = yield()
+    local fdno = yield()
     operators[fd] = nil
     self.fdev = nil
     self.fd = nil
@@ -378,7 +382,7 @@ local function waitable(self, operators, asa, fd, msec)
     end
     event:revoke(ev)
 
-    if op == OP_RUNQ then
+    if self.op == OP_RUNQ then
         assert(msec ~= nil, 'invalid implements')
         self.ctx:removeq(self)
         -- timed out
@@ -386,7 +390,7 @@ local function waitable(self, operators, asa, fd, msec)
     end
 
     -- opertion type must be OP_EVENT
-    assert(op == OP_EVENT, 'invalid implements')
+    assert(self.op == OP_EVENT, 'invalid implements')
     assert(fdno == fd, 'invalid implements')
     return true
 end
@@ -422,9 +426,9 @@ function Callee:sleep(msec)
     local deadline = getmsec() + msec
     -- wait until wake-up or resume by resume method
     SUSPENDED[cid] = self
-    local op = yield()
+    assert(yield() == nil, 'invalid implements')
     SUSPENDED[cid] = nil
-    assert(op == OP_RUNQ)
+    assert(self.op == OP_RUNQ)
     local rem = deadline - getmsec()
     return rem > 0 and rem or 0
 end
@@ -477,7 +481,7 @@ function Callee:sigwait(msec, ...)
 
     -- wait registered signals
     self.sigset = sigset
-    local op, signo = yield()
+    local signo = yield()
     self.sigset = nil
 
     -- revoke signal events
@@ -485,14 +489,14 @@ function Callee:sigwait(msec, ...)
         event:revoke(sigset:pop())
     end
 
-    if op == OP_RUNQ then
+    if self.op == OP_RUNQ then
         -- timed out
         assert(msec ~= nil, 'invalid implements')
         self.ctx:removeq(self)
         return nil, nil, true
     end
 
-    assert(op == OP_EVENT and sigmap[signo], 'invalid implements')
+    assert(self.op == OP_EVENT and sigmap[signo], 'invalid implements')
     -- got signal event
     return signo
 end
@@ -506,7 +510,9 @@ local CURRENT_CALLEE
 function Callee:call(op, ...)
     CURRENT_CALLEE = self
     -- call with passed arguments
-    local done, status = self.co(op, self.args:clear(...)) --- @type boolean,integer
+    self.op = op
+    local done, status = self.co(self.args:clear(...)) --- @type boolean,integer
+    self.op = nil
     CURRENT_CALLEE = nil
 
     if done then

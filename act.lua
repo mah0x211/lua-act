@@ -40,7 +40,6 @@ local callee_unwait_readable = Callee.unwait_readable
 local callee_unwait = Callee.unwait
 local new_context = require('act.context').new
 --- constants
-local OP_RUNQ = aux.OP_RUNQ
 --- @type act.context?
 local ACT_CTX
 
@@ -371,15 +370,6 @@ local function getcid()
     error('cannot call getcid() at outside of execution context', 2)
 end
 
---- on_exit
---- @param op integer
---- @param exitfn function
---- @param ... any
-local function on_exit(op, exitfn, ...)
-    assert(op == OP_RUNQ, 'invalid implements')
-    return exitfn(...)
-end
-
 --- atexit
 --- @param exitfn function
 --- @vararg any
@@ -391,20 +381,11 @@ local function atexit(exitfn, ...)
             error('exitfn must be function', 2)
         end
 
-        local _, err = spawn_child(true, on_exit, exitfn, ...)
+        local _, err = spawn_child(true, exitfn, ...)
         return not err, err
     end
 
     error('cannot call atexit() at outside of execution context', 2)
-end
-
---- on_start
---- @param op integer
---- @param mainfn function
---- @param ... any
-local function on_start(op, mainfn, ...)
-    assert(op == OP_RUNQ, 'invalid implements')
-    return mainfn(...)
 end
 
 --- runloop
@@ -422,7 +403,7 @@ local function runloop(mainfn, ...)
 
     -- create main coroutine
     local ok
-    ok, err = spawn_child(false, on_start, mainfn, ...)
+    ok, err = spawn_child(false, mainfn, ...)
     if not ok then
         return false, err
     end
