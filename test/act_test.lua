@@ -273,6 +273,7 @@ function testcase.await()
             {
                 {
                     cid = cid1,
+                    status = act.OK,
                     result = {
                         'hello',
                     },
@@ -281,6 +282,7 @@ function testcase.await()
             {
                 {
                     cid = cid2,
+                    status = act.OK,
                     result = {
                         'world',
                     },
@@ -323,6 +325,7 @@ function testcase.exit()
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
+            status = act.OK,
             result = {
                 'hello world!',
             },
