@@ -29,6 +29,26 @@ typedef struct {
     lua_State *L;
 } act_stack_t;
 
+static int insert_lua(lua_State *L)
+{
+    act_stack_t *s = luaL_checkudata(L, 1, MODULE_MT);
+    int idx        = lauxh_checkuinteger(L, 2);
+
+    if (lua_gettop(L) > 2) {
+        int tail = lua_gettop(s->L);
+
+        if (idx <= 1) {
+            // prepend all arguments to head
+            lua_xmove(s->L, L, tail);
+        } else if (idx <= tail) {
+            // insert all arguments to idx
+            lua_xmove(s->L, L, tail - idx + 1);
+        }
+        lua_xmove(L, s->L, lua_gettop(L) - 2);
+    }
+    return 0;
+}
+
 static int unshift_lua(lua_State *L)
 {
     int argc       = lua_gettop(L) - 1;
@@ -147,6 +167,7 @@ LUALIB_API int luaopen_act_stack(lua_State *L)
         {"push",    push_lua   },
         {"pop",     pop_lua    },
         {"unshift", unshift_lua},
+        {"insert",  insert_lua },
         {NULL,      NULL       }
     };
 

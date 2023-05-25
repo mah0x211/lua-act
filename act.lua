@@ -40,6 +40,7 @@ local callee_unwait_readable = Callee.unwait_readable
 local callee_unwait = Callee.unwait
 local new_context = require('act.context').new
 --- constants
+local OP_RUNQ = aux.OP_RUNQ
 --- @type act.context?
 local ACT_CTX
 
@@ -125,24 +126,6 @@ local function later()
         error('cannot call later() from outside of execution context', 2)
     end
     callee:later()
-end
-
---- atexit
---- @param fn function
---- @vararg any
---- @return boolean ok
---- @return string? err
-local function atexit(fn, ...)
-    if callee_acquire() then
-        if not is_func(fn) then
-            error('fn must be function', 2)
-        end
-
-        local _, err = spawn_child(true, fn, ...)
-        return not err, err
-    end
-
-    error('cannot call atexit() at outside of execution context', 2)
 end
 
 --- await
@@ -388,12 +371,48 @@ local function getcid()
     error('cannot call getcid() at outside of execution context', 2)
 end
 
+--- on_exit
+--- @param op integer
+--- @param exitfn function
+--- @param ... any
+local function on_exit(op, exitfn, ...)
+    assert(op == OP_RUNQ, 'invalid implements')
+    return exitfn(...)
+end
+
+--- atexit
+--- @param exitfn function
+--- @vararg any
+--- @return boolean ok
+--- @return string? err
+local function atexit(exitfn, ...)
+    if callee_acquire() then
+        if not is_func(exitfn) then
+            error('exitfn must be function', 2)
+        end
+
+        local _, err = spawn_child(true, on_exit, exitfn, ...)
+        return not err, err
+    end
+
+    error('cannot call atexit() at outside of execution context', 2)
+end
+
+--- on_start
+--- @param op integer
+--- @param mainfn function
+--- @param ... any
+local function on_start(op, mainfn, ...)
+    assert(op == OP_RUNQ, 'invalid implements')
+    return mainfn(...)
+end
+
 --- runloop
---- @param fn function
+--- @param mainfn function
 --- @vararg any
 --- @return boolean ok
 --- @return any err
-local function runloop(fn, ...)
+local function runloop(mainfn, ...)
     -- create act context
     local err
     ACT_CTX, err = new_context()
@@ -403,7 +422,7 @@ local function runloop(fn, ...)
 
     -- create main coroutine
     local ok
-    ok, err = spawn_child(false, fn, ...)
+    ok, err = spawn_child(false, on_start, mainfn, ...)
     if not ok then
         return false, err
     end
@@ -439,19 +458,19 @@ local function runloop(fn, ...)
 end
 
 --- run
---- @param fn function
+--- @param mainfn function
 --- @vararg any
 --- @return boolean ok
 --- @return any err
-local function run(fn, ...)
+local function run(mainfn, ...)
     -- check first argument
-    if not is_func(fn) then
-        error('fn must be function', 2)
+    if not is_func(mainfn) then
+        error('mainfn must be function', 2)
     elseif ACT_CTX then
         return false, 'act run already'
     end
 
-    local ok, rv, err = pcall(runloop, fn, ...)
+    local ok, rv, err = pcall(runloop, mainfn, ...)
     ACT_CTX = nil
     if ok then
         return rv, err
