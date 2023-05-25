@@ -249,16 +249,14 @@ function Callee:await(msec)
         self.is_await = true
         assert(yield() == nil, 'invalid implements')
         assert(self.op == OP_RUNQ, 'invalid implements')
+
+        -- timeout
         if self.is_await then
-            -- timeout
             self.is_await = nil
             assert(msec ~= nil, 'invalid implements')
             return nil, true
         end
 
-        if msec then
-            self.ctx:removeq(self)
-        end
         return self.child_stats:shift()
     end
 end
