@@ -37,7 +37,6 @@ local concat = aux.concat
 -- constants
 local OP_EVENT = aux.OP_EVENT
 local OP_RUNQ = aux.OP_RUNQ
-local OP_AWAIT = aux.OP_AWAIT
 local OK = require('act.coro').OK
 --- static variables
 local SUSPENDED = setmetatable({}, {
@@ -157,6 +156,9 @@ function Callee:dispose(ok, status)
         end
     end
 
+    -- dispose child_stats
+    self.child_stats = nil
+
     -- dispose child coroutines
     for _ = 1, #self.children do
         local child = self.children:pop()
@@ -177,43 +179,33 @@ function Callee:dispose(ok, status)
         self.ref = nil
         -- detach from parent
         ref:remove()
-        if parent.is_await then
-            -- parent waiting for child results
-            parent.is_await = nil
-            local stat = {
-                cid = self.cid,
-                status = status,
+
+        local stat = {
+            cid = self.cid,
+            status = status,
+        }
+        if ok then
+            stat.result = {
+                self.co:results(),
             }
-            if ok then
-                stat.result = {
-                    self.co:results(),
-                }
-            else
-                stat.error = self.co:results()
+        else
+            stat.error = self.co:results()
+        end
+
+        if not parent.is_atexit then
+            parent.child_stats:push(stat)
+            if parent.is_await then
+                -- resume await callee via runq
+                parent.is_await = nil
+                parent.ctx:removeq(parent)
+                parent.ctx:pushq(parent)
             end
-            parent:call(OP_AWAIT, stat)
-        elseif parent.is_atexit then
-            -- call atexit callee
+        else
+            -- call atexit callee via runq
             parent.is_atexit = nil
-            local stat = {
-                cid = self.cid,
-                status = status,
-            }
-            if ok then
-                stat.result = {
-                    self.co:results(),
-                }
-            else
-                stat.error = self.co:results()
-            end
             parent.args:insert(2, stat)
             parent.ctx:removeq(parent)
             parent.ctx:pushq(parent)
-        elseif not ok then
-            -- throws an error on failure
-            error(concat({
-                self.co:results(),
-            }, '\n'))
         end
     elseif not ok then
         error(concat({
@@ -243,24 +235,29 @@ end
 --- @return table? res
 --- @return boolean? timeout
 function Callee:await(msec)
+    local stat = self.child_stats:shift()
+    if stat then
+        return stat
+    end
+
     if #self.children > 0 then
         if msec ~= nil then
             assert(self.ctx:pushq(self, msec))
         end
 
         self.is_await = true
-        local op, res = yield()
-        if op == OP_AWAIT then
-            if msec then
-                self.ctx:removeq(self)
-            end
-            return res
+        assert(yield() == OP_RUNQ, 'invalid implements')
+        if self.is_await then
+            -- timeout
+            self.is_await = nil
+            assert(msec ~= nil, 'invalid implements')
+            return nil, true
         end
-        -- timeout
-        self.is_await = nil
-        assert(op == OP_RUNQ, 'invalid implements')
-        assert(msec ~= nil, 'invalid implements')
-        return nil, true
+
+        if msec then
+            self.ctx:removeq(self)
+        end
+        return self.child_stats:shift()
     end
 end
 
@@ -277,8 +274,7 @@ function Callee:suspend(msec)
     -- wait until resumed by resume method
     local cid = self.cid
     SUSPENDED[cid] = self
-    local op = yield()
-    assert(op == OP_RUNQ, 'invalid implements')
+    assert(yield() == OP_RUNQ, 'invalid implements')
 
     -- resumed by time-out
     if SUSPENDED[cid] then
@@ -555,10 +551,11 @@ end
 --- @vararg any
 function Callee:renew(ctx, is_atexit, fn, ...)
     self.ctx = ctx
-    self.is_atexit = is_atexit
-    self.args:set(...)
-    self.co:reset(fn)
     self.cid = getnsec()
+    self.is_atexit = is_atexit
+    self.co:reset(fn)
+    self.args:set(...)
+    self.child_stats = new_deque()
     -- attach to the current callee
     attach(self)
 end
@@ -571,12 +568,13 @@ end
 --- @return act.callee callee
 function Callee:init(ctx, is_atexit, fn, ...)
     self.ctx = ctx
+    self.cid = getnsec()
     self.is_atexit = is_atexit
     self.co = new_coro(fn)
     self.args = new_stack(...)
     self.argv = new_stack()
     self.children = new_deque()
-    self.cid = getnsec()
+    self.child_stats = new_deque()
     -- attach to the current callee
     attach(self)
     return self
