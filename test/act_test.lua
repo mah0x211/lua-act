@@ -82,6 +82,20 @@ function testcase.spawn()
         assert(executed, 'child coroutine did not executed')
     end)))
 
+    -- test that spawn new coroutine with arguments
+    assert(act.run(with_luacov(function()
+        local cid = act.spawn(function(...)
+            assert.equal({...}, {'foo', 'bar', 'baz'})
+        end, 'foo', 'bar', 'baz')
+
+        local res = act.await()
+        assert.equal(res, {
+            cid = cid,
+            status = act.OK,
+            result = {},
+        })
+    end)))
+
     -- test that fail with a non-function argument
     assert(act.run(with_luacov(function()
         local err = assert.throws(act.spawn, 1)
