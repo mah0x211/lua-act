@@ -182,13 +182,13 @@ function Callee:dispose(ok, status)
             parent.is_await = nil
             local stat = {
                 cid = self.cid,
+                status = status,
             }
             if ok then
                 stat.result = {
                     self.co:results(),
                 }
             else
-                stat.status = status
                 stat.error = self.co:results()
             end
             parent:call(OP_AWAIT, stat)

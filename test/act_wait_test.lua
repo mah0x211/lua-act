@@ -41,6 +41,7 @@ function testcase.wait_readable_writable()
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
+            status = act.OK,
             result = {
                 'hello world!',
             },
@@ -139,6 +140,7 @@ function testcase.unwait_readable_writable()
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
+            status = act.OK,
             result = {},
         })
     end)))
@@ -161,6 +163,7 @@ function testcase.unwait_readable_writable()
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
+            status = act.OK,
             result = {},
         })
     end)))
@@ -187,6 +190,7 @@ function testcase.unwait_readable_writable()
             local res = assert(act.await())
             assert.equal(res, {
                 cid = cid,
+                status = act.OK,
                 result = {},
             })
         end)))
