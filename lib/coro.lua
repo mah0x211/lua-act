@@ -28,7 +28,7 @@ local reco = require('reco')
 return {
     new = require('reco').new, --- @type fun(fn:function):reco
     OK = reco.OK, --- @type integer
-    CO_YIELD = reco.YIELD, --- @type integer
+    YIELD = reco.YIELD, --- @type integer
     ERRRUN = reco.ERRRUN, --- @type integer
     ERRSYNTAX = reco.ERRSYNTAX, --- @type integer
     ERRMEM = reco.ERRMEM, --- @type integer
