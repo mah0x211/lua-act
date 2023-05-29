@@ -85,13 +85,19 @@ function testcase.spawn()
     -- test that spawn new coroutine with arguments
     assert(act.run(with_luacov(function()
         local cid = act.spawn(function(...)
-            assert.equal({...}, {'foo', 'bar', 'baz'})
+            assert.equal({
+                ...,
+            }, {
+                'foo',
+                'bar',
+                'baz',
+            })
         end, 'foo', 'bar', 'baz')
 
         local res = act.await()
         assert.equal(res, {
             cid = cid,
-            status = act.OK,
+            status = 'ok',
             result = {},
         })
     end)))
@@ -134,7 +140,7 @@ function testcase.atexit()
             assert.is_int(stat.cid)
             stat.cid = nil
             assert.equal(stat, {
-                status = act.OK,
+                status = 'ok',
                 result = {
                     'hello',
                     'world',
@@ -180,7 +186,7 @@ function testcase.atexit()
             assert.is_table(stat)
             assert.is_int(stat.cid)
             assert.is_nil(stat.result)
-            assert.equal(stat.status, act.ERRRUN)
+            assert.equal(stat.status, 'errrun')
             assert.match(stat.error, 'hello')
             assert.equal(a, 'foo')
             assert.equal(b, 'bar')
@@ -228,7 +234,7 @@ function testcase.atexit()
                     'hello',
                     'world',
                 },
-                status = act.OK,
+                status = 'ok',
             },
             'foo',
             'bar',
@@ -287,7 +293,7 @@ function testcase.await()
             {
                 {
                     cid = cid1,
-                    status = act.OK,
+                    status = 'ok',
                     result = {
                         'hello',
                     },
@@ -296,7 +302,7 @@ function testcase.await()
             {
                 {
                     cid = cid2,
-                    status = act.OK,
+                    status = 'ok',
                     result = {
                         'world',
                     },
@@ -307,7 +313,7 @@ function testcase.await()
         local res = assert(act.await())
         assert.contains(res, {
             cid = cid3,
-            status = act.ERRRUN,
+            status = 'errrun',
         })
         assert.match(res.error, 'error occurred')
 
@@ -339,7 +345,7 @@ function testcase.exit()
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
-            status = act.OK,
+            status = 'ok',
             result = {
                 'hello world!',
             },

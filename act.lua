@@ -461,13 +461,7 @@ local function run(mainfn, ...)
 end
 
 -- exports
-local coro = require('act.coro')
 return {
-    OK = coro.OK,
-    ERRRUN = coro.ERRRUN,
-    ERRSYNTAX = coro.ERRSYNTAX,
-    ERRMEM = coro.ERRMEM,
-    ERRERR = coro.ERRERR,
     run = run,
     getcid = getcid,
     wait_writable = wait_writable,

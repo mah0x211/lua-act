@@ -409,10 +409,27 @@ function Callee:sleep(msec)
     return rem > 0 and rem or 0
 end
 
+local coro = require('act.coro')
+local OK = coro.OK
+local YIELD = coro.YIELD
+local ERRRUN = coro.ERRRUN
+local ERRSYNTAX = coro.ERRSYNTAX
+local ERRMEM = coro.ERRMEM
+local ERRERR = coro.ERRERR
+local STATUS_TEXT = {
+    [OK] = 'ok',
+    [YIELD] = 'yield',
+    [ERRRUN] = 'errrun',
+    [ERRSYNTAX] = 'errsyntax',
+    [ERRMEM] = 'errmem',
+    [ERRERR] = 'errerr',
+}
+
 --- dispose
---- @param ok boolean
 --- @param status integer
-function Callee:dispose(ok, status)
+function Callee:dispose(status)
+    local status_text = assert(STATUS_TEXT[status], 'unknown status code')
+
     -- remove from runq
     self.ctx:removeq(self)
     -- release locks
@@ -456,7 +473,7 @@ function Callee:dispose(ok, status)
         child.parent = nil
         child.ref = nil
         -- call dispose method
-        child:dispose(true)
+        child:dispose(OK)
     end
 
     -- call parent
@@ -472,9 +489,9 @@ function Callee:dispose(ok, status)
 
         local stat = {
             cid = self.cid,
-            status = status,
+            status = status_text,
         }
-        if ok then
+        if status == OK then
             stat.result = {
                 self.co:results(),
             }
@@ -497,7 +514,7 @@ function Callee:dispose(ok, status)
             parent.ctx:removeq(parent)
             parent.ctx:pushq(parent)
         end
-    elseif not ok then
+    elseif status ~= OK then
         error(concat({
             self.co:results(),
         }, '\n'))
@@ -513,8 +530,6 @@ end
 
 --- @type act.callee?
 local CURRENT_CALLEE
---- @type integer
-local OK = require('act.coro').OK
 
 --- call
 --- @param op integer
@@ -528,9 +543,9 @@ function Callee:call(op, ...)
     CURRENT_CALLEE = nil
 
     if done then
-        self:dispose(status == OK, status)
+        self:dispose(status)
     elseif self.is_exit then
-        self:dispose(true, OK)
+        self:dispose(OK)
     end
 end
 
