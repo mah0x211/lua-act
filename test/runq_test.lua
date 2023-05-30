@@ -24,21 +24,19 @@ function testcase.push()
         call = function()
         end,
     }
-    assert(q:push(callee, 1))
-    assert(q:push({
+    q:push(callee, 1)
+    q:push({
         call = function()
         end,
-    }, 2))
+    }, 2)
     assert.equal(q:len(), 2)
 
     -- test that cannot add same callee
-    local ok, err = q:push(callee, 1)
-    assert.is_false(ok)
+    local err = assert.throws(q.push, q, callee, 1)
     assert.match(err, 'callee is already registered')
 
     -- test that callee must has a function in call field
-    ok, err = q:push({})
-    assert.is_false(ok)
+    err = assert.throws(q.push, q, {})
     assert.match(err, 'callee must have a call method')
 
     -- test that callee must has a function in call field
@@ -59,8 +57,8 @@ function testcase.remove()
         call = function()
         end,
     }
-    assert(q:push(a))
-    assert(q:push(b))
+    q:push(a)
+    q:push(b)
 
     -- test that remove the pushed callees
     q:remove(a)
@@ -124,7 +122,7 @@ function testcase.sleep()
     assert.less_or_equal(t, 1)
 
     -- test that return immdiately if executable callee is in run-q
-    assert.is_true(q:push(callee))
+    q:push(callee)
     t = getmsec()
     assert.is_true(q:sleep())
     t = getmsec() - t
@@ -133,7 +131,7 @@ function testcase.sleep()
     q:consume()
 
     -- test that sleep until callee is ready to execute
-    assert.is_true(q:push(callee, 100))
+    q:push(callee, 100)
     t = getmsec()
     assert.is_true(q:sleep())
     t = getmsec() - t

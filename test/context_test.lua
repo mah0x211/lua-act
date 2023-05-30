@@ -34,7 +34,7 @@ function testcase.pushq()
             res[#res + 1] = 'called'
         end,
     }
-    assert.is_true(ctx:pushq(callee))
+    ctx:pushq(callee)
     assert.equal(ctx.runq:len(), 1)
     ctx.runq:consume()
     assert.equal(ctx.runq:len(), 0)

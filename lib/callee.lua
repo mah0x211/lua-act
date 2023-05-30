@@ -64,7 +64,7 @@ end
 
 --- later
 function Callee:later()
-    assert(self.ctx:pushq(self))
+    self.ctx:pushq(self)
     assert(yield() == nil, 'invalid implements')
     assert(self.op == OP_RUNQ, 'invalid implements')
 end
@@ -95,7 +95,7 @@ function Callee:yield(msec, ...)
     end
 
     if msec ~= nil then
-        assert(self.ctx:pushq(self, msec))
+        self.ctx:pushq(self, msec)
     end
 
     local elm = parent.child_stats:push({
@@ -138,7 +138,7 @@ function Callee:await(msec)
         end
 
         if msec ~= nil then
-            assert(self.ctx:pushq(self, msec))
+            self.ctx:pushq(self, msec)
         end
 
         self.is_await = true
@@ -209,7 +209,7 @@ end
 function Callee:sigwait(msec, ...)
     -- register to runq with msec
     if msec ~= nil then
-        assert(self.ctx:pushq(self, msec))
+        self.ctx:pushq(self, msec)
     end
 
     local event = self.ctx.event
@@ -283,7 +283,7 @@ end
 local function waitable(self, operators, asa, fd, msec)
     -- register to runq with msec
     if msec ~= nil then
-        assert(self.ctx:pushq(self, msec))
+        self.ctx:pushq(self, msec)
     end
 
     -- operation already in progress in another callee
@@ -377,7 +377,7 @@ local function unwaitfd(operators, fd)
         callee.ctx.event:revoke(ev)
         -- requeue without timeout
         callee.ctx:removeq(callee)
-        assert(callee.ctx:pushq(callee))
+        callee.ctx:pushq(callee)
     end
 end
 
@@ -432,7 +432,7 @@ end
 --- @return ...
 function Callee:suspend(msec)
     if msec ~= nil then
-        assert(self.ctx:pushq(self, msec))
+        self.ctx:pushq(self, msec)
     end
 
     -- wait until resumed by resume method
@@ -457,7 +457,7 @@ end
 --- @return integer rem
 --- @return any err
 function Callee:sleep(msec)
-    assert(self.ctx:pushq(self, msec))
+    self.ctx:pushq(self, msec)
 
     local cid = self.cid
     local deadline = getmsec() + msec
