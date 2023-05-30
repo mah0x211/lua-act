@@ -348,29 +348,57 @@ function testcase.lock_timeout_order()
     end
 end
 
-function testcase.lock_invalid_argument()
-    for lockfn, unlockfn in ipairs({
-        [act.read_lock] = act.read_unlock,
-        [act.write_lock] = act.write_unlock,
-    }) do
-        -- test that fail on called with invalid argument
-        assert(act.run(with_luacov(function()
-            local err = assert.throws(lockfn, -1)
-            assert.match(err, 'fd must be unsigned integer')
+function testcase.read_lock_invalid_argument()
+    -- test that fail on called with invalid argument
+    assert(act.run(with_luacov(function()
+        local err = assert.throws(act.read_lock, -1)
+        assert.match(err, 'fd must be unsigned integer')
 
-            err = assert.throws(lockfn, 1, {})
-            assert.match(err, 'msec must be unsigned integer')
+        err = assert.throws(act.read_lock, 1, {})
+        assert.match(err, 'msec must be unsigned integer')
+    end)))
 
-            err = assert.throws(unlockfn, -1)
-            assert.match(err, 'fd must be unsigned integer')
-        end)))
-
-        -- test that fail on called from outside of execution context
-        local err = assert.throws(lockfn)
-        assert.match(err, 'outside of execution')
-
-        -- test that fail on called from outside of execution context
-        err = assert.throws(unlockfn)
-        assert.match(err, 'outside of execution')
-    end
+    -- test that fail on called from outside of execution context
+    local err = assert.throws(act.read_lock)
+    assert.match(err, 'outside of execution')
 end
+
+function testcase.read_unlock_invalid_argument()
+    -- test that fail on called with invalid argument
+    assert(act.run(with_luacov(function()
+        local err = assert.throws(act.read_unlock, -1)
+        assert.match(err, 'fd must be unsigned integer')
+    end)))
+
+    -- test that fail on called from outside of execution context
+    local err = assert.throws(act.read_unlock)
+    assert.match(err, 'outside of execution')
+end
+
+function testcase.write_lock_invalid_argument()
+    -- test that fail on called with invalid argument
+    assert(act.run(with_luacov(function()
+        local err = assert.throws(act.write_lock, -1)
+        assert.match(err, 'fd must be unsigned integer')
+
+        err = assert.throws(act.write_lock, 1, {})
+        assert.match(err, 'msec must be unsigned integer')
+    end)))
+
+    -- test that fail on called from outside of execution context
+    local err = assert.throws(act.write_lock)
+    assert.match(err, 'outside of execution')
+end
+
+function testcase.write_unlock_invalid_argument()
+    -- test that fail on called with invalid argument
+    assert(act.run(with_luacov(function()
+        local err = assert.throws(act.write_unlock, -1)
+        assert.match(err, 'fd must be unsigned integer')
+    end)))
+
+    -- test that fail on called from outside of execution context
+    local err = assert.throws(act.write_unlock)
+    assert.match(err, 'outside of execution')
+end
+
