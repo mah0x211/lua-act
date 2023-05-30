@@ -32,6 +32,7 @@ build = {
         ['act.coro'] = "lib/coro.lua",
         ['act.deque'] = "lib/deque.lua",
         ['act.event'] = "lib/event.lua",
+        ['act.fork'] = "lib/fork.lua",
         ['act.getcpus'] = {
             sources = {
                 "src/getcpus.c",
