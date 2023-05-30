@@ -154,7 +154,7 @@ local function lock(runq, lockq, callee, fd, msec)
 
     if msec ~= nil then
         -- suspend until reached to msec
-        assert(runq:push(callee, msec))
+        runq:push(callee, msec)
     end
 
     -- other callee is locking the fd

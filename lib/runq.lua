@@ -64,41 +64,33 @@ end
 --- push
 --- @param callee act.callee
 --- @param msec? integer
---- @return boolean ok
---- @return any err
 function RunQ:push(callee, msec)
-    if not callee or not is_func(callee.call) then
-        return false, 'callee must have a call method'
-    end
+    assert(callee and is_func(callee.call), 'callee must have a call method')
+    local ref = self.ref
+
+    -- register callee
+    assert(ref[callee] == nil, 'callee is already registered')
+
     local nsec = hrtimer_getnsec(msec and msec * 1000000 or 0)
     msec = nsec2msec(nsec)
 
-    -- register callee
-    local ref = self.ref
-    if not ref[callee] then
-        local queue = ref[msec]
-        local qelm
-
-        if not queue then
-            -- create new queue associated for msec
-            queue = new_deque() --- @type deque
-            -- push callee to queue
-            qelm = queue:unshift(callee)
-            -- push queue to minheap
-            ref[msec] = queue
-            ref[queue] = self.heap:push(nsec, queue)
-        else
-            -- push callee to existing queue
-            qelm = queue:unshift(callee)
-        end
-
-        ref[callee] = qelm
-        ref[qelm] = queue
-
-        return true
+    local queue = ref[msec]
+    local qelm
+    if not queue then
+        -- create new queue associated for msec
+        queue = new_deque() --- @type deque
+        -- push callee to queue
+        qelm = queue:unshift(callee)
+        -- push queue to minheap
+        ref[msec] = queue
+        ref[queue] = self.heap:push(nsec, queue)
+    else
+        -- push callee to existing queue
+        qelm = queue:unshift(callee)
     end
 
-    return false, 'callee is already registered'
+    ref[callee] = qelm
+    ref[qelm] = queue
 end
 
 --- remove

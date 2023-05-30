@@ -55,10 +55,7 @@ local function spawn_child(is_atexit, fn, ...)
 
     -- push to runq if not atexit
     if not is_atexit then
-        local ok, err = ACT_CTX:pushq(callee)
-        if not ok then
-            return nil, err
-        end
+        ACT_CTX:pushq(callee)
     end
 
     return callee.cid
