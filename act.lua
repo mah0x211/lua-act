@@ -127,6 +127,21 @@ local function later()
     callee:later()
 end
 
+--- yield
+--- @param msec? integer
+--- @param ... any
+--- @return boolean ok
+local function yield(msec, ...)
+    local callee = callee_acquire()
+    if callee then
+        if msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
+        return callee:yield(msec, ...)
+    end
+    error('cannot call yield() from outside of execution context', 2)
+end
+
 --- await
 --- @param msec? integer
 --- @return table stat
@@ -479,6 +494,7 @@ return {
     suspend = suspend,
     await = await,
     atexit = atexit,
+    yield = yield,
     later = later,
     exit = exit,
     spawn = spawn,

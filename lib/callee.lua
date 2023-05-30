@@ -69,17 +69,74 @@ function Callee:later()
     assert(self.op == OP_RUNQ, 'invalid implements')
 end
 
+--- @type table<integer, act.callee>
+local YIELDED = setmetatable({}, {
+    __mode = 'v',
+})
+
+--- yield
+--- @param msec? integer
+--- @param ... any
+--- @return boolean ok
+function Callee:yield(msec, ...)
+    -- check parent is exists except atexit callee
+    local parent = self.parent
+    while parent and parent.is_atexit do
+        parent = parent.parent
+    end
+    assert(parent, 'parent is not exists')
+
+    -- resume parent via runq if parent is await
+    if parent.is_await then
+        -- NOTE: parent must be pushed to runq before push a child to runq
+        parent.is_await = nil
+        parent.ctx:removeq(parent)
+        parent.ctx:pushq(parent)
+    end
+
+    if msec ~= nil then
+        assert(self.ctx:pushq(self, msec))
+    end
+
+    local elm = parent.child_stats:push({
+        cid = self.cid,
+        status = 'yield',
+        result = {
+            ...,
+        },
+    })
+
+    YIELDED[self.cid] = self
+    assert(yield() == nil, 'invalid implements')
+    assert(self.op == OP_RUNQ, 'invalid implements')
+    -- timeout
+    if YIELDED[self.cid] then
+        YIELDED[self.cid] = nil
+        elm:remove()
+        assert(msec ~= nil, 'invalid implements')
+        return false
+    end
+
+    if msec then
+        self.ctx:removeq(self)
+    end
+
+    return true
+end
+
 --- await until the child thread to exit while the specified number of seconds.
---- @param msec integer
+--- @param msec? integer
 --- @return table? res
 --- @return boolean? timeout
 function Callee:await(msec)
     local stat = self.child_stats:shift()
-    if stat then
-        return stat
-    end
 
-    if #self.children > 0 then
+    if not stat then
+        if #self.children == 0 then
+            -- no child
+            return
+        end
+
         if msec ~= nil then
             assert(self.ctx:pushq(self, msec))
         end
@@ -95,8 +152,18 @@ function Callee:await(msec)
             return nil, true
         end
 
-        return self.child_stats:shift()
+        stat = assert(self.child_stats:shift(), 'invalid implements')
     end
+
+    -- resume yielded child callee
+    if stat.status == 'yield' then
+        local callee = assert(YIELDED[stat.cid], 'invalid implements')
+        YIELDED[stat.cid] = nil
+        self.ctx:removeq(callee)
+        self.ctx:pushq(callee)
+    end
+
+    return stat
 end
 
 --- read_lock
@@ -437,6 +504,7 @@ function Callee:dispose(status)
 
     -- remove state properties
     self.is_exit = nil
+    YIELDED[self.cid] = nil
     SUSPENDED[self.cid] = nil
 
     -- revoke all events currently in use
