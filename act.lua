@@ -27,7 +27,7 @@
 require('nosigpipe')
 --- file scope variables
 local pcall = pcall
-local fork = require('fork')
+local fork = require('act.fork')
 local aux = require('act.aux')
 local is_uint = aux.is_uint
 local is_func = aux.is_func
@@ -71,11 +71,12 @@ local function pollable()
 end
 
 --- pfork
---- @return fork.process p
---- @return error? err
+--- @return fork.process? p
+--- @return any err
 --- @return boolean? again
 local function pfork()
     if callee_acquire() then
+        --- @type fork.process, any, boolean
         local p, err, again = fork()
 
         if not p then
