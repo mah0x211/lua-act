@@ -24,6 +24,7 @@
 -- Created by Masatoshi Teruya on 16/12/26.
 --
 --- file scope variables
+local pairs = pairs
 local yield = coroutine.yield
 local setmetatable = setmetatable
 local new_coro = require('act.coro').new
@@ -43,6 +44,7 @@ local OP_RUNQ = aux.OP_RUNQ
 --- @field cid integer
 --- @field co reco
 --- @field children deque
+--- @field yieldq deque
 --- @field op? integer
 --- @field parent? act.callee
 --- @field is_await? boolean
@@ -74,6 +76,21 @@ local YIELDED = setmetatable({}, {
     __mode = 'v',
 })
 
+--- consume_yieldq
+--- @return table stat
+function Callee:consume_yieldq()
+    local stat = self.yieldq:shift()
+
+    if stat then
+        -- resume yielded child
+        local callee = assert(YIELDED[stat.cid], 'invalid implements')
+        YIELDED[stat.cid] = nil
+        self.ctx:removeq(callee)
+        self.ctx:pushq(callee)
+        return stat
+    end
+end
+
 --- yield
 --- @param msec? integer
 --- @param ... any
@@ -98,7 +115,7 @@ function Callee:yield(msec, ...)
         self.ctx:pushq(self, msec)
     end
 
-    local elm = parent.child_stats:push({
+    local elm = parent.yieldq:push({
         cid = self.cid,
         status = 'yield',
         result = {
@@ -137,6 +154,11 @@ function Callee:await(msec)
             return
         end
 
+        stat = self:consume_yieldq()
+        if stat then
+            return stat
+        end
+
         if msec ~= nil then
             self.ctx:pushq(self, msec)
         end
@@ -152,15 +174,12 @@ function Callee:await(msec)
             return nil, true
         end
 
-        stat = assert(self.child_stats:shift(), 'invalid implements')
-    end
-
-    -- resume yielded child callee
-    if stat.status == 'yield' then
-        local callee = assert(YIELDED[stat.cid], 'invalid implements')
-        YIELDED[stat.cid] = nil
-        self.ctx:removeq(callee)
-        self.ctx:pushq(callee)
+        -- consume child stats
+        stat = self.child_stats:shift()
+        if not stat then
+            -- consume yieldq
+            stat = assert(self:consume_yieldq(), 'invalid implements')
+        end
     end
 
     return stat
@@ -531,8 +550,9 @@ function Callee:dispose(status)
         end
     end
 
-    -- dispose child_stats
+    -- dispose child_stats and yieldq
     self.child_stats = nil
+    self.yieldq = nil
 
     -- dispose child coroutines
     for _ = 1, #self.children do
@@ -657,6 +677,7 @@ function Callee:renew(ctx, is_atexit, fn, ...)
     self.co:reset(fn)
     self.args:set(...)
     self.child_stats = new_deque()
+    self.yieldq = new_deque()
     -- attach to the current callee
     attach(self)
 end
@@ -676,6 +697,7 @@ function Callee:init(ctx, is_atexit, fn, ...)
     self.argv = new_stack()
     self.children = new_deque()
     self.child_stats = new_deque()
+    self.yieldq = new_deque()
     -- attach to the current callee
     attach(self)
     return self
