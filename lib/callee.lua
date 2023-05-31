@@ -45,6 +45,8 @@ local OP_RUNQ = aux.OP_RUNQ
 --- @field co reco
 --- @field children deque
 --- @field yieldq deque
+--- @field awaitq deque
+--- @field awaitq_max integer
 --- @field op? integer
 --- @field parent? act.callee
 --- @field is_await? boolean
@@ -141,12 +143,42 @@ function Callee:yield(msec, ...)
     return true
 end
 
+local HUGE = math.huge
+
+--- awaitq_size get or set the maximum await queueing size.
+--- @param qsize? integer 0 not queueing, >0 queueing size, <0 unlimited
+--- @return integer qlen
+function Callee:awaitq_size(qsize)
+    if qsize ~= nil then
+        local qlen = #self.awaitq
+
+        if qsize == 0 then
+            -- remove all child stats
+            if qlen > 0 then
+                self.awaitq = new_deque()
+            end
+        elseif qsize < 0 then
+            -- unlimited
+            qsize = HUGE
+        elseif qlen > qsize then
+            -- remove exceeded child stats
+            for _ = 1, qlen - qsize do
+                self.awaitq:shift()
+            end
+        end
+        self.awaitq_max = qsize
+    end
+
+    return self.awaitq_max == HUGE and -1 or self.awaitq_max
+end
+
 --- await until the child thread to exit while the specified number of seconds.
 --- @param msec? integer
 --- @return table? res
 --- @return boolean? timeout
 function Callee:await(msec)
-    local stat = self.child_stats:shift()
+    -- consume awaitq
+    local stat = self.awaitq:shift()
 
     if not stat then
         if #self.children == 0 then
@@ -174,8 +206,8 @@ function Callee:await(msec)
             return nil, true
         end
 
-        -- consume child stats
-        stat = self.child_stats:shift()
+        -- consume awaitq
+        stat = self.awaitq:shift()
         if not stat then
             -- consume yieldq
             stat = assert(self:consume_yieldq(), 'invalid implements')
@@ -550,8 +582,8 @@ function Callee:dispose(status)
         end
     end
 
-    -- dispose child_stats and yieldq
-    self.child_stats = nil
+    -- dispose awaitq and yieldq
+    self.awaitq = nil
     self.yieldq = nil
 
     -- dispose child coroutines
@@ -587,20 +619,20 @@ function Callee:dispose(status)
             stat.error = self.co:results()
         end
 
-        if not parent.is_atexit then
-            parent.child_stats:push(stat)
-            if parent.is_await then
-                -- resume await callee via runq
-                parent.is_await = nil
-                parent.ctx:removeq(parent)
-                parent.ctx:pushq(parent)
-            end
-        else
+        if parent.is_atexit then
             -- call atexit callee via runq
             parent.is_atexit = nil
             parent.args:insert(1, stat)
             parent.ctx:removeq(parent)
             parent.ctx:pushq(parent)
+        elseif parent.is_await then
+            parent.awaitq:push(stat)
+            -- resume await callee via runq
+            parent.is_await = nil
+            parent.ctx:removeq(parent)
+            parent.ctx:pushq(parent)
+        elseif parent.awaitq_max > #parent.awaitq then
+            parent.awaitq:push(stat)
         end
     elseif status ~= OK then
         error(concat({
@@ -676,7 +708,8 @@ function Callee:renew(ctx, is_atexit, fn, ...)
     self.is_atexit = is_atexit
     self.co:reset(fn)
     self.args:set(...)
-    self.child_stats = new_deque()
+    self.awaitq = new_deque()
+    self.awaitq_max = 0
     self.yieldq = new_deque()
     -- attach to the current callee
     attach(self)
@@ -696,7 +729,8 @@ function Callee:init(ctx, is_atexit, fn, ...)
     self.args = new_stack(...)
     self.argv = new_stack()
     self.children = new_deque()
-    self.child_stats = new_deque()
+    self.awaitq = new_deque()
+    self.awaitq_max = 0
     self.yieldq = new_deque()
     -- attach to the current callee
     attach(self)

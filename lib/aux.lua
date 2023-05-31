@@ -29,7 +29,8 @@ local floor = math.floor
 local tblconcat = table.concat
 local tostring = tostring
 --- constants
-local INFINITE = math.huge
+local INF_POS = math.huge
+local INF_NEG = -INF_POS
 local OP_EVENT = 0
 local OP_RUNQ = 1
 
@@ -40,11 +41,18 @@ local function is_str(v)
     return type(v) == 'string'
 end
 
+--- is_int
+--- @param v any
+--- @return boolean ok
+local function is_int(v)
+    return type(v) == 'number' and v > INF_NEG and v < INF_POS and v == floor(v)
+end
+
 --- is_uint
 --- @param v any
 --- @return boolean ok
 local function is_uint(v)
-    return type(v) == 'number' and v >= 0 and v < INFINITE and v == floor(v)
+    return type(v) == 'number' and v >= 0 and v < INF_POS and v == floor(v)
 end
 
 --- is_func
@@ -76,6 +84,7 @@ return {
     OP_EVENT = OP_EVENT,
     OP_RUNQ = OP_RUNQ,
     is_str = is_str,
+    is_int = is_int,
     is_uint = is_uint,
     is_func = is_func,
     concat = concat,

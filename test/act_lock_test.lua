@@ -107,6 +107,7 @@ function testcase.lock()
                 return 'lock ok 10'
             end))
 
+            act.awaitq_size(-1)
             local res = assert(act.await())
             assert.equal(res.result, {
                 'lock ok 30',

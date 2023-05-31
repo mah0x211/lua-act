@@ -37,6 +37,7 @@ function testcase.timeout()
             return 'timeout'
         end)
 
+        act.awaitq_size(-1)
         act.sleep(10)
         local res = assert(act.await())
         assert.equal(res, {
