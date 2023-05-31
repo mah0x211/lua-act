@@ -29,6 +29,7 @@ require('nosigpipe')
 local pcall = pcall
 local fork = require('act.fork')
 local aux = require('act.aux')
+local is_int = aux.is_int
 local is_uint = aux.is_uint
 local is_func = aux.is_func
 local Callee = require('act.callee')
@@ -138,6 +139,21 @@ local function yield(msec, ...)
         return callee:yield(msec, ...)
     end
     error('cannot call yield() from outside of execution context', 2)
+end
+
+--- awaitq_size
+--- @param qsize? integer
+--- @return integer qlen
+local function awaitq_size(qsize)
+    local callee = callee_acquire()
+    if callee then
+        if qsize ~= nil and not is_int(qsize) then
+            error('qsize must be integer', 2)
+        end
+        return callee:awaitq_size(qsize)
+    end
+
+    error('cannot call awaitq_size() at outside of execution context', 2)
 end
 
 --- await
@@ -491,6 +507,7 @@ return {
     resume = resume,
     suspend = suspend,
     await = await,
+    awaitq_size = awaitq_size,
     atexit = atexit,
     yield = yield,
     later = later,
