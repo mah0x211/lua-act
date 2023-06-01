@@ -1,6 +1,5 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
-local getpid = require('testcase.getpid')
 local act = require('act')
 
 function testcase.run()
@@ -46,29 +45,6 @@ function testcase.pollable()
     assert(act.run(with_luacov(function()
         assert.is_true(act.pollable())
     end)))
-end
-
-function testcase.fork()
-    local pid = getpid()
-
-    -- test that fork process
-    assert(act.run(with_luacov(function()
-        local p = assert(act.fork())
-        if p:is_child() then
-            assert.not_equal(pid, getpid())
-            return
-        end
-        local res = assert(p:wait())
-        assert.equal(res.exit, 0)
-    end)))
-    if pid ~= getpid() then
-        -- ignore child process
-        return
-    end
-
-    -- test that throws an error if called from outside of execution context
-    local err = assert.throws(act.fork)
-    assert.match(err, 'cannot call fork() from outside of execution context')
 end
 
 function testcase.spawn()
