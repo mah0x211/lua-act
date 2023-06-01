@@ -17,10 +17,9 @@ dependencies = {
     "fork >= 0.2",
     "metamodule >= 0.4",
     "minheap >= 0.2",
-    "nosigpipe >= 0.1",
     "reco >= 1.5",
-    "epoll >= 0.2.0",
-    "kqueue >= 0.3.0",
+    "epoll >= 0.2.1",
+    "kqueue >= 0.3.1",
 }
 build = {
     type = "builtin",
@@ -33,25 +32,14 @@ build = {
         ['act.deque'] = "lib/deque.lua",
         ['act.event'] = "lib/event.lua",
         ['act.fork'] = "lib/fork.lua",
-        ['act.getcpus'] = {
-            sources = {
-                "src/getcpus.c",
-            },
-        },
-        ['act.hrtimer'] = {
-            sources = {
-                "src/hrtimer.c",
-            },
-        },
+        ['act.getcpus'] = "src/getcpus.c",
+        ['act.hrtimer'] = "src/hrtimer.c",
+        ['act.ignsigpipe'] = "src/ignsigpipe.c",
         ['act.lockq'] = "lib/lockq.lua",
         ['act.minheap'] = "lib/minheap.lua",
         ['act.poller'] = "lib/poller.lua",
         ['act.pool'] = "lib/pool.lua",
         ['act.runq'] = "lib/runq.lua",
-        ['act.stack'] = {
-            sources = {
-                "src/stack.c",
-            },
-        },
+        ['act.stack'] = "src/stack.c",
     },
 }

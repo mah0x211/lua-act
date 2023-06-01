@@ -24,7 +24,7 @@
 -- Created by Masatoshi Teruya on 16/12/25.
 --
 --- ignore SIGPIPE
-require('nosigpipe')
+require('act.ignsigpipe')
 --- file scope variables
 local pcall = pcall
 local fork = require('act.fork')
