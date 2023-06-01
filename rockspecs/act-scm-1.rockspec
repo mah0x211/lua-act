@@ -20,6 +20,7 @@ dependencies = {
     "reco >= 1.5",
     "epoll >= 0.2.1",
     "kqueue >= 0.3.1",
+    "waitpid >= 0.1.0",
 }
 build = {
     type = "builtin",

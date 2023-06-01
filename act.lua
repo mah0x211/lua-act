@@ -27,6 +27,8 @@
 require('act.ignsigpipe')
 --- file scope variables
 local pcall = pcall
+local waitpid = require('waitpid')
+local getmsec = require('act.hrtimer').getmsec
 local fork = require('act.fork')
 local aux = require('act.aux')
 local is_int = aux.is_int
@@ -47,7 +49,7 @@ local ACT_CTX
 --- spawn_child
 --- @param is_atexit boolean
 --- @param fn function
---- @vararg any
+--- @param ... any
 --- @return any cid
 --- @return string? err
 local function spawn_child(is_atexit, fn, ...)
@@ -90,9 +92,73 @@ local function pfork()
     error('cannot call fork() from outside of execution context', 2)
 end
 
+--- @class waitpid.result
+--- @field pid integer process id
+--- @field exit integer exit code
+--- @field sigcont boolean true if the process was resumed by SIGCONT
+--- @field sigterm integer signal number that caused the process to terminate
+--- @field sigstop integer signal number that caused the process to stop
+
+--- pwaitpid
+--- @param msec? integer timeout in msec
+--- @param wpid? integer process id to wait
+--- @param ... string options
+--- | 'nohang' : set WNOHANG option (default)
+--- | 'untraced' : set WUNTRACED option
+--- | 'continued' : set WCONTINUED option
+--- @return waitpid.result? res
+--- @return any err
+--- @return boolean? timeout
+local function pwaitpid(msec, wpid, ...)
+    local callee = callee_acquire()
+    if callee then
+        local interval = 100
+        local deadline
+
+        if msec ~= nil then
+            if not is_uint(msec) then
+                error('msec must be unsigned integer', 2)
+            end
+            deadline = getmsec() + msec
+            if interval > msec then
+                interval = msec
+            end
+        end
+
+        if wpid ~= nil and not is_int(wpid) then
+            error('wpid must be integer', 2)
+        end
+
+        while true do
+            local res, err, again = waitpid(wpid, 'nohang', ...)
+            if res then
+                return res
+            elseif not again then
+                return nil, err
+            end
+
+            if deadline then
+                local remain = deadline - getmsec()
+                if remain <= 0 then
+                    -- timeout
+                    return nil, nil, true
+                elseif remain < interval then
+                    -- update interval
+                    interval = remain
+                end
+            end
+
+            -- sleep
+            callee:sleep(interval)
+        end
+    end
+
+    error('cannot call waitpid() from outside of execution context', 2)
+end
+
 --- spawn
 --- @param fn function
---- @vararg ...
+--- @param ... any
 --- @return any cid
 --- @return string? err
 local function spawn(fn, ...)
@@ -107,7 +173,7 @@ local function spawn(fn, ...)
 end
 
 --- exit
---- @vararg ...
+--- @param ... any
 local function exit(...)
     local callee = callee_acquire()
     if callee then
@@ -190,7 +256,7 @@ end
 
 --- resume
 --- @param cid any
---- @vararg ...
+--- @param ... any
 --- @return boolean ok
 local function resume(cid, ...)
     if callee_acquire() then
@@ -217,8 +283,8 @@ local function sleep(msec)
 end
 
 --- sigwait
---- @param msec integer
---- @vararg any
+--- @param msec? integer
+--- @param ... any
 --- @return integer signo
 --- @return string? err
 --- @return boolean? timeout
@@ -401,7 +467,7 @@ end
 
 --- atexit
 --- @param exitfn function
---- @vararg any
+--- @param ... any
 --- @return boolean ok
 --- @return string? err
 local function atexit(exitfn, ...)
@@ -419,7 +485,7 @@ end
 
 --- runloop
 --- @param mainfn function
---- @vararg any
+--- @param ... any
 --- @return boolean ok
 --- @return any err
 local function runloop(mainfn, ...)
@@ -469,7 +535,7 @@ end
 
 --- run
 --- @param mainfn function
---- @vararg any
+--- @param ... any
 --- @return boolean ok
 --- @return any err
 local function run(mainfn, ...)
@@ -514,5 +580,6 @@ return {
     exit = exit,
     spawn = spawn,
     fork = pfork,
+    waitpid = pwaitpid,
     pollable = pollable,
 }

@@ -58,7 +58,7 @@ local OP_RUNQ = aux.OP_RUNQ
 local Callee = {}
 
 --- exit
---- @vararg any
+--- @param ... any
 function Callee:exit(...)
     self.is_exit = true
     yield(...)
@@ -253,7 +253,7 @@ end
 
 --- sigwait
 --- @param msec integer
---- @vararg integer signo
+--- @param ... integer signal numbers
 --- @return integer? signo
 --- @return any err
 --- @return boolean? timeout
@@ -457,7 +457,7 @@ local SUSPENDED = setmetatable({}, {
 
 --- resume
 --- @param cid string
---- @vararg any
+--- @param ... any
 --- @return boolean ok
 local function resume(cid, ...)
     local callee = SUSPENDED[cid]
@@ -701,7 +701,7 @@ end
 --- @param ctx act.context
 --- @param is_atexit boolean
 --- @param fn function
---- @vararg any
+--- @param ... any
 function Callee:renew(ctx, is_atexit, fn, ...)
     self.ctx = ctx
     self.cid = getnsec()

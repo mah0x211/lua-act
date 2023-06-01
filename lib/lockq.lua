@@ -38,7 +38,6 @@ end
 
 --- init
 --- @param runq act.runq
---- @vararg any
 --- @return act.lockq
 function LockQ:init(runq)
     if find(tostring(runq), 'act.runq') ~= 1 then
