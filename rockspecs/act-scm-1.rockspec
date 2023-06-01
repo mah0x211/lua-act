@@ -19,8 +19,8 @@ dependencies = {
     "minheap >= 0.2",
     "nosigpipe >= 0.1",
     "reco >= 1.5",
-    "epoll >= 0.2.0",
-    "kqueue >= 0.3.0",
+    "epoll >= 0.2.1",
+    "kqueue >= 0.3.1",
 }
 build = {
     type = "builtin",
