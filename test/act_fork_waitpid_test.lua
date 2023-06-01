@@ -109,8 +109,8 @@ function testcase.waitpid()
         assert.is_nil(res)
         assert.is_nil(err)
         assert.is_true(timeout)
-        assert.greater(elapsed, 50)
-        assert.less(elapsed, 100)
+        assert.greater(elapsed, 45)
+        assert.less(elapsed, 55)
 
         -- cleanup
         while act.waitpid() do
