@@ -24,119 +24,159 @@
 --
 -- Created by Masatoshi Teruya on 18/04/11.
 --
-local Act = require('act')
-require('net.poll').set_poller(Act)
--- you need to install the net and signal modules as follows;
---  $ luarocks install net signal
-local inet = require('net.stream.inet')
+-- you need to install the following modules:
+--  dump
+--  signal
+--  act
+--  net
+--
+local dump = require('dump')
 local signal = require('signal')
+local new_server = require('net.stream.inet').server.new
 
-local function handler(client)
-    Act.atexit(function(...)
-        client:close()
-    end)
+-- NOTE: The net module performs asynchronous processing implicitly using the
+-- gpoll module.
+-- Therefore, by registering a group of functions of the act module in the
+-- gpoll module, concurrent processing is automatically performed without
+-- changing the synchronous code.
+local act = require('act')
+require('gpoll').set_poller(act)
+local getcpus = require('act.getcpus')
 
-    while true do
-        local msg, err = client:recv()
-
-        if not msg then
-            return
-        end
-
+local function handle_client(client)
+    local msg, err, timeout = client:recv()
+    while msg do
+        local _
         _, err = client:send(msg)
         if err then
-            print('error:', err)
+            break
+        end
+        msg, err, timeout = client:recv()
+    end
+
+    if err then
+        print('error:', err)
+    elseif timeout then
+        print('timeout')
+    end
+    client:close()
+end
+
+local function handle_server(server)
+    while true do
+        local client, err = server:accept()
+        if client then
+            act.spawn(handle_client, client)
+        elseif err then
+            print('failed to accept', err)
+            break
+        end
+    end
+end
+
+local function handle_signal()
+    local signo = act.sigwait(nil, signal.SIGUSR1)
+    return 'got signal:' .. tostring(signo)
+end
+
+local function handle_worker(pid, server)
+    print('start worker', pid)
+    assert(server:listen())
+    local cid = act.spawn(handle_server, server)
+    act.spawn(handle_signal)
+    -- await end of signal handler or server handler
+    local stat = act.await()
+    if stat.cid == cid then
+        print('handle_server failed:', dump(stat))
+    end
+    server:close()
+end
+
+local function kill_workers(workers)
+    print('send SIGUSR1 to all worker-processes')
+    for _, proc in pairs(workers) do
+        local res, err = proc:kill(signal.SIGUSR1, 'nohang')
+        if res then
+            print('worker-process exit', res.pid)
+            workers[res.pid] = nil
+        elseif err then
+            print('failed to proc:kill():', err)
+        end
+    end
+end
+
+local function wait_worker_exit(workers)
+    if next(workers) then
+        print('wait all worker-processes exit')
+        repeat
+            local res, err = act.waitpid(200)
+            if res then
+                print('worker-process exit', res.pid)
+                workers[res.pid] = nil
+            elseif err then
+                print('got error:', err, dump(workers))
+                break
+            else
+                kill_workers(workers)
+            end
+        until not next(workers)
+        print('done')
+    end
+end
+
+local function main()
+    local server = assert(new_server('127.0.0.1', 5000))
+    local workers = {}
+    signal.blockAll()
+
+    -- register exit handler
+    act.atexit(function()
+        server:close()
+        wait_worker_exit(workers)
+        print('end server')
+    end)
+
+    print('start server: ', '127.0.0.1', 5000)
+    -- create worker-processes
+    for _ = 1, getcpus() do
+        local proc, err = act.fork()
+        if not proc then
+            print('failed to act.fork():', err)
             return
         end
-    end
-end
 
-local function waitWorkerExit(nworker)
-    -- wait 10 msec
-    Act.sleep(10)
-
-    local status = Act.waitpid(-1)
-
-    while status do
-        if status then
-            if status.pid == -1 then
-                break
-            end
-            print('worker-process exit', status.pid)
-            nworker = nworker - 1
-        end
-
-        status = Act.waitpid(-1)
-    end
-
-    return nworker
-end
-
-local function handleSignal(nworker)
-    while nworker > 0 do
-        local signo = Act.sigwait(nil, signal.SIGINT, signal.SIGCHLD)
-
-        -- stop workers
-        if signo == signal.SIGINT then
-            -- send SIGUSR1 signal
-            signal.killpg(signal.SIGUSR1)
-            nworker = waitWorkerExit(nworker)
-            -- send SIGKILL if worker still exists
-            if nworker > 0 then
-                signal.killpg(signal.SIGKILL)
-                nworker = waitWorkerExit(nworker)
-            end
-            break
-            -- worker exited
-        elseif signo == signal.SIGCHLD then
-            nworker = waitWorkerExit(nworker)
-        end
-    end
-end
-
-local ok, err = Act.run(function()
-    local server = assert(inet.server.new('127.0.0.1', 5000))
-    local nworker = 0
-
-    assert(server:listen())
-    signal.blockAll()
-    print('start server: ', '127.0.0.1', 5000)
-    -- handle by 5 worker process
-    for i = 1, 5 do
-        local pid, err = Act.fork()
-
-        if err then
-            print(err)
-            -- worker process
-        elseif pid == 0 then
-            print('worker start')
-            Act.spawn(function()
-                while true do
-                    local client, err = server:accept()
-
-                    if client then
-                        Act.spawn(handler, client)
-                    elseif err then
-                        print('failed to accept', err)
-                        break
-                    end
-                end
-            end)
-
-            -- worker wait a SIGUSR1
-            Act.sigwait(nil, signal.SIGUSR1)
-            print('worker end')
+        -- handle worker-process
+        if proc:is_child() then
+            handle_worker(proc:pid(), server)
             os.exit()
         end
 
-        nworker = nworker + 1
+        workers[proc:pid()] = proc
     end
 
-    handleSignal(nworker)
-    server:close()
-    print('end server')
-end)
+    -- handle signal
+    while next(workers) do
+        -- wait SIGINT and SIGCHLD signals
+        local signo = act.sigwait(nil, signal.SIGINT, signal.SIGCHLD)
 
+        -- stop server by Ctrl-C
+        if signo == signal.SIGINT then
+            break
+        end
+
+        -- wait worker-process exit
+        local res, err = act.waitpid(100)
+        if res then
+            print('worker-process exit', res.pid)
+            workers[res.pid] = nil
+        elseif err then
+            print('got error:', err)
+            return
+        end
+    end
+end
+
+local ok, err = act.run(main)
 if not ok then
     print(err)
 end

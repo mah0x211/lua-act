@@ -24,58 +24,60 @@
 --
 -- Created by Masatoshi Teruya on 16/12/24.
 --
-local Act = require('act')
-require('net.poll').set_poller(Act)
--- you need to install the net module as follows;
---  $ luarocks install net
-local InetServer = require('net.stream.inet').server
+-- you need to install the following modules:
+--  act
+--  net
+--
+local new_server = require('net.stream.inet').server.new
 
-local function handler(client)
-    -- print("run hadler: ", client)
-    Act.atexit(function(...)
-        -- print("atexit: ", client)
-        client:close()
-        -- print('handler closed')
-    end)
-    while true do
-        -- print('recv')
-        local msg, err, timeout = client:recv()
+-- NOTE: The net module performs asynchronous processing implicitly using the
+-- gpoll module.
+-- Therefore, by registering a group of functions of the act module in the
+-- gpoll module, concurrent processing is automatically performed without
+-- changing the synchronous code.
+local act = require('act')
+require('gpoll').set_poller(act)
 
-        if not msg then
-            -- print('close by peer')
-            return
-        end
-
-        -- print('send')
+local function handle_client(client)
+    local msg, err, timeout = client:recv()
+    while msg do
+        local _
         _, err = client:send(msg)
         if err then
-            print('error:', err)
-            return
+            break
         end
+        msg, err, timeout = client:recv()
     end
+
+    if err then
+        print('error:', err)
+    elseif timeout then
+        print('timeout')
+    end
+    client:close()
 end
 
-local ok, err = Act.run(function()
-    local server = assert(InetServer.new('127.0.0.1', 5000))
-
+local function main()
+    local server = assert(new_server('127.0.0.1', 5000))
     assert(server:listen())
+
     print('start server: ', '127.0.0.1', 5000)
     while true do
         local client, err = server:accept()
-
         if client then
-            -- print('spawn handler')
-            Act.spawn(handler, client)
+            -- create coroutine
+            act.spawn(handle_client, client)
         elseif err then
-            -- print('failed to accept', err)
+            print('failed to accept', err)
             break
         end
     end
+    print('end server')
 
     server:close()
-    print('end server')
-end)
+end
 
+local ok, err = act.run(main)
 if not ok then
     error(err)
 end
