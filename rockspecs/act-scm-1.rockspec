@@ -1,4 +1,3 @@
-rockspec_format = "3.0"
 package = "act"
 version = "scm-1"
 source = {
@@ -13,7 +12,7 @@ description = {
 dependencies = {
     "lua >= 5.1",
     "lauxhlib >= 0.5",
-    "mah0x211/deque >= 0.5",
+    "denque >= 0.5",
     "fork >= 0.2",
     "metamodule >= 0.4",
     "minheap >= 0.2",
