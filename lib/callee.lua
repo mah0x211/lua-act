@@ -43,9 +43,9 @@ local OP_RUNQ = aux.OP_RUNQ
 --- @field ctx act.context
 --- @field cid integer
 --- @field co reco
---- @field children deque
---- @field yieldq deque
---- @field awaitq deque
+--- @field children act.deque
+--- @field yieldq act.deque
+--- @field awaitq act.deque
 --- @field awaitq_max integer
 --- @field op? integer
 --- @field parent? act.callee
@@ -54,7 +54,7 @@ local OP_RUNQ = aux.OP_RUNQ
 --- @field is_atexit? boolean
 --- @field is_exit? boolean
 --- @field fdev? poller.event
---- @field sigset? deque
+--- @field sigset? act.deque
 local Callee = {}
 
 --- exit

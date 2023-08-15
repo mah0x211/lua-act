@@ -33,7 +33,7 @@ local OP_EVENT = require('act.aux').OP_EVENT
 
 --- @class act.event
 --- @field monitor poller
---- @field pool deque
+--- @field pool act.deque
 --- @field used table<poller.event, boolean>
 local Event = {}
 
