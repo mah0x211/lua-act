@@ -53,7 +53,7 @@ local OP_RUNQ = aux.OP_RUNQ
 --- @field is_cancel? boolean
 --- @field is_atexit? boolean
 --- @field is_exit? boolean
---- @field fdev? poller.event
+--- @field ioevents? table<string, integer>
 --- @field sigset? act.deque
 local Callee = {}
 
@@ -322,55 +322,130 @@ function Callee:sigwait(msec, ...)
     return signo
 end
 
---- waitable
+--- evusage.info
+--- @class evusage.info
+--- @field asa string
+--- @field ev poller.event
+--- @field fd integer
+
+--- evusage
+--- @class evusage
+--- @field readable table<integer, string>
+--- @field writable table<integer, string>
+--- @field [string] evusage.info
+local EVUSAGE = {
+    readable = {},
+    writable = {},
+}
+
+--- new_io_event
 --- @param self act.callee
---- @param operators table
 --- @param asa string
 --- @param fd integer
+--- @return string evid
+--- @return any err
+local function new_io_event(self, asa, fd)
+    -- operation already in-progress
+    if EVUSAGE[asa][fd] then
+        return nil, 'operation already in progress'
+    end
+
+    -- register io(readable or writable) event as edge trigger
+    local event = self.ctx.event
+    local ev, err = event[asa](event, self, fd, false, true)
+    if err then
+        return nil, err
+    end
+
+    -- manage events with event-id
+    local evid = tostring(ev)
+    EVUSAGE[asa][fd] = evid
+    EVUSAGE[evid] = {
+        asa = asa,
+        ev = ev,
+        fd = fd,
+    }
+    self.ioevents[evid] = fd
+
+    return evid
+end
+
+--- new_readable_event
+--- @param fd integer
+--- @return string event_id
+--- @return any err
+function Callee:new_readable_event(fd)
+    return new_io_event(self, 'readable', fd)
+end
+
+--- new_writable_event
+--- @param fd integer
+--- @return string event_id
+--- @return any err
+function Callee:new_writable_event(fd)
+    return new_io_event(self, 'writable', fd)
+end
+
+--- dispose_event
+--- @param evid string
+--- @return boolean ok
+--- @return any err
+function Callee:dispose_event(evid)
+    local fd = self.ioevents[evid]
+    if not fd then
+        -- not a self-managed event
+        return false, 'invalid event-id'
+    end
+
+    -- revoke io-event
+    local evinfo = EVUSAGE[evid]
+    self.ctx.event:revoke(evinfo.ev)
+
+    -- clear usage
+    EVUSAGE[evid] = nil
+    EVUSAGE[evinfo.asa][evinfo.fd] = nil
+    self.ioevents[evid] = nil
+
+    return true
+end
+
+--- iowait
+--- @class iowait
+--- @field readable table<integer, act.callee>
+--- @field writable table<integer, act.callee>
+local IOWAIT = {
+    readable = {},
+    writable = {},
+}
+
+--- wait_event
+--- @param evid string
 --- @param msec integer
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-local function waitable(self, operators, asa, fd, msec)
+function Callee:wait_event(evid, msec)
+    local fd = self.ioevents[evid]
+    if not fd then
+        return false, 'invalid event-id'
+    end
+
     -- register to runq with msec
     if msec ~= nil then
         self.ctx:pushq(self, msec)
     end
 
-    -- operation already in progress in another callee
-    if operators[fd] then
-        if msec then
-            self.ctx:removeq(self)
-        end
-        return false, 'operation already in progress'
-    end
-
-    -- register io(readable or writable) event as oneshot event
-    local event = self.ctx.event
-    local ev, err = event[asa](event, self, fd, true)
-    if err then
-        if msec then
-            self.ctx:removeq(self)
-        end
-        return false, err
-    end
-
-    -- retain ev and related info
-    self.is_cancel = nil
-    self.fdev = ev
-    operators[fd] = self
     -- wait until event fired
+    self.is_cancel = nil
+    local evinfo = EVUSAGE[evid]
+    IOWAIT[evinfo.asa][evinfo.fd] = self
     local fdno = yield()
-    operators[fd] = nil
-    self.fdev = nil
-    self.fd = nil
-
-    -- canceled by cancel method
+    IOWAIT[evinfo.asa][evinfo.fd] = nil
+    -- canceled unwait functions
     if self.is_cancel then
         self.is_cancel = nil
         return false
     end
-    event:revoke(ev)
 
     -- timed out
     if self.op == OP_RUNQ then
@@ -378,6 +453,7 @@ local function waitable(self, operators, asa, fd, msec)
         return false, nil, true
     end
 
+    -- event occurred
     if msec then
         self.ctx:removeq(self)
     end
@@ -388,9 +464,28 @@ local function waitable(self, operators, asa, fd, msec)
     return true
 end
 
---- static variables
-local RWAITS = {}
-local WWAITS = {}
+--- waitable
+--- @param self act.callee
+--- @param asa string
+--- @param fd integer
+--- @param msec integer
+--- @return boolean ok
+--- @return any err
+--- @return boolean? timeout
+local function waitable(self, asa, fd, msec)
+    -- failed to create io-event
+    local evid, err = new_io_event(self, asa, fd)
+    if not evid then
+        return false, err
+    end
+
+    local ok, timeout
+    ok, err, timeout = self:wait_event(evid, msec)
+    -- dispose event
+    self:dispose_event(evid)
+
+    return ok, err, timeout
+end
 
 --- wait_readable
 --- @param fd integer
@@ -399,7 +494,7 @@ local WWAITS = {}
 --- @return any err
 --- @return boolean? timeout
 function Callee:wait_readable(fd, msec)
-    return waitable(self, RWAITS, 'readable', fd, msec)
+    return waitable(self, 'readable', fd, msec)
 end
 
 --- wait_writable
@@ -409,24 +504,18 @@ end
 --- @return any err
 --- @return boolean? timeout
 function Callee:wait_writable(fd, msec)
-    return waitable(self, WWAITS, 'writable', fd, msec)
+    return waitable(self, 'writable', fd, msec)
 end
 
 --- unwaitfd
---- @param operators table<integer, act.callee>
+--- @param asa string
 --- @param fd integer
-local function unwaitfd(operators, fd)
-    local callee = operators[fd]
+local function unwaitfd(asa, fd)
+    local callee = IOWAIT[asa][fd]
 
-    -- found
     if callee then
-        operators[fd] = nil
-
-        local ev = callee.fdev
-        callee.fdev = nil
         callee.is_cancel = true
-        callee.ctx.event:revoke(ev)
-        -- requeue without timeout
+        -- re-queue without timeout
         callee.ctx:removeq(callee)
         callee.ctx:pushq(callee)
     end
@@ -435,22 +524,23 @@ end
 --- unwait_readable
 --- @param fd integer
 local function unwait_readable(fd)
-    unwaitfd(RWAITS, fd)
+    unwaitfd('readable', fd)
 end
 
 --- unwait_writable
 --- @param fd integer
 local function unwait_writable(fd)
-    unwaitfd(WWAITS, fd)
+    unwaitfd('writable', fd)
 end
 
 --- unwait
 --- @param fd integer
 local function unwait(fd)
-    unwaitfd(RWAITS, fd)
-    unwaitfd(WWAITS, fd)
+    unwaitfd('readable', fd)
+    unwaitfd('writable', fd)
 end
 
+--- @type table<any, act.callee>
 local SUSPENDED = setmetatable({}, {
     __mode = 'v',
 })
@@ -560,18 +650,15 @@ function Callee:dispose(status)
 
     -- revoke all events currently in use
     local event = self.ctx.event
-    -- revoke io event
-    local ev = self.fdev
-    if ev then
-        self.fdev = nil
-        local fd = ev:ident()
-        if RWAITS[fd] == self then
-            RWAITS[fd] = nil
-        elseif WWAITS[fd] == self then
-            WWAITS[fd] = nil
-        end
-        event:revoke(ev)
+    -- revoke self-managed io events
+    for evid, fd in pairs(self.ioevents) do
+        local evinfo = EVUSAGE[evid]
+        EVUSAGE[evid] = nil
+        EVUSAGE[evinfo.asa][fd] = nil
+        IOWAIT[evinfo.asa][fd] = nil
+        event:revoke(evinfo.ev)
     end
+    self.ioevents = nil
 
     -- revoke signal events
     local sigset = self.sigset
@@ -711,6 +798,7 @@ function Callee:renew(ctx, is_atexit, fn, ...)
     self.awaitq = new_deque()
     self.awaitq_max = 0
     self.yieldq = new_deque()
+    self.ioevents = {}
     -- attach to the current callee
     attach(self)
 end
@@ -732,6 +820,7 @@ function Callee:init(ctx, is_atexit, fn, ...)
     self.awaitq = new_deque()
     self.awaitq_max = 0
     self.yieldq = new_deque()
+    self.ioevents = {}
     -- attach to the current callee
     attach(self)
     return self
