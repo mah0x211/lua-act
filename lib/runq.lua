@@ -46,7 +46,7 @@ end
 
 --- @class act.runq
 --- @field heap minheap
---- @field ref table<act.callee, deque.element>|table<integer, deque>|table<deque, minheap.element>
+--- @field ref table<act.callee, act.deque.element>|table<integer, act.deque>|table<act.deque, minheap.element>
 local RunQ = {}
 
 function RunQ:__newindex()
@@ -78,7 +78,7 @@ function RunQ:push(callee, msec)
     local qelm
     if not queue then
         -- create new queue associated for msec
-        queue = new_deque() --- @type deque
+        queue = new_deque() --- @type act.deque
         -- push callee to queue
         qelm = queue:unshift(callee)
         -- push queue to minheap

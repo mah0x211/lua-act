@@ -19,18 +19,18 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 -- THE SOFTWARE.
 --
---- @class denque
+--- @class act.deque
 --- @field __len fun(self):integer
---- @field unshift fun(self, data:any):(elm:denque.element)
+--- @field unshift fun(self, data:any):(elm:act.deque.element)
 --- @field shift fun(self):(data:any)
---- @field push fun(self, data:any):(elm:denque.element)
+--- @field push fun(self, data:any):(elm:act.deque.element)
 --- @field pop fun(self):(data:any)
---- @field head fun(self):(elm:denque.element?)
---- @field tail fun(self):(elm:denque.element?)
---- @field remove fun(self, elm:denque.element):(data:any)
---- @class denque.element
+--- @field head fun(self):(elm:act.deque.element?)
+--- @field tail fun(self):(elm:act.deque.element?)
+--- @field remove fun(self, elm:act.deque.element):(data:any)
+--- @class act.deque.element
 --- @field data fun(self, newdata?:any):(data:any)
---- @field prev fun(self):(elm:denque.element?)
---- @field next fun(self):(elm:denque.element?)
+--- @field prev fun(self):(elm:act.deque.element?)
+--- @field next fun(self):(elm:act.deque.element?)
 --- @field remove fun(self):(data:any)
 return require('denque').new

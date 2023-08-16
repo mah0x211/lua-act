@@ -20,6 +20,7 @@
 -- THE SOFTWARE.
 --
 --- @class minheap
+--- @field len integer
 --- @field isEmpty fun(self):boolean
 --- @field peek fun(self):(node:minheap.element?)
 --- @field push fun(self, pri:number, val:any):(node:minheap.element)
