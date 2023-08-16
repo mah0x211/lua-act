@@ -27,6 +27,7 @@
 require('act.ignsigpipe')
 --- file scope variables
 local pcall = pcall
+local type = type
 local waitpid = require('waitpid')
 local getmsec = require('act.hrtimer').getmsec
 local fork = require('act.fork')
@@ -454,6 +455,76 @@ local function wait_writable(fd, msec)
     error('cannot call wait_writable() from outside of execution context', 2)
 end
 
+--- dispose_event
+--- @param evid string
+--- @return boolean ok
+--- @return any err
+local function dispose_event(evid)
+    local callee = callee_acquire()
+    if callee then
+        if type(evid) ~= 'string' then
+            error('evid must be string', 2)
+        end
+        return callee:dispose_event(evid)
+    end
+
+    error('cannot call dispose_event() from outside of execution context', 2)
+end
+
+--- wait_event
+--- @param evid string
+--- @param msec? integer
+--- @return boolean ok
+--- @return any err
+--- @return boolean? timeout
+local function wait_event(evid, msec)
+    local callee = callee_acquire()
+    if callee then
+        if type(evid) ~= 'string' then
+            error('evid must be string', 2)
+        elseif msec ~= nil and not is_uint(msec) then
+            error('msec must be unsigned integer', 2)
+        end
+        return callee:wait_event(evid, msec)
+    end
+
+    error('cannot call wait_event() from outside of execution context', 2)
+end
+
+--- new_writable_event
+--- @param fd integer
+--- @return string evid
+--- @return any err
+local function new_writable_event(fd)
+    local callee = callee_acquire()
+    if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        end
+        return callee:new_writable_event(fd)
+    end
+
+    error('cannot call new_writable_event() from outside of execution context',
+          2)
+end
+
+--- new_readable_event
+--- @param fd integer
+--- @return string evid
+--- @return any err
+local function new_readable_event(fd)
+    local callee = callee_acquire()
+    if callee then
+        if not is_uint(fd) then
+            error('fd must be unsigned integer', 2)
+        end
+        return callee:new_readable_event(fd)
+    end
+
+    error('cannot call new_readable_event() from outside of execution context',
+          2)
+end
+
 --- getcid
 --- @return any cid
 local function getcid()
@@ -559,6 +630,10 @@ end
 return {
     run = run,
     getcid = getcid,
+    new_readable_event = new_readable_event,
+    new_writable_event = new_writable_event,
+    wait_event = wait_event,
+    dispose_event = dispose_event,
     wait_writable = wait_writable,
     wait_readable = wait_readable,
     unwait = unwait,
