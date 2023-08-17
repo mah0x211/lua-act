@@ -26,6 +26,7 @@ build = {
     modules = {
         act = "act.lua",
         ["act.aux"] = "lib/aux.lua",
+        ["act.bitset"] = "src/bitset.c",
         ["act.callee"] = "lib/callee.lua",
         ["act.context"] = "lib/context.lua",
         ["act.coro"] = "lib/coro.lua",
