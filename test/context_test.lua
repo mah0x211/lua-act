@@ -43,3 +43,26 @@ function testcase.pushq()
     })
 end
 
+function testcase.cidset()
+    local ctx = assert(new_context())
+
+    -- test that allocate cid from cidset
+    local list = {
+        assert(ctx:cid_alloc()),
+    }
+    for i = 2, 4500 do
+        list[i] = assert(ctx:cid_alloc())
+        assert.equal(list[i], list[i - 1] + 1)
+    end
+
+    -- test that free cid to cidset
+    for i = 2, 100, 2 do
+        assert(ctx:cid_free(list[i]))
+    end
+
+    -- test that return unused cid
+    for i = 2, 100, 2 do
+        list[i] = assert(ctx:cid_alloc())
+        assert.equal(list[i], list[i - 1] + 1)
+    end
+end

@@ -30,9 +30,7 @@ local setmetatable = setmetatable
 local new_coro = require('act.coro').new
 local new_stack = require('act.stack')
 local new_deque = require('act.deque')
-local hrtimer = require('act.hrtimer')
-local getnsec = hrtimer.getnsec
-local getmsec = hrtimer.getmsec
+local getmsec = require('act.hrtimer').getmsec
 local aux = require('act.aux')
 local concat = aux.concat
 -- constants
@@ -79,7 +77,7 @@ local YIELDED = setmetatable({}, {
 })
 
 --- consume_yieldq
---- @return table stat
+--- @return table? stat
 function Callee:consume_yieldq()
     local stat = self.yieldq:shift()
 
@@ -638,6 +636,9 @@ local STATUS_TEXT = {
 function Callee:dispose(status)
     local status_text = assert(STATUS_TEXT[status], 'unknown status code')
 
+    local cid = self.cid
+    -- remove cid
+    self.ctx:cid_free(cid)
     -- remove from runq
     self.ctx:removeq(self)
     -- release locks
@@ -645,8 +646,8 @@ function Callee:dispose(status)
 
     -- remove state properties
     self.is_exit = nil
-    YIELDED[self.cid] = nil
-    SUSPENDED[self.cid] = nil
+    YIELDED[cid] = nil
+    SUSPENDED[cid] = nil
 
     -- revoke all events currently in use
     local event = self.ctx.event
@@ -695,7 +696,7 @@ function Callee:dispose(status)
         ref:remove()
 
         local stat = {
-            cid = self.cid,
+            cid = cid,
             status = status_text,
         }
         if status == OK then
@@ -791,7 +792,7 @@ end
 --- @param ... any
 function Callee:renew(ctx, is_atexit, fn, ...)
     self.ctx = ctx
-    self.cid = getnsec()
+    self.cid = ctx:cid_alloc()
     self.is_atexit = is_atexit
     self.co:reset(fn)
     self.args:set(...)
@@ -811,7 +812,7 @@ end
 --- @return act.callee callee
 function Callee:init(ctx, is_atexit, fn, ...)
     self.ctx = ctx
-    self.cid = getnsec()
+    self.cid = ctx:cid_alloc()
     self.is_atexit = is_atexit
     self.co = new_coro(fn)
     self.args = new_stack(...)
