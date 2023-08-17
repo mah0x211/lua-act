@@ -26,11 +26,22 @@ local new_runq = require('act.runq').new
 local new_lockq = require('act.lockq').new
 local new_pool = require('act.pool').new
 
+--- @class act.bitset
+--- @field get fun(self:act.bitset, pos:integer):(ok:boolean?, err:any)
+--- @field set fun(self:act.bitset, pos:integer):(ok:boolean?, err:any)
+--- @field unset fun(self:act.bitset, pos:integer):(ok:boolean?, err:any)
+--- @field ffz fun(self:act.bitset):(pos:integer?, err:any)
+--- @field add fun(self:act.bitset):(pos:integer?, err:any)
+
+--- @type fun():act.bitset
+local new_bitset = require('act.bitset')
+
 --- @class act.context
 --- @field event act.event
 --- @field runq act.runq
 --- @field lockq act.lockq
 --- @field pool act.pool
+--- @field cidset act.bitset
 local Context = {}
 
 function Context:__newindex()
@@ -46,10 +57,17 @@ function Context:init()
         return nil, err
     end
 
+    local cidset
+    cidset, err = new_bitset()
+    if err then
+        return nil, err
+    end
+
     rawset(self, 'event', event)
     rawset(self, 'runq', new_runq())
     rawset(self, 'lockq', new_lockq(self.runq))
     rawset(self, 'pool', new_pool())
+    rawset(self, 'cidset', cidset)
     return self
 end
 
@@ -129,6 +147,21 @@ end
 --- @param callee act.callee
 function Context:pool_set(callee)
     self.pool:push(callee)
+end
+
+--- cid_alloc
+--- @return integer cid
+--- @return any err
+function Context:cid_alloc()
+    return self.cidset:add()
+end
+
+--- cid_free
+--- @param cid integer
+--- @return boolean ok
+--- @return any err
+function Context:cid_free(cid)
+    return self.cidset:unset(cid)
 end
 
 return {
