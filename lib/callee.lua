@@ -326,28 +326,18 @@ end
 --- @field ev poller.event
 --- @field fd integer
 
---- evusage
---- @class evusage
---- @field readable table<integer, string>
---- @field writable table<integer, string>
---- @field [string] evusage.info
-local EVUSAGE = {
-    readable = {},
-    writable = {},
-}
+--- @alias event_id any
+
+--- @alias evusage table<event_id, evusage.info>
+local EVUSAGE = {}
 
 --- new_io_event
 --- @param self act.callee
 --- @param asa string
 --- @param fd integer
---- @return string evid
+--- @return event_id evid
 --- @return any err
 local function new_io_event(self, asa, fd)
-    -- operation already in-progress
-    if EVUSAGE[asa][fd] then
-        return nil, 'operation already in progress'
-    end
-
     -- register io(readable or writable) event as edge trigger
     local event = self.ctx.event
     local ev, err = event[asa](event, self, fd, false, true)
@@ -357,20 +347,18 @@ local function new_io_event(self, asa, fd)
 
     -- manage events with event-id
     local evid = tostring(ev)
-    EVUSAGE[asa][fd] = evid
     EVUSAGE[evid] = {
         asa = asa,
         ev = ev,
         fd = fd,
     }
-    self.ioevents[evid] = fd
 
     return evid
 end
 
 --- new_readable_event
 --- @param fd integer
---- @return string event_id
+--- @return event_id evid
 --- @return any err
 function Callee:new_readable_event(fd)
     return new_io_event(self, 'readable', fd)
@@ -378,32 +366,27 @@ end
 
 --- new_writable_event
 --- @param fd integer
---- @return string event_id
+--- @return event_id evid
 --- @return any err
 function Callee:new_writable_event(fd)
     return new_io_event(self, 'writable', fd)
 end
 
 --- dispose_event
---- @param evid string
+--- @param evid event_id
 --- @return boolean ok
 --- @return any err
 function Callee:dispose_event(evid)
-    local fd = self.ioevents[evid]
-    if not fd then
-        -- not a self-managed event
+    local evinfo = EVUSAGE[evid]
+    if not evinfo then
+        -- not found
         return false, 'invalid event-id'
     end
 
     -- revoke io-event
-    local evinfo = EVUSAGE[evid]
     self.ctx.event:revoke(evinfo.ev)
-
     -- clear usage
     EVUSAGE[evid] = nil
-    EVUSAGE[evinfo.asa][evinfo.fd] = nil
-    self.ioevents[evid] = nil
-
     return true
 end
 
@@ -417,14 +400,14 @@ local IOWAIT = {
 }
 
 --- wait_event
---- @param evid string
+--- @param evid event_id
 --- @param msec integer
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
 function Callee:wait_event(evid, msec)
-    local fd = self.ioevents[evid]
-    if not fd then
+    local evinfo = EVUSAGE[evid]
+    if not evinfo then
         return false, 'invalid event-id'
     end
 
@@ -435,7 +418,6 @@ function Callee:wait_event(evid, msec)
 
     -- wait until event fired
     self.is_cancel = nil
-    local evinfo = EVUSAGE[evid]
     IOWAIT[evinfo.asa][evinfo.fd] = self
     local fdno = yield()
     IOWAIT[evinfo.asa][evinfo.fd] = nil
@@ -458,7 +440,7 @@ function Callee:wait_event(evid, msec)
 
     -- opertion type must be OP_EVENT
     assert(self.op == OP_EVENT, 'invalid implements')
-    assert(fdno == fd, 'invalid implements')
+    assert(fdno == evinfo.fd, 'invalid implements')
     return true
 end
 
@@ -477,8 +459,10 @@ local function waitable(self, asa, fd, msec)
         return false, err
     end
 
+    self.ioevents[evid] = true
     local ok, timeout
     ok, err, timeout = self:wait_event(evid, msec)
+    self.ioevents[evid] = nil
     -- dispose event
     self:dispose_event(evid)
 
@@ -652,11 +636,10 @@ function Callee:dispose(status)
     -- revoke all events currently in use
     local event = self.ctx.event
     -- revoke self-managed io events
-    for evid, fd in pairs(self.ioevents) do
+    for evid in pairs(self.ioevents) do
         local evinfo = EVUSAGE[evid]
         EVUSAGE[evid] = nil
-        EVUSAGE[evinfo.asa][fd] = nil
-        IOWAIT[evinfo.asa][fd] = nil
+        IOWAIT[evinfo.asa][evinfo.fd] = nil
         event:revoke(evinfo.ev)
     end
     self.ioevents = nil

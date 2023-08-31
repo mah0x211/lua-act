@@ -27,7 +27,6 @@
 require('act.ignsigpipe')
 --- file scope variables
 local pcall = pcall
-local type = type
 local waitpid = require('waitpid')
 local getmsec = require('act.hrtimer').getmsec
 local fork = require('act.fork')
@@ -456,14 +455,14 @@ local function wait_writable(fd, msec)
 end
 
 --- dispose_event
---- @param evid string
+--- @param evid any
 --- @return boolean ok
 --- @return any err
 local function dispose_event(evid)
     local callee = callee_acquire()
     if callee then
-        if type(evid) ~= 'string' then
-            error('evid must be string', 2)
+        if evid == nil then
+            error('evid must not be nil', 2)
         end
         return callee:dispose_event(evid)
     end
@@ -472,7 +471,7 @@ local function dispose_event(evid)
 end
 
 --- wait_event
---- @param evid string
+--- @param evid any
 --- @param msec? integer
 --- @return boolean ok
 --- @return any err
@@ -480,8 +479,8 @@ end
 local function wait_event(evid, msec)
     local callee = callee_acquire()
     if callee then
-        if type(evid) ~= 'string' then
-            error('evid must be string', 2)
+        if evid == nil then
+            error('evid must not be nil', 2)
         elseif msec ~= nil and not is_uint(msec) then
             error('msec must be unsigned integer', 2)
         end
@@ -493,7 +492,7 @@ end
 
 --- new_writable_event
 --- @param fd integer
---- @return string evid
+--- @return any evid
 --- @return any err
 local function new_writable_event(fd)
     local callee = callee_acquire()
@@ -510,7 +509,7 @@ end
 
 --- new_readable_event
 --- @param fd integer
---- @return string evid
+--- @return any evid
 --- @return any err
 local function new_readable_event(fd)
     local callee = callee_acquire()

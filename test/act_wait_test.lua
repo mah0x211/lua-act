@@ -98,7 +98,7 @@ function testcase.wait_readable_writable()
                 local ok, err, timeout = waitfn(sock:fd(), 50)
                 wait = false
                 assert.is_false(ok)
-                assert.equal(err, 'operation already in progress')
+                assert.match(err, 'EEXIST')
                 assert.is_nil(timeout)
             end))
 
@@ -106,7 +106,7 @@ function testcase.wait_readable_writable()
             assert.is_true(wait)
             local ok, err, timeout = waitfn(sock:fd(), 50)
             assert.is_false(ok)
-            assert.equal(err, 'operation already in progress')
+            assert.match(err, 'EEXIST')
             assert.is_nil(timeout)
         end)))
     end
