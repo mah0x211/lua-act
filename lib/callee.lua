@@ -268,7 +268,7 @@ function Callee:sigwait(msec, ...)
     for _, signo in pairs({
         ...,
     }) do
-        local ev, err = event:signal(self, signo, true)
+        local ev, err = event:signal(self, signo, 'oneshot')
 
         if err then
             if msec then
@@ -340,7 +340,7 @@ local EVUSAGE = {}
 local function new_io_event(self, asa, fd)
     -- register io(readable or writable) event as edge trigger
     local event = self.ctx.event
-    local ev, err = event[asa](event, self, fd, false, true)
+    local ev, err = event[asa](event, self, fd, 'edge')
     if err then
         return nil, err
     end
