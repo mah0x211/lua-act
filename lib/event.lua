@@ -93,11 +93,15 @@ end
 --- @param callee act.callee
 --- @param asa string
 --- @param val integer|number
---- @param oneshot? boolean
---- @param edge? boolean
+--- @param trigger string?
+---| 'oneshot' oneshot event
+---| 'edge' edge-triggered event
 --- @return poller.event? ev
 --- @return any err
-function Event:register(callee, asa, val, oneshot, edge)
+function Event:register(callee, asa, val, trigger)
+    assert(trigger == nil or trigger == 'oneshot' or trigger == 'edge',
+           'trigger must be "oneshot" or "edge"')
+
     local ev = self.pool:pop()
 
     -- create new event
@@ -105,10 +109,12 @@ function Event:register(callee, asa, val, oneshot, edge)
         ev = self.monitor:new_event()
     end
 
-    if oneshot then
-        ev:as_oneshot()
-    elseif edge then
-        ev:as_edge()
+    if trigger then
+        if trigger == 'oneshot' then
+            ev:as_oneshot()
+        elseif trigger == 'edge' then
+            ev:as_edge()
+        end
     end
 
     -- register event as a asa
@@ -127,31 +133,31 @@ end
 --- signal
 --- @param callee act.callee
 --- @param signo integer
---- @param oneshot boolean
+--- @param trigger string?
 --- @return poller.event? ev
 --- @return any err
-function Event:signal(callee, signo, oneshot)
-    return self:register(callee, 'as_signal', signo, oneshot)
+function Event:signal(callee, signo, trigger)
+    return self:register(callee, 'as_signal', signo, trigger)
 end
 
 --- writable
 --- @param callee act.callee
 --- @param fd integer
---- @param oneshot boolean
+--- @param trigger string?
 --- @return poller.event? ev
 --- @return any err
-function Event:writable(callee, fd, oneshot)
-    return self:register(callee, 'as_write', fd, oneshot)
+function Event:writable(callee, fd, trigger)
+    return self:register(callee, 'as_write', fd, trigger)
 end
 
 --- readable
 --- @param callee act.callee
 --- @param fd integer
---- @param oneshot boolean
+--- @param trigger string?
 --- @return poller.event? ev
 --- @return any err
-function Event:readable(callee, fd, oneshot)
-    return self:register(callee, 'as_read', fd, oneshot)
+function Event:readable(callee, fd, trigger)
+    return self:register(callee, 'as_read', fd, trigger)
 end
 
 --- consume
