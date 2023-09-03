@@ -138,12 +138,12 @@ function testcase.lock_timeout()
             assert(lockfn(fd))
             act.spawn(with_luacov(function()
                 local elapsed = nanotime()
-                local ok, err, timeout = lockfn(fd)
+                local ok, err, timeout = lockfn(fd, 10)
                 elapsed = (nanotime() - elapsed) * 1000
                 assert.is_false(ok)
                 assert.is_nil(err)
                 assert.is_true(timeout)
-                assert.less(elapsed, 10)
+                assert.less(elapsed, 15)
                 return 'lock timeout'
             end))
 

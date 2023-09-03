@@ -27,6 +27,8 @@
 require('act.ignsigpipe')
 --- file scope variables
 local pcall = pcall
+local format = string.format
+local concat = table.concat
 local waitpid = require('waitpid')
 local getmsec = require('act.hrtimer').getmsec
 local fork = require('act.fork')
@@ -51,16 +53,9 @@ local ACT_CTX
 --- @param fn function
 --- @param ... any
 --- @return any cid
---- @return string? err
 local function spawn_child(is_atexit, fn, ...)
     -- create new callee
     local callee = new_callee(ACT_CTX, is_atexit, fn, ...)
-
-    -- push to runq if not atexit
-    if not is_atexit then
-        ACT_CTX:pushq(callee)
-    end
-
     return callee.cid
 end
 
@@ -160,7 +155,6 @@ end
 --- @param fn function
 --- @param ... any
 --- @return any cid
---- @return string? err
 local function spawn(fn, ...)
     if callee_acquire() then
         if not is_func(fn) then
@@ -539,15 +533,13 @@ end
 --- @param exitfn function
 --- @param ... any
 --- @return boolean ok
---- @return string? err
 local function atexit(exitfn, ...)
     if callee_acquire() then
         if not is_func(exitfn) then
             error('exitfn must be function', 2)
         end
-
-        local _, err = spawn_child(true, exitfn, ...)
-        return not err, err
+        spawn_child(true, exitfn, ...)
+        return true
     end
 
     error('cannot call atexit() at outside of execution context', 2)
@@ -567,11 +559,7 @@ local function runloop(mainfn, ...)
     end
 
     -- create main coroutine
-    local ok
-    ok, err = spawn_child(false, mainfn, ...)
-    if not ok then
-        return false, err
-    end
+    spawn_child(false, mainfn, ...)
 
     -- run act scheduler
     local runq = ACT_CTX.runq
@@ -579,9 +567,13 @@ local function runloop(mainfn, ...)
     while true do
         -- consume runq
         local msec = runq:consume()
-        local remain
+        -- finish if no more callee
+        if ACT_CTX.active_callees == 0 then
+            return true
+        end
 
         -- consume events
+        local remain
         remain, err = event:consume(msec)
         if err then
             -- got critical error
@@ -590,10 +582,26 @@ local function runloop(mainfn, ...)
             -- no more events
             -- finish if no more callee
             if runq:len() == 0 then
+                -- get traceback of active callees
+                local infos = ACT_CTX:getinfo_active_callees()
+                if #infos > 0 then
+                    -- some callees may be waiting for resume by other callees
+                    -- but no body resume them.
+                    local list = {
+                        'deadlock detected',
+                    }
+                    for i = 1, #infos do
+                        list[#list + 1] =
+                            format('  %s:%d', infos[i].short_src,
+                                   infos[i].currentline)
+                    end
+                    error(concat(list, '\n'))
+                end
                 return true
             end
 
             -- sleep until timer time elapsed
+            local ok
             ok, err = runq:sleep()
             if not ok then
                 -- got critical error
@@ -618,6 +626,7 @@ local function run(mainfn, ...)
 
     local ok, rv, err = pcall(runloop, mainfn, ...)
     ACT_CTX = nil
+    collectgarbage('collect')
     if ok then
         return rv, err
     end

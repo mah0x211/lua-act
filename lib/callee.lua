@@ -618,8 +618,10 @@ local STATUS_TEXT = {
 --- dispose
 --- @param status integer
 function Callee:dispose(status)
-    local status_text = assert(STATUS_TEXT[status], 'unknown status code')
+    -- delete reference to active callee
+    self.ctx:del_active_callees(self)
 
+    local status_text = assert(STATUS_TEXT[status], 'unknown status code')
     local cid = self.cid
     -- remove cid
     self.ctx:cid_free(cid)
@@ -829,10 +831,18 @@ local function new(ctx, is_atexit, fn, ...)
     if callee then
         -- use pooled callee
         callee:renew(ctx, is_atexit, fn, ...)
-        return callee
+    else
+        callee = Callee(ctx, is_atexit, fn, ...)
     end
 
-    return Callee(ctx, is_atexit, fn, ...)
+    -- add reference to active callee
+    ctx:add_active_callees(callee)
+    if not is_atexit then
+        -- push to runq if not atexit
+        ctx:pushq(callee)
+    end
+
+    return callee
 end
 
 return {
