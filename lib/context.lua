@@ -42,6 +42,7 @@ local new_bitset = require('act.bitset')
 --- @field lockq act.lockq
 --- @field pool act.pool
 --- @field cidset act.bitset
+--- @field active_callees table<act.callee, boolean>
 local Context = {}
 
 function Context:__newindex()
@@ -68,7 +69,36 @@ function Context:init()
     rawset(self, 'lockq', new_lockq(self.runq))
     rawset(self, 'pool', new_pool())
     rawset(self, 'cidset', cidset)
+    rawset(self, 'active_callees', {})
     return self
+end
+
+--- add_active_callees
+--- @param callee act.callee
+function Context:add_active_callees(callee)
+    if self.active_callees[callee] then
+        error('callee is already active')
+    end
+    self.active_callees[callee] = true
+end
+
+--- del_active_callees
+--- @param callee act.callee
+function Context:del_active_callees(callee)
+    if not self.active_callees[callee] then
+        error('callee is not active')
+    end
+    self.active_callees[callee] = nil
+end
+
+--- getinfo_active_callees
+--- @return table[] infos
+function Context:getinfo_active_callees()
+    local infos = {}
+    for callee in pairs(self.active_callees) do
+        infos[#infos + 1] = callee.co:getinfo(2, 'Sl')
+    end
+    return infos
 end
 
 --- renew
