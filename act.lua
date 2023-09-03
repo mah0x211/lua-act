@@ -568,7 +568,7 @@ local function runloop(mainfn, ...)
         -- consume runq
         local msec = runq:consume()
         -- finish if no more callee
-        if ACT_CTX.active_callees == 0 then
+        if not ACT_CTX:has_active_callees() then
             return true
         end
 

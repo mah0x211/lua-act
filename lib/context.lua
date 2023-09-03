@@ -91,6 +91,12 @@ function Context:del_active_callees(callee)
     self.active_callees[callee] = nil
 end
 
+--- has_active_callees
+--- @return boolean
+function Context:has_active_callees()
+    return next(self.active_callees) ~= nil
+end
+
 --- getinfo_active_callees
 --- @return table[] infos
 function Context:getinfo_active_callees()
