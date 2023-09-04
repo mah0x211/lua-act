@@ -25,16 +25,23 @@
 --
 --- file scope variables
 local rawset = rawset
-local setmetatable = setmetatable
 local new_deque = require('act.deque')
 local poller = require('act.poller')
 local new_errno = require('errno').new
 local OP_EVENT = require('act.aux').OP_EVENT
 
+--- @class act.event.info
+--- @field ev poller.event
+--- @field asa string
+--- @field val integer
+--- @field trigger string?
+---| 'oneshot' oneshot event
+---| 'edge' edge-triggered event
+
 --- @class act.event
 --- @field monitor poller
 --- @field pool act.deque
---- @field used table<poller.event, boolean>
+--- @field used table<string, table<integer, act.event.info>>
 local Event = {}
 
 function Event:__newindex()
@@ -53,9 +60,11 @@ function Event:init()
 
     rawset(self, 'monitor', monitor)
     rawset(self, 'pool', new_deque())
-    rawset(self, 'used', setmetatable({}, {
-        __mode = 'k',
-    }))
+    rawset(self, 'used', {
+        signal = {},
+        readable = {},
+        writable = {},
+    })
 
     return self
 end
@@ -72,40 +81,71 @@ function Event:renew()
     -- re-create new pool (dispose pooled events)
     self.pool = new_deque()
     -- renew used events
-    for ev in pairs(self.used) do
-        assert(ev:renew())
+    for _, events in pairs(self.used) do
+        for _, evinfo in pairs(events) do
+            assert(evinfo.ev:renew())
+        end
     end
 
     return true
 end
 
+local ASA2METHOD = {
+    signal = 'as_signal',
+    readable = 'as_read',
+    writable = 'as_write',
+}
+
 --- revoke
---- @param ev poller.event
-function Event:revoke(ev)
+--- @param asa string
+---| 'signal' signal event
+---| 'readable' readable event
+---| 'writable' writable event
+--- @param val integer
+function Event:revoke(asa, val)
+    assert(type(asa) == 'string' and ASA2METHOD[asa],
+           'asa must be "signal", "readable" or "writable"')
+
     -- release reference of event explicitly
-    self.used[ev] = nil
-    assert(ev:revert())
-    -- push to event pool
-    self.pool:push(ev)
+    local evinfo = self.used[asa][val]
+    if evinfo then
+        self.used[asa][val] = nil
+        assert(evinfo.ev:revert())
+        -- push to event pool
+        self.pool:push(evinfo.ev)
+    end
 end
 
 --- register
 --- @param callee act.callee
---- @param asa string
---- @param val integer|number
---- @param trigger string?
----| 'oneshot' oneshot event
----| 'edge' edge-triggered event
---- @return poller.event? ev
+--- @param asa
+---| '"signal"' signal event
+---| '"readable"' readable event
+---| '"writable"' writable event
+--- @param val integer
+--- @param trigger?
+---| '"oneshot"' oneshot event
+---| '"edge"' edge-triggered event
+--- @return act.event.info? evinfo
 --- @return any err
+--- @return any evref
 function Event:register(callee, asa, val, trigger)
+    assert(type(asa) == 'string' and ASA2METHOD[asa],
+           'asa must be "signal", "readable" or "writable"')
     assert(trigger == nil or trigger == 'oneshot' or trigger == 'edge',
            'trigger must be "oneshot" or "edge"')
 
-    local ev = self.pool:pop()
+    local evinfo = self.used[asa][val]
+    if evinfo and evinfo.trigger == trigger then
+        -- use cached event
+        evinfo.ev:udata(callee)
+        return evinfo
+    end
 
-    -- create new event
+    -- get pooled event
+    local ev = self.pool:pop()
     if not ev then
+        -- create new event
         ev = self.monitor:new_event()
     end
 
@@ -118,46 +158,53 @@ function Event:register(callee, asa, val, trigger)
     end
 
     -- register event as a asa
+    local method = ASA2METHOD[asa]
     local err, errno
-    ev, err, errno = ev[asa](ev, val, callee)
+    ev, err, errno = ev[method](ev, val, callee)
     if not ev then
         return nil, new_errno(errno, err)
     end
 
     -- retain reference of event object in use
-    self.used[ev] = true
+    evinfo = {
+        ev = ev,
+        asa = asa,
+        val = val,
+        trigger = trigger,
+    }
+    self.used[asa][val] = evinfo
 
-    return ev
+    return evinfo
 end
 
 --- signal
 --- @param callee act.callee
 --- @param signo integer
 --- @param trigger string?
---- @return poller.event? ev
+--- @return act.event.info? evinfo
 --- @return any err
 function Event:signal(callee, signo, trigger)
-    return self:register(callee, 'as_signal', signo, trigger)
+    return self:register(callee, 'signal', signo, trigger)
 end
 
 --- writable
 --- @param callee act.callee
 --- @param fd integer
 --- @param trigger string?
---- @return poller.event? ev
+--- @return act.event.info? evinfo
 --- @return any err
 function Event:writable(callee, fd, trigger)
-    return self:register(callee, 'as_write', fd, trigger)
+    return self:register(callee, 'writable', fd, trigger)
 end
 
 --- readable
 --- @param callee act.callee
 --- @param fd integer
 --- @param trigger string?
---- @return poller.event? ev
+--- @return act.event.info? evinfo
 --- @return any err
 function Event:readable(callee, fd, trigger)
-    return self:register(callee, 'as_read', fd, trigger)
+    return self:register(callee, 'readable', fd, trigger)
 end
 
 --- consume
@@ -179,7 +226,11 @@ function Event:consume(msec)
 
             while ev do
                 -- resume
-                callee:call(OP_EVENT, ev:ident(), disabled)
+                if callee then
+                    -- clear callee reference from event
+                    ev:udata(nil)
+                    callee:call(OP_EVENT, ev:ident(), disabled)
+                end
                 -- get next event
                 ev, callee, disabled = monitor:consume()
             end

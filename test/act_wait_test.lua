@@ -93,21 +93,26 @@ function testcase.wait_readable_writable()
     }) do
         local wait = false
         assert(act.run(with_luacov(function()
-            act.spawn(with_luacov(function()
+            local cid = act.spawn(with_luacov(function()
                 wait = true
                 local ok, err, timeout = waitfn(sock:fd(), 50)
                 wait = false
                 assert.is_false(ok)
-                assert.match(err, 'EEXIST')
-                assert.is_nil(timeout)
+                assert.is_nil(err)
+                assert.is_true(timeout)
             end))
 
             act.later()
             assert.is_true(wait)
             local ok, err, timeout = waitfn(sock:fd(), 50)
             assert.is_false(ok)
-            assert.match(err, 'EEXIST')
+            assert.match(err, 'EALREADY')
             assert.is_nil(timeout)
+            assert.equal(act.await(), {
+                cid = cid,
+                status = 'ok',
+                result = {},
+            })
         end)))
     end
 end

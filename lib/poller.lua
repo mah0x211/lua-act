@@ -35,7 +35,7 @@ local kqueue = require('kqueue')
 --- @field is_oneshot fun(self):boolean
 --- @field as_oneshot fun(self):(ok:boolean, err:string, errno:integer)
 --- @field ident fun(self):integer
---- @field udata fun(self):any
+--- @field udata fun(self, udata:any):any
 --- @field getinfo fun(self, event:string):table
 
 --- @class poller.empty_event
