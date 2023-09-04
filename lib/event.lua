@@ -37,6 +37,8 @@ local OP_EVENT = require('act.aux').OP_EVENT
 --- @field trigger string?
 ---| 'oneshot' oneshot event
 ---| 'edge' edge-triggered event
+--- @field callee act.callee?
+--- @field is_ready boolean?
 
 --- @class act.event
 --- @field monitor poller
@@ -131,7 +133,7 @@ end
 ---| '"edge"' edge-triggered event
 --- @return act.event.info? evinfo
 --- @return any err
---- @return any evref
+--- @return boolean? is_ready
 function Event:register(callee, asa, val, trigger)
     assert(type(asa) == 'string' and ASA2METHOD[asa],
            'asa must be "signal", "readable" or "writable"')
@@ -140,8 +142,13 @@ function Event:register(callee, asa, val, trigger)
 
     local evinfo = self.used[asa][val]
     if evinfo and evinfo.trigger == trigger then
+        if evinfo.is_ready then
+            -- event is already occurred
+            evinfo.is_ready = nil
+            return nil, nil, true
+        end
         -- use cached event
-        evinfo.ev:udata(callee)
+        evinfo.callee = callee
         return evinfo
     end
 
@@ -160,54 +167,25 @@ function Event:register(callee, asa, val, trigger)
         end
     end
 
-    -- register event as a asa
-    local method = ASA2METHOD[asa]
-    local err, errno
-    ev, err, errno = ev[method](ev, val, callee)
-    if not ev then
-        return nil, new_errno(errno, err)
-    end
-
-    -- retain reference of event object in use
-    evinfo = {
-        ev = ev,
+    -- register new event
+    local newinfo = {
         asa = asa,
         val = val,
         trigger = trigger,
+        callee = callee,
     }
-    self.used[asa][val] = evinfo
+    local method = ASA2METHOD[asa]
+    local err, errno
+    ev, err, errno = ev[method](ev, val, newinfo)
+    if not ev then
+        return nil, new_errno(errno, err)
+    end
+    newinfo.ev = ev
 
-    return evinfo
-end
+    -- retain reference of event object in use
+    self.used[asa][val] = newinfo
 
---- signal
---- @param callee act.callee
---- @param signo integer
---- @param trigger string?
---- @return act.event.info? evinfo
---- @return any err
-function Event:signal(callee, signo, trigger)
-    return self:register(callee, 'signal', signo, trigger)
-end
-
---- writable
---- @param callee act.callee
---- @param fd integer
---- @param trigger string?
---- @return act.event.info? evinfo
---- @return any err
-function Event:writable(callee, fd, trigger)
-    return self:register(callee, 'writable', fd, trigger)
-end
-
---- readable
---- @param callee act.callee
---- @param fd integer
---- @param trigger string?
---- @return act.event.info? evinfo
---- @return any err
-function Event:readable(callee, fd, trigger)
-    return self:register(callee, 'readable', fd, trigger)
+    return newinfo
 end
 
 --- consume
@@ -225,17 +203,21 @@ function Event:consume(msec)
             return nil, new_errno(errno, err)
         elseif nev > 0 then
             -- consuming events
-            local ev, callee, disabled = monitor:consume()
+            local ev, evinfo, disabled = monitor:consume()
 
             while ev do
                 -- resume
+                local callee = evinfo.callee
                 if callee then
-                    -- clear callee reference from event
-                    ev:udata(nil)
-                    callee:call(OP_EVENT, ev:ident(), disabled)
+                    -- clear callee reference from event-info
+                    evinfo.callee = nil
+                    callee:call(OP_EVENT, evinfo.ev:ident(), disabled)
+                else
+                    -- set a flag to confirm that the event has already occurred
+                    evinfo.is_ready = true
                 end
                 -- get next event
-                ev, callee, disabled = monitor:consume()
+                ev, evinfo, disabled = monitor:consume()
             end
         end
 

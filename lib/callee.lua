@@ -346,17 +346,19 @@ local function waitable(self, asa, fd, msec)
         return false, EALREADY:new()
     end
 
+    local event = self.ctx.event
+    local evinfo, err, is_ready = event:register(self, asa, fd, 'edge')
+    if is_ready then
+        -- fd is ready to read or write
+        return true
+    elseif not evinfo then
+        -- failed to create io-event
+        return false, err
+    end
+
     -- register to runq with msec
     if msec ~= nil then
         self.ctx:pushq(self, msec)
-    end
-
-    local event = self.ctx.event
-    local evinfo, err = event:register(self, asa, fd, 'edge')
-    if not evinfo then
-        -- failed to create io-event
-        self.ctx:removeq(self)
-        return false, err
     end
 
     -- clear cancel flag
