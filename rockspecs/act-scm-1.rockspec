@@ -16,8 +16,8 @@ dependencies = {
     "fork >= 0.2",
     "metamodule >= 0.4",
     "minheap >= 0.2",
-    "reco >= 1.5",
-    "epoll >= 0.2.1",
+    "reco >= 1.6",
+    "epoll >= 0.3.0",
     "kqueue >= 0.3.1",
     "waitpid >= 0.1.0",
 }
