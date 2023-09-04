@@ -274,17 +274,25 @@ function testcase.wait_unwait_throws_error_for_invalid_arguments()
     end
 end
 
-function testcase.wait_unwait_throws_error_for_outside_of_execution_context()
+function testcase.wait_throws_error_for_outside_of_execution_context()
     for _, fn in ipairs({
         act.wait_readable,
         act.wait_writable,
+    }) do
+        -- test that throws an error if called from outside of execution context
+        local err = assert.throws(fn)
+        assert.match(err, 'outside of execution')
+    end
+end
+
+function testcase.unwait_did_not_throws_error_for_outside_of_execution_context()
+    for _, fn in ipairs({
         act.unwait_readable,
         act.unwait_writable,
         act.unwait,
     }) do
         -- test that throws an error if called from outside of execution context
-        local err = assert.throws(fn)
-        assert.match(err, 'outside of execution')
+        assert.is_false(fn(1))
     end
 end
 

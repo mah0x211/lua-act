@@ -40,6 +40,9 @@ local Callee = require('act.callee')
 local new_callee = Callee.new
 local callee_acquire = Callee.acquire
 local callee_resume = Callee.resume
+local callee_unwait = Callee.unwait
+local callee_unwait_readable = Callee.unwait_readable
+local callee_unwait_writable = Callee.unwait_writable
 local new_context = require('act.context').new
 --- constants
 --- @type act.context?
@@ -363,48 +366,45 @@ end
 --- @param fd integer
 --- @return boolean ok
 local function unwait_readable(fd)
-    local callee = callee_acquire()
-    if callee then
+    if ACT_CTX then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
         end
-        callee:unwait_readable(fd)
+        callee_unwait_readable(ACT_CTX, fd)
         return true
     end
 
-    error('cannot call unwait_readable() from outside of execution context', 2)
+    return false
 end
 
 --- unwait_writable
 --- @param fd integer
 --- @return boolean ok
 local function unwait_writable(fd)
-    local callee = callee_acquire()
-    if callee then
+    if ACT_CTX then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
         end
-        callee:unwait_writable(fd)
+        callee_unwait_writable(ACT_CTX, fd)
         return true
     end
 
-    error('cannot call unwait_writable() from outside of execution context', 2)
+    return false
 end
 
 --- unwait
 --- @param fd integer
 --- @return boolean ok
 local function unwait(fd)
-    local callee = callee_acquire()
-    if callee then
+    if ACT_CTX then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
         end
-        callee:unwait(fd)
+        callee_unwait(ACT_CTX, fd)
         return true
     end
 
-    error('cannot call unwait() from outside of execution context', 2)
+    return false
 end
 
 --- wait_readable
@@ -555,8 +555,8 @@ local function run(mainfn, ...)
     end
 
     local ok, rv, err = pcall(runloop, mainfn, ...)
-    ACT_CTX = nil
     collectgarbage('collect')
+    ACT_CTX = nil
     if ok then
         return rv, err
     end

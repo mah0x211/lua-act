@@ -422,9 +422,10 @@ function Callee:wait_writable(fd, msec)
 end
 
 --- unwaitfd
+--- @param ctx act.context
 --- @param asa string
 --- @param fd integer
-function Callee:unwaitfd(asa, fd)
+local function unwaitfd(ctx, asa, fd)
     local callee = IOWAIT[asa][fd]
 
     if callee then
@@ -432,29 +433,37 @@ function Callee:unwaitfd(asa, fd)
         -- re-queue without timeout
         callee.ctx:removeq(callee)
         callee.ctx:pushq(callee)
-    else
-        -- revoke cached io-event
-        self.ctx.event:revoke(asa, fd)
+        return true
     end
+
+    -- revoke cached event
+    return ctx.event:revoke(asa, fd)
 end
 
 --- unwait_readable
+--- @param ctx act.context
 --- @param fd integer
-function Callee:unwait_readable(fd)
-    self:unwaitfd('readable', fd)
+--- @return boolean ok
+local function unwait_readable(ctx, fd)
+    return unwaitfd(ctx, 'readable', fd)
 end
 
 --- unwait_writable
+--- @param ctx act.context
 --- @param fd integer
-function Callee:unwait_writable(fd)
-    self:unwaitfd('writable', fd)
+--- @return boolean ok
+local function unwait_writable(ctx, fd)
+    return unwaitfd(ctx, 'writable', fd)
 end
 
 --- unwait
+--- @param ctx act.context
 --- @param fd integer
-function Callee:unwait(fd)
-    self:unwaitfd('readable', fd)
-    self:unwaitfd('writable', fd)
+--- @return boolean ok
+local function unwait(ctx, fd)
+    local ok1 = unwaitfd(ctx, 'readable', fd)
+    local ok2 = unwaitfd(ctx, 'writable', fd)
+    return ok1 and ok2
 end
 
 --- @type table<any, act.callee>
@@ -783,5 +792,8 @@ return {
     new = new,
     acquire = acquire,
     resume = resume,
+    unwait = unwait,
+    unwait_readable = unwait_readable,
+    unwait_writable = unwait_writable,
 }
 
