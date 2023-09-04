@@ -102,6 +102,7 @@ local ASA2METHOD = {
 ---| 'readable' readable event
 ---| 'writable' writable event
 --- @param val integer
+--- @return boolean ok
 function Event:revoke(asa, val)
     assert(type(asa) == 'string' and ASA2METHOD[asa],
            'asa must be "signal", "readable" or "writable"')
@@ -113,7 +114,9 @@ function Event:revoke(asa, val)
         assert(evinfo.ev:revert())
         -- push to event pool
         self.pool:push(evinfo.ev)
+        return true
     end
+    return false
 end
 
 --- register
