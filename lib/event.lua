@@ -189,14 +189,14 @@ function Event:register(callee, asa, val, trigger)
 end
 
 --- consume
---- @param msec integer
+--- @param sec number
 --- @return integer? nev
 --- @return any err
-function Event:consume(msec)
+function Event:consume(sec)
     if #self.monitor > 0 then
         local monitor = self.monitor
         -- wait events
-        local nev, err, errno = monitor:wait(msec)
+        local nev, err, errno = monitor:wait(sec)
 
         if err then
             -- got critical error

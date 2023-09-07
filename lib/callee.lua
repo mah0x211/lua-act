@@ -28,10 +28,10 @@ local pairs = pairs
 local yield = coroutine.yield
 local setmetatable = setmetatable
 local EALREADY = require('errno').EALREADY
+local gettime = require('time.clock').gettime
 local new_coro = require('act.coro').new
 local new_stack = require('act.stack')
 local new_deque = require('act.deque')
-local getmsec = require('act.hrtimer').getmsec
 local aux = require('act.aux')
 local concat = aux.concat
 -- constants
@@ -93,10 +93,10 @@ function Callee:consume_yieldq()
 end
 
 --- yield
---- @param msec? integer
+--- @param sec? number
 --- @param ... any
 --- @return boolean ok
-function Callee:yield(msec, ...)
+function Callee:yield(sec, ...)
     -- check parent is exists except atexit callee
     local parent = self.parent
     while parent and parent.is_atexit do
@@ -112,8 +112,8 @@ function Callee:yield(msec, ...)
         parent.ctx:pushq(parent)
     end
 
-    if msec ~= nil then
-        self.ctx:pushq(self, msec)
+    if sec ~= nil then
+        self.ctx:pushq(self, sec)
     end
 
     local elm = parent.yieldq:push({
@@ -131,11 +131,11 @@ function Callee:yield(msec, ...)
     if YIELDED[self.cid] then
         YIELDED[self.cid] = nil
         elm:remove()
-        assert(msec ~= nil, 'invalid implements')
+        assert(sec ~= nil, 'invalid implements')
         return false
     end
 
-    if msec then
+    if sec then
         self.ctx:removeq(self)
     end
 
@@ -172,10 +172,10 @@ function Callee:awaitq_size(qsize)
 end
 
 --- await until the child thread to exit while the specified number of seconds.
---- @param msec? integer
+--- @param sec? number
 --- @return table? res
 --- @return boolean? timeout
-function Callee:await(msec)
+function Callee:await(sec)
     -- consume awaitq
     local stat = self.awaitq:shift()
 
@@ -190,8 +190,8 @@ function Callee:await(msec)
             return stat
         end
 
-        if msec ~= nil then
-            self.ctx:pushq(self, msec)
+        if sec ~= nil then
+            self.ctx:pushq(self, sec)
         end
 
         self.is_await = true
@@ -201,7 +201,7 @@ function Callee:await(msec)
         -- timeout
         if self.is_await then
             self.is_await = nil
-            assert(msec ~= nil, 'invalid implements')
+            assert(sec ~= nil, 'invalid implements')
             return nil, true
         end
 
@@ -218,12 +218,12 @@ end
 
 --- read_lock
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function Callee:read_lock(fd, msec)
-    return self.ctx:read_lock(self, fd, msec)
+function Callee:read_lock(fd, sec)
+    return self.ctx:read_lock(self, fd, sec)
 end
 
 --- read_unlock
@@ -235,12 +235,12 @@ end
 
 --- write_lock
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function Callee:write_lock(fd, msec)
-    return self.ctx:write_lock(self, fd, msec)
+function Callee:write_lock(fd, sec)
+    return self.ctx:write_lock(self, fd, sec)
 end
 
 --- write_unlock
@@ -251,15 +251,15 @@ function Callee:write_unlock(fd)
 end
 
 --- sigwait
---- @param msec integer
+--- @param sec number
 --- @param ... integer signal numbers
 --- @return integer? signo
 --- @return any err
 --- @return boolean? timeout
-function Callee:sigwait(msec, ...)
-    -- register to runq with msec
-    if msec ~= nil then
-        self.ctx:pushq(self, msec)
+function Callee:sigwait(sec, ...)
+    -- register to runq with sec
+    if sec ~= nil then
+        self.ctx:pushq(self, sec)
     end
 
     local event = self.ctx.event
@@ -272,7 +272,7 @@ function Callee:sigwait(msec, ...)
         local evinfo, err = event:register(self, 'signal', signo, 'oneshot')
 
         if err then
-            if msec then
+            if sec then
                 self.ctx:removeq(self)
             end
 
@@ -291,7 +291,7 @@ function Callee:sigwait(msec, ...)
 
     -- no need to wait signal if empty
     if #sigset == 0 then
-        if msec then
+        if sec then
             self.ctx:removeq(self)
         end
         return nil
@@ -310,11 +310,11 @@ function Callee:sigwait(msec, ...)
 
     -- timeout
     if self.op == OP_RUNQ then
-        assert(msec ~= nil, 'invalid implements')
+        assert(sec ~= nil, 'invalid implements')
         return nil, nil, true
     end
 
-    if msec then
+    if sec then
         self.ctx:removeq(self)
     end
 
@@ -336,11 +336,11 @@ local IOWAIT = {
 --- @param self act.callee
 --- @param asa string
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-local function waitable(self, asa, fd, msec)
+local function waitable(self, asa, fd, sec)
     if IOWAIT[asa][fd] then
         -- other callee is already waiting
         return false, EALREADY:new()
@@ -356,9 +356,9 @@ local function waitable(self, asa, fd, msec)
         return false, err
     end
 
-    -- register to runq with msec
-    if msec ~= nil then
-        self.ctx:pushq(self, msec)
+    -- register to runq with sec
+    if sec ~= nil then
+        self.ctx:pushq(self, sec)
     end
 
     -- clear cancel flag
@@ -386,12 +386,12 @@ local function waitable(self, asa, fd, msec)
     -- timed out
     if self.op == OP_RUNQ then
         event:revoke(asa, fd)
-        assert(msec ~= nil, 'invalid implements')
+        assert(sec ~= nil, 'invalid implements')
         return false, nil, true
     end
 
     -- event occurred
-    if msec then
+    if sec then
         self.ctx:removeq(self)
     end
 
@@ -405,22 +405,22 @@ end
 
 --- wait_readable
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function Callee:wait_readable(fd, msec)
-    return waitable(self, 'readable', fd, msec)
+function Callee:wait_readable(fd, sec)
+    return waitable(self, 'readable', fd, sec)
 end
 
 --- wait_writable
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function Callee:wait_writable(fd, msec)
-    return waitable(self, 'writable', fd, msec)
+function Callee:wait_writable(fd, sec)
+    return waitable(self, 'writable', fd, sec)
 end
 
 --- unwaitfd
@@ -495,13 +495,13 @@ local function resume(cid, ...)
 end
 
 --- suspend
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return string? err
 --- @return ...
-function Callee:suspend(msec)
-    if msec ~= nil then
-        self.ctx:pushq(self, msec)
+function Callee:suspend(sec)
+    if sec ~= nil then
+        self.ctx:pushq(self, sec)
     end
 
     -- wait until resumed by resume method
@@ -513,7 +513,7 @@ function Callee:suspend(msec)
     -- timeout
     if SUSPENDED[cid] then
         SUSPENDED[cid] = nil
-        assert(msec ~= nil, 'invalid implements')
+        assert(sec ~= nil, 'invalid implements')
         return false
     end
 
@@ -522,14 +522,14 @@ function Callee:suspend(msec)
 end
 
 --- sleep
---- @param msec integer
---- @return integer rem
+--- @param sec number
+--- @return number rem
 --- @return any err
-function Callee:sleep(msec)
-    self.ctx:pushq(self, msec)
+function Callee:sleep(sec)
+    self.ctx:pushq(self, sec)
 
     local cid = self.cid
-    local deadline = getmsec() + msec
+    local deadline = gettime() + sec
     -- wait until wake-up or resume by resume method
     SUSPENDED[cid] = self
     assert(yield() == nil, 'invalid implements')
@@ -538,10 +538,10 @@ function Callee:sleep(msec)
     -- timeout
     if SUSPENDED[cid] then
         SUSPENDED[cid] = nil
-        assert(msec ~= nil, 'invalid implements')
+        assert(sec ~= nil, 'invalid implements')
     end
 
-    local rem = deadline - getmsec()
+    local rem = deadline - gettime()
     return rem > 0 and rem or 0
 end
 

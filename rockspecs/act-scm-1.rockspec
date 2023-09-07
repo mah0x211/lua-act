@@ -17,8 +17,10 @@ dependencies = {
     "metamodule >= 0.4",
     "minheap >= 0.2",
     "reco >= 1.6",
-    "epoll >= 0.3.0",
-    "kqueue >= 0.3.1",
+    "epoll >= 0.4.0",
+    "kqueue >= 0.5.0",
+    "time-clock >= 0.4.0",
+    "time-sleep >= 0.2.1",
     "waitpid >= 0.1.0",
 }
 build = {

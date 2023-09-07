@@ -29,13 +29,14 @@ require('act.ignsigpipe')
 local pcall = pcall
 local format = string.format
 local concat = table.concat
+local type = type
 local waitpid = require('waitpid')
-local getmsec = require('act.hrtimer').getmsec
+local gettime = require('time.clock').gettime
 local fork = require('act.fork')
 local aux = require('act.aux')
 local is_int = aux.is_int
 local is_uint = aux.is_uint
-local is_func = aux.is_func
+local is_unsigned = aux.is_unsigned
 local Callee = require('act.callee')
 local new_callee = Callee.new
 local callee_acquire = Callee.acquire
@@ -95,7 +96,7 @@ end
 --- @field sigstop integer signal number that caused the process to stop
 
 --- pwaitpid
---- @param msec? integer timeout in msec
+--- @param sec? number timeout in seconds
 --- @param wpid? integer process id to wait
 --- @param ... string options
 --- | 'nohang' : set WNOHANG option (default)
@@ -104,19 +105,19 @@ end
 --- @return waitpid.result? res
 --- @return any err
 --- @return boolean? timeout
-local function pwaitpid(msec, wpid, ...)
+local function pwaitpid(sec, wpid, ...)
     local callee = callee_acquire()
     if callee then
-        local interval = 100
+        local interval = 0.1
         local deadline
 
-        if msec ~= nil then
-            if not is_uint(msec) then
-                error('msec must be unsigned integer', 2)
+        if sec ~= nil then
+            if not is_unsigned(sec) then
+                error('sec must be unsigned number or nil', 2)
             end
-            deadline = getmsec() + msec
-            if interval > msec then
-                interval = msec
+            deadline = gettime() + sec
+            if interval > sec then
+                interval = sec
             end
         end
 
@@ -133,7 +134,7 @@ local function pwaitpid(msec, wpid, ...)
             end
 
             if deadline then
-                local remain = deadline - getmsec()
+                local remain = deadline - gettime()
                 if remain <= 0 then
                     -- timeout
                     return nil, nil, true
@@ -157,7 +158,7 @@ end
 --- @return any cid
 local function spawn(fn, ...)
     if callee_acquire() then
-        if not is_func(fn) then
+        if type(fn) ~= 'function' then
             error('fn must be function', 2)
         end
         return spawn_child(false, fn, ...)
@@ -187,16 +188,16 @@ local function later()
 end
 
 --- yield
---- @param msec? integer
+--- @param sec? number
 --- @param ... any
 --- @return boolean ok
-local function yield(msec, ...)
+local function yield(sec, ...)
     local callee = callee_acquire()
     if callee then
-        if msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+        if sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:yield(msec, ...)
+        return callee:yield(sec, ...)
     end
     error('cannot call yield() from outside of execution context', 2)
 end
@@ -217,32 +218,32 @@ local function awaitq_size(qsize)
 end
 
 --- await
---- @param msec? integer
+--- @param sec? number
 --- @return table stat
 --- @return boolean timeout
-local function await(msec)
+local function await(sec)
     local callee = callee_acquire()
     if callee then
-        if msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+        if sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:await(msec)
+        return callee:await(sec)
     end
 
     error('cannot call await() at outside of execution context', 2)
 end
 
 --- suspend
---- @param msec? integer
+--- @param sec? number
 --- @return boolean ok
 --- @return any ...
-local function suspend(msec)
+local function suspend(sec)
     local callee = callee_acquire()
     if callee then
-        if msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+        if sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:suspend(msec)
+        return callee:suspend(sec)
     end
 
     error('cannot call suspend() at outside of execution context', 2)
@@ -261,34 +262,34 @@ local function resume(cid, ...)
 end
 
 --- sleep
---- @param msec integer
+--- @param sec number
 --- @return integer rem
 --- @return string? err
-local function sleep(msec)
+local function sleep(sec)
     local callee = callee_acquire()
     if callee then
-        if not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+        if not is_unsigned(sec) then
+            error('sec must be unsigned number', 2)
         end
-        return callee:sleep(msec)
+        return callee:sleep(sec)
     end
 
     error('cannot call sleep() from outside of execution context', 2)
 end
 
 --- sigwait
---- @param msec? integer
+--- @param sec? number
 --- @param ... any
 --- @return integer signo
 --- @return string? err
 --- @return boolean? timeout
-local function sigwait(msec, ...)
+local function sigwait(sec, ...)
     local callee = callee_acquire()
     if callee then
-        if msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+        if sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:sigwait(msec, ...)
+        return callee:sigwait(sec, ...)
     end
 
     error('cannot call sleep() from outside of execution context', 2)
@@ -296,19 +297,19 @@ end
 
 --- read_lock
 --- @param fd integer
---- @param msec? integer
+--- @param sec? number
 --- @return boolean ok
 --- @return string? err
 --- @return boolean? timeout
-local function read_lock(fd, msec)
+local function read_lock(fd, sec)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
-        elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer or nil', 2)
+        elseif sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:read_lock(fd, msec)
+        return callee:read_lock(fd, sec)
     end
 
     error('cannot call read_lock() from outside of execution context', 2)
@@ -330,19 +331,19 @@ end
 
 --- write_lock
 --- @param fd integer
---- @param msec? integer
+--- @param sec? number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-local function write_lock(fd, msec)
+local function write_lock(fd, sec)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
-        elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer or nil', 2)
+        elseif sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:write_lock(fd, msec)
+        return callee:write_lock(fd, sec)
     end
 
     error('cannot call write_lock() from outside of execution context', 2)
@@ -409,20 +410,20 @@ end
 
 --- wait_readable
 --- @param fd integer
---- @param msec? integer
+--- @param sec? number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-local function wait_readable(fd, msec)
+local function wait_readable(fd, sec)
     local callee = callee_acquire()
 
     if callee then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
-        elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+        elseif sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:wait_readable(fd, msec)
+        return callee:wait_readable(fd, sec)
     end
 
     error('cannot call wait_readable() from outside of execution context', 2)
@@ -430,19 +431,19 @@ end
 
 --- wait_writable
 --- @param fd integer
---- @param msec? integer
+--- @param sec? number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-local function wait_writable(fd, msec)
+local function wait_writable(fd, sec)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
             error('fd must be unsigned integer', 2)
-        elseif msec ~= nil and not is_uint(msec) then
-            error('msec must be unsigned integer', 2)
+        elseif sec ~= nil and not is_unsigned(sec) then
+            error('sec must be unsigned number or nil', 2)
         end
-        return callee:wait_writable(fd, msec)
+        return callee:wait_writable(fd, sec)
     end
 
     error('cannot call wait_writable() from outside of execution context', 2)
@@ -465,7 +466,7 @@ end
 --- @return boolean ok
 local function atexit(exitfn, ...)
     if callee_acquire() then
-        if not is_func(exitfn) then
+        if type(exitfn) ~= 'function' then
             error('exitfn must be function', 2)
         end
         spawn_child(true, exitfn, ...)
@@ -496,7 +497,7 @@ local function runloop(mainfn, ...)
     local event = ACT_CTX.event
     while true do
         -- consume runq
-        local msec = runq:consume()
+        local sec = runq:consume()
         -- finish if no more callee
         if not ACT_CTX:has_active_callees() then
             return true
@@ -504,7 +505,7 @@ local function runloop(mainfn, ...)
 
         -- consume events
         local remain
-        remain, err = event:consume(msec)
+        remain, err = event:consume(sec)
         if err then
             -- got critical error
             return false, err
@@ -548,7 +549,7 @@ end
 --- @return any err
 local function run(mainfn, ...)
     -- check first argument
-    if not is_func(mainfn) then
+    if type(mainfn) ~= 'function' then
         error('mainfn must be function', 2)
     elseif ACT_CTX then
         return false, 'act run already'

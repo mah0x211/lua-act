@@ -1,13 +1,12 @@
 require('luacov')
 local testcase = require('testcase')
 local runq = require('act.runq')
-local getmsec = require('act.hrtimer').getmsec
+local gettime = require('time.clock').gettime
 
 function testcase.new()
     -- test that create new runq
     local q = runq.new()
     assert.equal(q:len(), 0)
-    assert.equal(q.ref, {})
 
     -- test that throws an error if attempt to newindex
     local err = assert.throws(function()
@@ -39,12 +38,12 @@ function testcase.push()
     err = assert.throws(q.push, q, {})
     assert.match(err, 'callee must have a call method')
 
-    -- test that callee must has a function in call field
+    -- test that sec must be unsigned number
     err = assert.throws(q.push, q, {
         call = function()
         end,
     }, -1)
-    assert.match(err, 'unsigned integer expected')
+    assert.match(err, 'sec must be unsigned number or nil')
 end
 
 function testcase.remove()
@@ -90,12 +89,10 @@ function testcase.consume()
     q:push(c)
 
     -- test that invoking the callee.call method
-    local msec = q:consume()
-    if msec == 0 then
-        msec = q:consume()
+    local sec = q:consume()
+    while sec ~= -1 do
+        sec = q:consume()
     end
-    assert.equal(msec, -1)
-    assert.equal(q.ref, {})
     assert.equal(res, {
         'a',
         'b',
@@ -103,8 +100,8 @@ function testcase.consume()
     })
 
     -- test that returns remaining msec
-    q:push(a, 100)
-    assert.less_or_equal(q:consume(), 100)
+    q:push(a, 0.1)
+    assert.less_or_equal(q:consume(), 0.1)
 end
 
 function testcase.sleep()
@@ -115,27 +112,27 @@ function testcase.sleep()
     }
 
     -- test that return immdiately if no executable callee in run-q
-    local t = getmsec()
+    local t = gettime()
     assert.is_true(q:sleep())
-    t = getmsec() - t
-    assert.greater_or_equal(t, 0)
-    assert.less_or_equal(t, 1)
+    t = gettime() - t
+    assert.greater_or_equal(t, 0.0)
+    assert.less_or_equal(t, 0.001)
 
     -- test that return immdiately if executable callee is in run-q
     q:push(callee)
-    t = getmsec()
+    t = gettime()
     assert.is_true(q:sleep())
-    t = getmsec() - t
-    assert.greater_or_equal(t, 0)
-    assert.less_or_equal(t, 1)
+    t = gettime() - t
+    assert.greater_or_equal(t, 0.0)
+    assert.less_or_equal(t, 0.001)
     q:consume()
 
     -- test that sleep until callee is ready to execute
-    q:push(callee, 100)
-    t = getmsec()
+    q:push(callee, 0.1)
+    t = gettime()
     assert.is_true(q:sleep())
-    t = getmsec() - t
-    assert.greater_or_equal(t, 90)
-    assert.less(t, 110)
+    t = gettime() - t
+    assert.greater_or_equal(t, 0.09)
+    assert.less(t, 0.11)
 end
 

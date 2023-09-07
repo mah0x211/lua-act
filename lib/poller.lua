@@ -49,13 +49,13 @@ local kqueue = require('kqueue')
 --- @field as_read fun(self, fd:integer, udata:any):(ev:poller.event, err:string, errno:integer)
 --- @field as_write fun(self, fd:integer, udata:any):(ev:poller.event, err:string, errno:integer)
 --- @field as_signal fun(self, signo:integer, udata:any):(ev:poller.event, err:string, errno:integer)
---- @field as_timer fun(self, ident:integer, msec:integer, udata:any):(ev:poller.event, err:string, errno:integer)
+--- @field as_timer fun(self, ident:integer, sec:number, udata:any):(ev:poller.event, err:string, errno:integer)
 
 --- @class poller
 --- @field renew fun(self):(ok:boolean, err:string, errno:integer)
 --- @field new_event fun(self):poller.empty_event
---- @field wait fun(self, msec:integer? ):(n:integer, err:string, errno:integer)
---- @field consume fun(self, msec:integer? ):(ev:poller.event, udata:any, errno:integer)
+--- @field wait fun(self, sec:number? ):(n:integer, err:string, errno:integer)
+--- @field consume fun(self, sec:number? ):(ev:poller.event, udata:any, errno:integer)
 
 --- new
 --- @return poller?

@@ -27,7 +27,7 @@ function testcase.await_exit_child()
             return 'hello'
         end)
 
-        act.sleep(10)
+        act.sleep(0.01)
         assert.is_true(is_exit)
         assert.is_nil(act.await())
     end)))
@@ -52,7 +52,7 @@ function testcase.awaitq_size()
             return 'baz'
         end)
 
-        act.sleep(10)
+        act.sleep(0.01)
         assert.equal({
             act.await(),
             act.await(),
@@ -116,9 +116,9 @@ function testcase.timeout()
     assert(act.run(with_luacov(function()
         -- test that timeout
         act.spawn(function()
-            act.sleep(1000)
+            act.sleep(1)
         end)
-        local res, timeout = act.await(100)
+        local res, timeout = act.await(0.1)
         assert.is_nil(res)
         assert.is_true(timeout)
     end)))
@@ -128,7 +128,7 @@ function testcase.fail_on_invalid_argument()
     assert(act.run(with_luacov(function()
         -- test that fails on invalid argument
         local err = assert.throws(act.await, 'foo')
-        assert.match(err, 'msec must be unsigned integer')
+        assert.match(err, 'sec must be unsigned number')
 
         err = assert.throws(act.awaitq_size, 0.5)
         assert.match(err, 'qsize must be integer')

@@ -1,7 +1,7 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
-local nanotime = require('testcase.timer').nanotime
 local new_socketpair = require('testcase.socketpair')
+local gettime = require('time.clock').gettime
 local error = require('error')
 local errno = require('errno')
 local act = require('act')
@@ -30,7 +30,7 @@ function testcase.wait_readable_writable()
         local wait = false
         local cid = act.spawn(with_luacov(function()
             wait = true
-            assert(act.wait_readable(sock:fd(), 50))
+            assert(act.wait_readable(sock:fd(), 0.05))
             wait = false
             return sock:read()
         end))
@@ -50,7 +50,7 @@ function testcase.wait_readable_writable()
 
     -- test that wait until fd is writable
     assert(act.run(with_luacov(function()
-        local ok, err, timeout = act.wait_writable(sock:fd(), 50)
+        local ok, err, timeout = act.wait_writable(sock:fd(), 0.05)
         assert.is_true(ok)
         assert.is_nil(err)
         assert.is_nil(timeout)
@@ -66,7 +66,7 @@ function testcase.wait_readable_writable()
         act.wait_writable,
     }) do
         assert(act.run(with_luacov(function()
-            local ok, err, timeout = waitfn(sock:fd(), 50)
+            local ok, err, timeout = waitfn(sock:fd(), 0.05)
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_true(timeout)
@@ -79,7 +79,7 @@ function testcase.wait_readable_writable()
         act.wait_writable,
     }) do
         assert(act.run(with_luacov(function()
-            local ok, err, timeout = waitfn(123456789, 50)
+            local ok, err, timeout = waitfn(123456789, 0.05)
             assert.is_false(ok)
             assert(error.is(err, errno.EBADF))
             assert.is_nil(timeout)
@@ -95,7 +95,7 @@ function testcase.wait_readable_writable()
         assert(act.run(with_luacov(function()
             local cid = act.spawn(with_luacov(function()
                 wait = true
-                local ok, err, timeout = waitfn(sock:fd(), 50)
+                local ok, err, timeout = waitfn(sock:fd(), 0.05)
                 wait = false
                 assert.is_false(ok)
                 assert.is_nil(err)
@@ -104,7 +104,7 @@ function testcase.wait_readable_writable()
 
             act.later()
             assert.is_true(wait)
-            local ok, err, timeout = waitfn(sock:fd(), 50)
+            local ok, err, timeout = waitfn(sock:fd(), 0.05)
             assert.is_false(ok)
             assert.match(err, 'EALREADY')
             assert.is_nil(timeout)
@@ -129,14 +129,14 @@ function testcase.unwait_readable_writable()
         local wait = false
         local cid = act.spawn(with_luacov(function()
             wait = true
-            local elapsed = nanotime()
-            local ok, err, timeout = act.wait_readable(sock:fd(), 50)
-            elapsed = (nanotime() - elapsed) * 1000
+            local elapsed = gettime()
+            local ok, err, timeout = act.wait_readable(sock:fd(), 0.05)
+            elapsed = gettime() - elapsed
             wait = false
             assert.is_false(ok)
             assert.is_nil(err)
             assert.is_nil(timeout)
-            assert.less(elapsed, 10)
+            assert.less(elapsed, 0.01)
         end))
 
         act.later()
@@ -155,7 +155,7 @@ function testcase.unwait_readable_writable()
         local wait = false
         local cid = act.spawn(with_luacov(function()
             wait = true
-            local ok, err, timeout = act.wait_writable(sock:fd(), 50)
+            local ok, err, timeout = act.wait_writable(sock:fd(), 0.05)
             wait = false
             assert.is_false(ok)
             assert.is_nil(err)
@@ -182,7 +182,7 @@ function testcase.unwait_readable_writable()
             local wait = false
             local cid = act.spawn(with_luacov(function()
                 wait = true
-                local ok, err, timeout = waitfn(sock:fd(), 50)
+                local ok, err, timeout = waitfn(sock:fd(), 0.05)
                 wait = false
                 assert.is_false(ok)
                 assert.is_nil(err)
@@ -218,7 +218,7 @@ function testcase.wait_fails_on_shutdown()
             local wait = false
             local cid = act.spawn(with_luacov(function()
                 wait = true
-                local ok, err, timeout = waitfn(sock:fd(), 50)
+                local ok, err, timeout = waitfn(sock:fd(), 0.05)
                 wait = false
                 assert.is_true(ok)
                 assert.is_nil(err)
@@ -257,7 +257,7 @@ function testcase.wait_unwait_throws_error_for_invalid_arguments()
             assert.match(err, 'fd must be unsigned integer')
 
             err = assert.throws(waitfn, 0, -1)
-            assert.match(err, 'msec must be unsigned integer')
+            assert.match(err, 'sec must be unsigned number')
         end)))
     end
 

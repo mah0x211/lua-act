@@ -1,6 +1,6 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
-local nanotime = require('testcase.timer').nanotime
+local gettime = require('time.clock').gettime
 local signal = require('signal')
 local act = require('act')
 
@@ -12,15 +12,15 @@ function testcase.signal_occurrs()
         local wait = false
         act.spawn(with_luacov(function()
             wait = true
-            local elapsed = nanotime()
-            local signo, err, timeout = act.sigwait(50, signal.SIGUSR1)
-            elapsed = (nanotime() - elapsed) * 1000
+            local elapsed = gettime()
+            local signo, err, timeout = act.sigwait(0.05, signal.SIGUSR1)
+            elapsed = gettime() - elapsed
 
             wait = false
             assert.equal(signo, signal.SIGUSR1)
             assert.is_nil(err)
             assert.is_nil(timeout)
-            assert.less(elapsed, 2)
+            assert.less(elapsed, 0.002)
         end))
 
         act.later()
@@ -36,15 +36,15 @@ function testcase.no_signal_occurrs()
         local wait = false
         act.spawn(with_luacov(function()
             wait = true
-            local elapsed = nanotime()
-            local signo, err, timeout = act.sigwait(50)
-            elapsed = (nanotime() - elapsed) * 1000
+            local elapsed = gettime()
+            local signo, err, timeout = act.sigwait(0.05)
+            elapsed = gettime() - elapsed
 
             wait = false
             assert.is_nil(signo)
             assert.is_nil(err)
             assert.is_nil(timeout)
-            assert.less(elapsed, 2)
+            assert.less(elapsed, 0.002)
         end))
 
         act.later()
@@ -56,7 +56,7 @@ function testcase.timeout()
     -- test that fail by timeout
     assert(act.run(with_luacov(function()
         act.spawn(with_luacov(function()
-            local signo, err, timeout = act.sigwait(50, signal.SIGUSR1)
+            local signo, err, timeout = act.sigwait(0.05, signal.SIGUSR1)
 
             assert.is_nil(signo)
             assert.is_nil(err)
@@ -71,7 +71,7 @@ end
 function testcase.invalid_signal()
     -- test that return error if invalid signal is specified
     assert(act.run(with_luacov(function()
-        local signo, err = act.sigwait(50, signal.SIGUSR1, -1)
+        local signo, err = act.sigwait(0.05, signal.SIGUSR1, -1)
         assert.is_nil(signo)
         assert.match(err, 'EINVAL')
     end)))
@@ -81,7 +81,7 @@ function testcase.signal_throws()
     -- test that fail with invalid arguments
     assert(act.run(with_luacov(function()
         local err = assert.throws(act.sigwait, -1)
-        assert.match(err, 'msec must be unsigned integer')
+        assert.match(err, 'sec must be unsigned number')
 
         err = assert.throws(act.sigwait, nil, 'SIGUSR1')
         assert.match(err, 'number expected')
