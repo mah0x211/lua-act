@@ -36,7 +36,6 @@ build = {
         ["act.event"] = "lib/event.lua",
         ["act.fork"] = "lib/fork.lua",
         ["act.getcpus"] = "src/getcpus.c",
-        ["act.hrtimer"] = "src/hrtimer.c",
         ["act.ignsigpipe"] = "src/ignsigpipe.c",
         ["act.lockq"] = "lib/lockq.lua",
         ["act.minheap"] = "lib/minheap.lua",
