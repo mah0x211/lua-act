@@ -1,6 +1,6 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
-local nanotime = require('testcase.timer').nanotime
+local gettime = require('time.clock').gettime
 local act = require('act')
 
 function testcase.suspend_resume()
@@ -9,14 +9,14 @@ function testcase.suspend_resume()
         local suspended = false
         local cid = act.spawn(with_luacov(function()
             suspended = true
-            local elapsed = nanotime()
+            local elapsed = gettime()
             local ok, val = act.suspend()
-            elapsed = (nanotime() - elapsed) * 1000
+            elapsed = gettime() - elapsed
 
             assert.is_true(ok)
             assert.equal(val, 'hello')
             -- returned immediately if resumed
-            assert.less(elapsed, 2)
+            assert.less(elapsed, 0.002)
         end))
 
         act.later()
@@ -30,11 +30,11 @@ end
 function testcase.suspend_timeout()
     -- test that suspend timed out
     assert(act.run(with_luacov(function()
-        local ok, val = act.suspend(100)
+        local ok, val = act.suspend(0.1)
         assert.is_false(ok)
         assert.is_nil(val)
 
-        ok, val = act.suspend(100)
+        ok, val = act.suspend(0.1)
         assert.is_false(ok)
         assert.is_nil(val)
     end)))
@@ -44,7 +44,7 @@ function testcase.suspend_throws_error_for_invalid_arguments()
     -- test that throws an error if argument is invalid
     assert(act.run(with_luacov(function()
         local err = assert.throws(act.suspend, 'abc')
-        assert.match(err, 'msec must be unsigned integer')
+        assert.match(err, 'sec must be unsigned number')
     end)))
 end
 

@@ -117,9 +117,9 @@ end
 
 --- pushq pushes a callee to runq
 --- @param callee act.callee
---- @param msec? integer
-function Context:pushq(callee, msec)
-    self.runq:push(callee, msec)
+--- @param sec? number
+function Context:pushq(callee, sec)
+    self.runq:push(callee, sec)
 end
 
 --- removeq remove a callee from runq
@@ -131,12 +131,12 @@ end
 --- read_lock
 --- @param callee act.callee
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function Context:read_lock(callee, fd, msec)
-    return self.lockq:read_lock(callee, fd, msec)
+function Context:read_lock(callee, fd, sec)
+    return self.lockq:read_lock(callee, fd, sec)
 end
 
 --- read_unlock
@@ -150,12 +150,12 @@ end
 --- write_lock
 --- @param callee act.callee
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function Context:write_lock(callee, fd, msec)
-    return self.lockq:write_lock(callee, fd, msec)
+function Context:write_lock(callee, fd, sec)
+    return self.lockq:write_lock(callee, fd, sec)
 end
 
 --- write_unlock

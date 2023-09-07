@@ -1,9 +1,9 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
-local nanotime = require('testcase.timer').nanotime
 local getpid = require('testcase.getpid')
 local errno = require('errno')
 local act = require('act')
+local gettime = require('time.clock').gettime
 
 function testcase.fork()
     local pid = getpid()
@@ -36,7 +36,7 @@ function testcase.waitpid()
     assert(act.run(with_luacov(function()
         local p = assert(act.fork())
         if p:is_child() then
-            act.sleep(500)
+            act.sleep(0.5)
             return
         end
 
@@ -58,7 +58,7 @@ function testcase.waitpid()
     assert(act.run(with_luacov(function()
         local p1 = assert(act.fork())
         if p1:is_child() then
-            act.sleep(500)
+            act.sleep(0.5)
             return
         end
 
@@ -88,29 +88,29 @@ function testcase.waitpid()
     assert(act.run(with_luacov(function()
         local p = assert(act.fork())
         if p:is_child() then
-            act.sleep(500)
+            act.sleep(0.5)
             return
         end
 
         -- test that wait child process exit with timeout
-        local elapsed = nanotime()
-        local res, err, timeout = act.waitpid(200)
-        elapsed = (nanotime() - elapsed) * 1000
+        local elapsed = gettime()
+        local res, err, timeout = act.waitpid(0.2)
+        elapsed = gettime() - elapsed
         assert.is_nil(res)
         assert.is_nil(err)
         assert.is_true(timeout)
-        assert.greater(elapsed, 200)
-        assert.less(elapsed, 250)
+        assert.greater(elapsed, 0.2)
+        assert.less(elapsed, 0.25)
 
         -- that that wait child process exit with timeout that less than 100 msec
-        elapsed = nanotime()
-        res, err, timeout = act.waitpid(50)
-        elapsed = (nanotime() - elapsed) * 1000
+        elapsed = gettime()
+        res, err, timeout = act.waitpid(0.05)
+        elapsed = gettime() - elapsed
         assert.is_nil(res)
         assert.is_nil(err)
         assert.is_true(timeout)
-        assert.greater(elapsed, 45)
-        assert.less(elapsed, 59)
+        assert.greater(elapsed, 0.045)
+        assert.less(elapsed, 0.059)
 
         -- cleanup
         while act.waitpid() do
@@ -135,7 +135,7 @@ function testcase.waitpid()
     assert(act.run(with_luacov(function()
         -- test that throws an error if msec is not a valid number
         local err = assert.throws(act.waitpid, -1)
-        assert.match(err, 'msec must be unsigned integer')
+        assert.match(err, 'sec must be unsigned number or nil')
 
         -- test that throws an error if wpid is not a valid number
         err = assert.throws(act.waitpid, nil, 'foo')

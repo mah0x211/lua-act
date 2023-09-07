@@ -1,9 +1,9 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
-local nanotime = require('testcase.timer').nanotime
 local act = require('act')
 local new_lockq = require('act.lockq').new
 local new_runq = require('act.runq').new
+local gettime = require('time.clock').gettime
 
 function testcase.new_lockq()
     --- create a new lockq
@@ -36,14 +36,14 @@ function testcase.release()
         end,
     }
     local fd = 1
-    assert(lockq:read_lock(callee1, fd, 100))
+    assert(lockq:read_lock(callee1, fd, 0.1))
     assert.equal(lockq.rlockq[fd].locker, callee1)
 
     assert(act.run(with_luacov(function()
         local try_lock = false
         act.spawn(with_luacov(function()
             try_lock = true
-            assert(lockq:read_lock(callee2, fd, 100))
+            assert(lockq:read_lock(callee2, fd, 0.1))
             try_lock = false
         end))
         act.later()
@@ -73,54 +73,54 @@ function testcase.lock()
             local fd = 1
 
             act.spawn(with_luacov(function()
-                local ok, err, timeout = lockfn(fd, 30)
+                local ok, err, timeout = lockfn(fd, 0.03)
 
-                act.sleep(5)
+                act.sleep(0.005)
                 assert.is_true(ok)
                 assert.is_nil(err)
                 assert.is_nil(timeout)
 
                 -- test that return true if the lock is already held
-                ok, err, timeout = lockfn(fd, 30)
+                ok, err, timeout = lockfn(fd, 0.03)
                 assert.is_true(ok)
                 assert.is_nil(err)
                 assert.is_nil(timeout)
 
-                return 'lock ok 30'
+                return 'lock ok 0.03 sec'
             end))
 
             act.spawn(with_luacov(function()
-                local ok, err, timeout = lockfn(fd, 20)
+                local ok, err, timeout = lockfn(fd, 0.02)
 
                 assert.is_true(ok)
                 assert.is_nil(err)
                 assert.is_nil(timeout)
-                return 'lock ok 20'
+                return 'lock ok 0.02 sec'
             end))
 
             act.spawn(with_luacov(function()
-                local ok, err, timeout = lockfn(fd, 10)
+                local ok, err, timeout = lockfn(fd, 0.01)
 
                 assert.is_true(ok)
                 assert.is_nil(err)
                 assert.is_nil(timeout)
-                return 'lock ok 10'
+                return 'lock ok 0.01 sec'
             end))
 
             act.awaitq_size(-1)
             local res = assert(act.await())
             assert.equal(res.result, {
-                'lock ok 30',
+                'lock ok 0.03 sec',
             })
 
             res = assert(act.await())
             assert.equal(res.result, {
-                'lock ok 20',
+                'lock ok 0.02 sec',
             })
 
             res = assert(act.await())
             assert.equal(res.result, {
-                'lock ok 10',
+                'lock ok 0.01 sec',
             })
         end)))
     end
@@ -137,13 +137,13 @@ function testcase.lock_timeout()
 
             assert(lockfn(fd))
             act.spawn(with_luacov(function()
-                local elapsed = nanotime()
-                local ok, err, timeout = lockfn(fd, 10)
-                elapsed = (nanotime() - elapsed) * 1000
+                local elapsed = gettime()
+                local ok, err, timeout = lockfn(fd, 0.01)
+                elapsed = gettime() - elapsed
                 assert.is_false(ok)
                 assert.is_nil(err)
                 assert.is_true(timeout)
-                assert.less(elapsed, 15)
+                assert.less(elapsed, 0.015)
                 return 'lock timeout'
             end))
 
@@ -157,16 +157,16 @@ function testcase.lock_timeout()
         assert(act.run(with_luacov(function()
             local fd = 1
 
-            assert(lockfn(fd, 30))
+            assert(lockfn(fd, 0.03))
             act.spawn(with_luacov(function()
-                local elapsed = nanotime()
-                local ok, err, timeout = lockfn(fd, 30)
-                elapsed = (nanotime() - elapsed) * 1000
+                local elapsed = gettime()
+                local ok, err, timeout = lockfn(fd, 0.03)
+                elapsed = gettime() - elapsed
                 assert.is_false(ok)
                 assert.is_nil(err)
                 assert.is_true(timeout)
-                assert.greater(elapsed, 30)
-                assert.less(elapsed, 40)
+                assert.greater(elapsed, 0.03)
+                assert.less(elapsed, 0.04)
                 return 'timeout'
             end))
 
@@ -189,37 +189,37 @@ function testcase.unlock()
             local locked = false
 
             act.spawn(with_luacov(function()
-                assert(lockfn(fd, 30))
+                assert(lockfn(fd, 0.03))
 
                 locked = true
-                act.sleep(10)
+                act.sleep(0.01)
                 unlockfn(fd)
                 locked = false
-                return 'lock 10 msec'
+                return 'lock and sleep 0.01 sec'
             end))
 
             act.spawn(with_luacov(function()
-                local elapsed = nanotime()
-                local ok, timeout = lockfn(fd, 1000)
-                elapsed = (nanotime() - elapsed) * 1000
+                local elapsed = gettime()
+                local ok, timeout = lockfn(fd, 1.0)
+                elapsed = gettime() - elapsed
 
                 assert.is_false(locked)
                 assert.is_true(ok)
                 assert.is_nil(timeout)
-                assert.less(elapsed, 20)
-                return 'lock ok 1000'
+                assert.less(elapsed, 0.02)
+                return 'lock ok 1.0 sec'
             end))
 
             act.later()
             assert.is_true(locked)
             local res = assert(act.await())
             assert.equal(res.result, {
-                'lock 10 msec',
+                'lock and sleep 0.01 sec',
             })
 
             res = assert(act.await())
             assert.equal(res.result, {
-                'lock ok 1000',
+                'lock ok 1.0 sec',
             })
         end)))
     end
@@ -235,52 +235,52 @@ function testcase.lock_multiple_fd()
             local fd1, fd2 = 1, 2
 
             act.spawn(with_luacov(function()
-                local ok, err, timeout = lockfn(fd1, 30)
+                local ok, err, timeout = lockfn(fd1, 0.03)
                 assert.is_true(ok)
                 assert.is_nil(err)
                 assert.is_nil(timeout)
 
-                ok, err, timeout = lockfn(fd2, 30)
+                ok, err, timeout = lockfn(fd2, 0.03)
                 assert.is_true(ok)
                 assert.is_nil(err)
                 assert.is_nil(timeout)
 
-                act.sleep(30)
+                act.sleep(0.03)
 
-                return 'lock 1 and 2 ok 30'
+                return 'lock 1 and 2 ok 0.03'
             end))
 
             act.spawn(with_luacov(function()
-                local ok, err, timeout = lockfn(fd1, 20)
+                local ok, err, timeout = lockfn(fd1, 0.02)
 
                 assert.is_false(ok)
                 assert.is_nil(err)
                 assert.is_true(timeout)
-                return 'lock 1 timeout 20'
+                return 'lock 1 timeout 0.02'
             end))
 
             act.spawn(with_luacov(function()
-                local ok, err, timeout = lockfn(fd2, 10)
+                local ok, err, timeout = lockfn(fd2, 0.01)
 
                 assert.is_false(ok)
                 assert.is_nil(err)
                 assert.is_true(timeout)
-                return 'lock 2 timeout 10'
+                return 'lock 2 timeout 0.01'
             end))
 
             local res = assert(act.await())
             assert.equal(res.result, {
-                'lock 2 timeout 10',
+                'lock 2 timeout 0.01',
             })
 
             res = assert(act.await())
             assert.equal(res.result, {
-                'lock 1 timeout 20',
+                'lock 1 timeout 0.02',
             })
 
             res = assert(act.await())
             assert.equal(res.result, {
-                'lock 1 and 2 ok 30',
+                'lock 1 and 2 ok 0.03',
             })
         end)))
     end
@@ -296,54 +296,54 @@ function testcase.lock_timeout_order()
             local fd = 1
 
             act.spawn(with_luacov(function()
-                local ok, err, timeout = lockfn(fd, 30)
+                local ok, err, timeout = lockfn(fd, 0.03)
 
-                act.sleep(30)
+                act.sleep(0.03)
                 assert.is_true(ok)
                 assert.is_nil(err)
                 assert.is_nil(timeout)
-                return 'lock ok 30'
+                return 'lock ok 0.03'
             end))
 
             act.spawn(with_luacov(function()
-                local elapsed = nanotime()
-                local ok, err, timeout = lockfn(fd, 20)
-                elapsed = (nanotime() - elapsed) * 1000
+                local elapsed = gettime()
+                local ok, err, timeout = lockfn(fd, 0.02)
+                elapsed = gettime() - elapsed
 
                 assert.is_false(ok)
                 assert.is_nil(err)
                 assert.is_true(timeout)
-                assert.greater(elapsed, 10)
-                assert.less(elapsed, 30)
-                return 'lock timeout 20'
+                assert.greater(elapsed, 0.01)
+                assert.less(elapsed, 0.03)
+                return 'lock timeout 0.02'
             end))
 
             act.spawn(with_luacov(function()
-                local elapsed = nanotime()
-                local ok, err, timeout = lockfn(fd, 10)
-                elapsed = (nanotime() - elapsed) * 1000
+                local elapsed = gettime()
+                local ok, err, timeout = lockfn(fd, 0.01)
+                elapsed = gettime() - elapsed
 
                 assert.is_false(ok)
                 assert.is_nil(err)
                 assert.is_true(timeout)
-                assert.greater(elapsed, 1)
-                assert.less(elapsed, 20)
-                return 'lock timeout 10'
+                assert.greater(elapsed, 0.01)
+                assert.less(elapsed, 0.02)
+                return 'lock timeout 0.01'
             end))
 
             local res = assert(act.await())
             assert.equal(res.result, {
-                'lock timeout 10',
+                'lock timeout 0.01',
             })
 
             res = assert(act.await())
             assert.equal(res.result, {
-                'lock timeout 20',
+                'lock timeout 0.02',
             })
 
             res = assert(act.await())
             assert.equal(res.result, {
-                'lock ok 30',
+                'lock ok 0.03',
             })
         end)))
     end
@@ -356,7 +356,7 @@ function testcase.read_lock_invalid_argument()
         assert.match(err, 'fd must be unsigned integer')
 
         err = assert.throws(act.read_lock, 1, {})
-        assert.match(err, 'msec must be unsigned integer')
+        assert.match(err, 'sec must be unsigned number or nil')
     end)))
 
     -- test that fail on called from outside of execution context
@@ -383,7 +383,7 @@ function testcase.write_lock_invalid_argument()
         assert.match(err, 'fd must be unsigned integer')
 
         err = assert.throws(act.write_lock, 1, {})
-        assert.match(err, 'msec must be unsigned integer')
+        assert.match(err, 'sec must be unsigned number or nil')
     end)))
 
     -- test that fail on called from outside of execution context

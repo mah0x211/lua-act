@@ -34,11 +34,11 @@ local INF_NEG = -INF_POS
 local OP_EVENT = 0
 local OP_RUNQ = 1
 
---- is_str
+--- is_unsigned
 --- @param v any
 --- @return boolean ok
-local function is_str(v)
-    return type(v) == 'string'
+local function is_unsigned(v)
+    return type(v) == 'number' and v >= 0 and v < INF_POS
 end
 
 --- is_int
@@ -53,13 +53,6 @@ end
 --- @return boolean ok
 local function is_uint(v)
     return type(v) == 'number' and v >= 0 and v < INF_POS and v == floor(v)
-end
-
---- is_func
---- @param v any
---- @return boolean ok
-local function is_func(v)
-    return type(v) == 'function'
 end
 
 --- concat
@@ -83,10 +76,9 @@ end
 return {
     OP_EVENT = OP_EVENT,
     OP_RUNQ = OP_RUNQ,
-    is_str = is_str,
     is_int = is_int,
     is_uint = is_uint,
-    is_func = is_func,
+    is_unsigned = is_unsigned,
     concat = concat,
 }
 

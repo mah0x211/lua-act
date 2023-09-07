@@ -10,7 +10,7 @@ function testcase.yield()
             return 'world'
         end)
 
-        local res = assert(act.await(100))
+        local res = assert(act.await(0.1))
         assert.equal(res, {
             cid = cid,
             status = 'yield',
@@ -18,7 +18,7 @@ function testcase.yield()
                 'hello',
             },
         })
-        res = assert(act.await(100))
+        res = assert(act.await(0.1))
         res.cid = nil
         assert.equal(res, {
             status = 'ok',
@@ -33,12 +33,12 @@ function testcase.timeout()
     assert(act.run(with_luacov(function()
         -- test that timeout
         local cid = act.spawn(function()
-            assert.is_false(act.yield(5, 'hello'))
+            assert.is_false(act.yield(0.005, 'hello'))
             return 'timeout'
         end)
 
         act.awaitq_size(-1)
-        act.sleep(10)
+        act.sleep(0.01)
         local res = assert(act.await())
         assert.equal(res, {
             cid = cid,
@@ -57,7 +57,7 @@ function testcase.fail_on_main_thread()
         end)
 
         -- test that fail on called from main thread
-        local err = assert.throws(act.yield, 10, 'hello')
+        local err = assert.throws(act.yield, 0.01, 'hello')
         assert.match(err, 'parent is not exists')
     end)))
 end
@@ -66,7 +66,7 @@ function testcase.fail_on_invalid_argument()
     assert(act.run(with_luacov(function()
         -- test that waiting for spawned coroutines to terminate
         local err = assert.throws(act.yield, 'foo')
-        assert.match(err, 'msec must be unsigned integer')
+        assert.match(err, 'sec must be unsigned number')
     end)))
 end
 

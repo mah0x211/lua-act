@@ -134,11 +134,11 @@ end
 --- @param lockq table<integer, table>
 --- @param callee act.callee
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-local function lock(runq, lockq, callee, fd, msec)
+local function lock(runq, lockq, callee, fd, sec)
     local waitq = lockq[fd]
     if not waitq then
         -- create a new lock-waitq and keep the waitq reference
@@ -151,9 +151,9 @@ local function lock(runq, lockq, callee, fd, msec)
         return true
     end
 
-    if msec ~= nil then
-        -- suspend until reached to msec
-        runq:push(callee, msec)
+    if sec ~= nil then
+        -- suspend until reached to sec
+        runq:push(callee, sec)
     end
 
     -- other callee is locking the fd
@@ -169,7 +169,7 @@ local function lock(runq, lockq, callee, fd, msec)
 
     -- resumed by time-out if locker is not callee
     if waitq.locker ~= callee then
-        if msec then
+        if sec then
             runq:remove(callee)
         end
         return false, nil, true
@@ -182,23 +182,23 @@ end
 --- read_lock
 --- @param callee act.callee
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function LockQ:read_lock(callee, fd, msec)
-    return lock(self.runq, self.rlockq, callee, fd, msec)
+function LockQ:read_lock(callee, fd, sec)
+    return lock(self.runq, self.rlockq, callee, fd, sec)
 end
 
 --- write_lock
 --- @param callee act.callee
 --- @param fd integer
---- @param msec integer
+--- @param sec number
 --- @return boolean ok
 --- @return any err
 --- @return boolean? timeout
-function LockQ:write_lock(callee, fd, msec)
-    return lock(self.runq, self.wlockq, callee, fd, msec)
+function LockQ:write_lock(callee, fd, sec)
+    return lock(self.runq, self.wlockq, callee, fd, sec)
 end
 
 return {
