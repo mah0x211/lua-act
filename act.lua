@@ -48,6 +48,18 @@ local new_context = require('act.context').new
 --- constants
 --- @type act.context?
 local ACT_CTX
+local EVENT_CACHE_ENABLED = false
+
+--- event_cache
+--- @param enabled boolean
+local function event_cache(enabled)
+    if callee_acquire() then
+        error('the event cache state cannot be changed at runtime execution', 2)
+    elseif type(enabled) ~= 'boolean' then
+        error('enabled must be boolean', 2)
+    end
+    EVENT_CACHE_ENABLED = enabled
+end
 
 --- spawn_child
 --- @param is_atexit boolean
@@ -484,7 +496,7 @@ end
 local function runloop(mainfn, ...)
     -- create act context
     local err
-    ACT_CTX, err = new_context()
+    ACT_CTX, err = new_context(EVENT_CACHE_ENABLED)
     if err then
         return false, err
     end
@@ -568,6 +580,7 @@ end
 -- exports
 return {
     run = run,
+    event_cache = event_cache,
     getcid = getcid,
     wait_writable = wait_writable,
     wait_readable = wait_readable,

@@ -43,6 +43,7 @@ local OP_EVENT = require('act.aux').OP_EVENT
 --- @class act.event
 --- @field monitor poller
 --- @field pool act.deque
+--- @field cache_enabled boolean
 --- @field used table<string, table<integer, act.event.info>>
 local Event = {}
 
@@ -51,9 +52,13 @@ function Event:__newindex()
 end
 
 --- init
+--- @param cache_enabled boolean? default: false
 --- @return act.event? ev
 --- @return any err
-function Event:init()
+function Event:init(cache_enabled)
+    assert(type(cache_enabled) == 'boolean' or cache_enabled == nil,
+           'cache_enabled must be boolean or nil')
+
     -- create event monitor
     local monitor, err, errno = poller()
     if err then
@@ -62,6 +67,7 @@ function Event:init()
 
     rawset(self, 'monitor', monitor)
     rawset(self, 'pool', new_deque())
+    rawset(self, 'cache_enabled', cache_enabled and true or false)
     rawset(self, 'used', {
         signal = {},
         readable = {},
@@ -119,6 +125,19 @@ function Event:revoke(asa, val)
         return true
     end
     return false
+end
+
+--- cache
+--- @param asa string
+---| 'signal' signal event
+---| 'readable' readable event
+---| 'writable' writable event
+--- @param val integer
+function Event:cache(asa, val)
+    if not self.cache_enabled then
+        -- revoke cached event
+        self:revoke(asa, val)
+    end
 end
 
 --- register
