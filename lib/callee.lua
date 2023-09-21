@@ -390,6 +390,9 @@ local function waitable(self, asa, fd, sec)
         return false, nil, true
     end
 
+    -- cache registered event
+    event:cache(asa, fd)
+
     -- event occurred
     if sec then
         self.ctx:removeq(self)

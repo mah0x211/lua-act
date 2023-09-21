@@ -50,10 +50,11 @@ function Context:__newindex()
 end
 
 --- init
+--- @param event_cache_enabled boolean
 --- @return act.context? ctx
 --- @return any err
-function Context:init()
-    local event, err = new_event()
+function Context:init(event_cache_enabled)
+    local event, err = new_event(event_cache_enabled)
     if err then
         return nil, err
     end
