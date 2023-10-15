@@ -28,6 +28,7 @@ local pairs = pairs
 local yield = coroutine.yield
 local setmetatable = setmetatable
 local EALREADY = require('errno').EALREADY
+local ECANCELED = require('errno').ECANCELED
 local gettime = require('time.clock').gettime
 local new_coro = require('act.coro').new
 local new_stack = require('act.stack')
@@ -337,23 +338,23 @@ local IOWAIT = {
 --- @param asa string
 --- @param fd integer
 --- @param sec number
---- @return boolean ok
+--- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
 local function waitable(self, asa, fd, sec)
     if IOWAIT[asa][fd] then
         -- other callee is already waiting
-        return false, EALREADY:new()
+        return nil, EALREADY:new()
     end
 
     local event = self.ctx.event
     local evinfo, err, is_ready = event:register(self, asa, fd, 'edge')
     if is_ready then
         -- fd is ready to read or write
-        return true
+        return fd
     elseif not evinfo then
         -- failed to create io-event
-        return false, err
+        return nil, err
     end
 
     -- register to runq with sec
@@ -380,14 +381,14 @@ local function waitable(self, asa, fd, sec)
         -- revoke event
         event:revoke(asa, fd)
         self.is_cancel = nil
-        return false
+        return nil, ECANCELED:new()
     end
 
     -- timed out
     if self.op == OP_RUNQ then
         event:revoke(asa, fd)
         assert(sec ~= nil, 'invalid implements')
-        return false, nil, true
+        return nil, nil, true
     end
 
     -- cache registered event
@@ -400,7 +401,7 @@ local function waitable(self, asa, fd, sec)
 
     -- opertion type must be OP_EVENT and fdno must be fd
     if self.op == OP_EVENT and fdno == fd then
-        return true
+        return fd
     end
     event:revoke(asa, fd)
     error('invalid implements')
@@ -409,7 +410,7 @@ end
 --- wait_readable
 --- @param fd integer
 --- @param sec number
---- @return boolean ok
+--- @return integer fd
 --- @return any err
 --- @return boolean? timeout
 function Callee:wait_readable(fd, sec)
@@ -419,7 +420,7 @@ end
 --- wait_writable
 --- @param fd integer
 --- @param sec number
---- @return boolean ok
+--- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
 function Callee:wait_writable(fd, sec)

@@ -423,7 +423,7 @@ end
 --- wait_readable
 --- @param fd integer
 --- @param sec? number
---- @return boolean ok
+--- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
 local function wait_readable(fd, sec)
@@ -444,7 +444,7 @@ end
 --- wait_writable
 --- @param fd integer
 --- @param sec? number
---- @return boolean ok
+--- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
 local function wait_writable(fd, sec)
