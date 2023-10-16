@@ -18,7 +18,7 @@ local function socketpair()
 end
 
 function testcase.after_each()
-    for _, sock in ipairs(SOCKPAIR or {}) do
+    for _, sock in pairs(SOCKPAIR or {}) do
         sock:close()
     end
 end
@@ -199,6 +199,96 @@ function testcase.unwait_readable_writable()
                 status = 'ok',
                 result = {},
             })
+        end)))
+    end
+end
+
+function testcase.wait_multiple_fds()
+    local sock1, sock2 = socketpair()
+
+    -- test that wait until multiple fds are readable
+    assert(act.run(with_luacov(function()
+        local wait = false
+        local cid = act.spawn(with_luacov(function()
+            local fds = {
+                [sock1:fd()] = sock1,
+                [sock2:fd()] = sock2,
+            }
+
+            local msg = {}
+            for _ = 1, 2 do
+                wait = true
+                local fd, err, timeout =
+                    act.wait_readable(sock1:fd(), 0.05, sock2:fd())
+                wait = false
+                local sock = assert(fds[fd])
+                assert.is_nil(err)
+                assert.is_nil(timeout)
+                msg[#msg + 1] = sock:read()
+            end
+            return msg[1], msg[2]
+        end))
+
+        act.later()
+        assert.is_true(wait)
+        sock1:write('hello')
+        sock2:write('world')
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            status = 'ok',
+            result = {
+                'hello',
+                'world',
+            },
+        })
+    end)))
+
+    -- test that wait until multiple fds are writable
+    assert(act.run(with_luacov(function()
+        local msg = {}
+        local cid = act.spawn(with_luacov(function()
+            local fds = {
+                [sock1:fd()] = sock1,
+                [sock2:fd()] = sock2,
+            }
+            act.later()
+
+            -- writable event occurs randomly
+            while next(fds) do
+                local fd, err, timeout =
+                    act.wait_writable(sock1:fd(), 0.05, sock2:fd())
+                local sock = assert(fds[fd])
+                assert.is_nil(err)
+                assert.is_nil(timeout)
+                fds[fd] = nil
+                msg[#msg + 1] = 'hello from sock' ..
+                                    (sock == sock1 and '1' or '2')
+            end
+        end))
+
+        act.later()
+        local res = assert(act.await())
+        assert.equal(res, {
+            cid = cid,
+            status = 'ok',
+            result = {},
+        })
+        table.sort(msg)
+        assert.equal(msg, {
+            'hello from sock1',
+            'hello from sock2',
+        })
+    end)))
+
+    -- test that throws an error if additional fds are invalid
+    for _, waitfn in ipairs({
+        act.wait_readable,
+        act.wait_writable,
+    }) do
+        assert(act.run(with_luacov(function()
+            local err = assert.throws(waitfn, sock1:fd(), nil, -1)
+            assert.match(err, 'must be unsigned integer')
         end)))
     end
 end

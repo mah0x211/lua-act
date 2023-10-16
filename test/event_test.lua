@@ -88,21 +88,21 @@ function testcase.revoke()
     assert.is_false(event:revoke('readable', 0))
 end
 
-function testcase.cache()
+function testcase.revoke_if_cache_not_enabled()
     local callee = {}
 
     -- test that event will be revoked if cache_enabled is false
     local event = new_event()
     local evinfo = event:register(callee, 'readable', 0)
     assert.equal(evinfo, event.used.readable[0])
-    event:cache('readable', 0)
+    event:revoke_if_cache_not_enabled('readable', 0)
     assert.is_nil(event.used.readable[0])
 
     -- test that event will not be revoked if cache_enabled is true
     event = new_event(true)
     evinfo = event:register(callee, 'readable', 0)
     assert.equal(evinfo, event.used.readable[0])
-    event:cache('readable', 0)
+    event:revoke_if_cache_not_enabled('readable', 0)
     assert.equal(evinfo, event.used.readable[0])
     event:revoke('readable', 0)
 end

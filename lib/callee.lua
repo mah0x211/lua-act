@@ -27,6 +27,7 @@
 local pairs = pairs
 local yield = coroutine.yield
 local setmetatable = setmetatable
+local select = select
 local EALREADY = require('errno').EALREADY
 local ECANCELED = require('errno').ECANCELED
 local gettime = require('time.clock').gettime
@@ -34,6 +35,7 @@ local new_coro = require('act.coro').new
 local new_stack = require('act.stack')
 local new_deque = require('act.deque')
 local aux = require('act.aux')
+local is_uint = aux.is_uint
 local concat = aux.concat
 -- constants
 local OP_EVENT = aux.OP_EVENT
@@ -53,7 +55,7 @@ local OP_RUNQ = aux.OP_RUNQ
 --- @field is_cancel? boolean
 --- @field is_atexit? boolean
 --- @field is_exit? boolean
---- @field ioevents? table<act.event.info, boolean>
+--- @field ioevents? table<integer, act.event.info>
 --- @field sigset? act.deque
 local Callee = {}
 
@@ -324,7 +326,7 @@ function Callee:sigwait(sec, ...)
     return signo
 end
 
---- iowait
+--- iowait restrict the fd from being used in multiple coroutines
 --- @class iowait
 --- @field readable table<integer, act.callee>
 --- @field writable table<integer, act.callee>
@@ -338,23 +340,61 @@ local IOWAIT = {
 --- @param asa string
 --- @param fd integer
 --- @param sec number
+--- @param ... integer additional fds
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
-local function waitable(self, asa, fd, sec)
-    if IOWAIT[asa][fd] then
-        -- other callee is already waiting
-        return nil, EALREADY:new()
+local function waitable(self, asa, fd, sec, ...)
+    local event = self.ctx.event
+    local nfd = select('#', ...) + 1
+    local fds = {
+        fd,
+        ...,
+    }
+    local revoke_events = function(n)
+        for i = 1, n or nfd do
+            fd = fds[i]
+            self.ioevents[fd] = nil
+            IOWAIT[asa][fd] = nil
+            event:revoke(asa, fd)
+        end
+    end
+    local revoke_events_if_cache_not_enabled = function(n)
+        for i = 1, n or nfd do
+            fd = fds[i]
+            self.ioevents[fd] = nil
+            IOWAIT[asa][fd] = nil
+            event:revoke_if_cache_not_enabled(asa, fd)
+        end
     end
 
-    local event = self.ctx.event
-    local evinfo, err, is_ready = event:register(self, asa, fd, 'edge')
-    if is_ready then
-        -- fd is ready to read or write
-        return fd
-    elseif not evinfo then
-        -- failed to create io-event
-        return nil, err
+    for i = 1, nfd do
+        fd = fds[i]
+        if not is_uint(fd) then
+            revoke_events_if_cache_not_enabled(i - 1)
+            error('invalid fd#' .. i .. ' must be unsigned integer', 2)
+        end
+
+        if IOWAIT[asa][fd] then
+            -- other callee is already waiting for the fd
+            revoke_events_if_cache_not_enabled(i - 1)
+            return nil, EALREADY:new()
+        end
+
+        local evinfo, err, is_ready = event:register(self, asa, fd, 'edge')
+        if is_ready then
+            -- fd is ready to read or write
+            revoke_events_if_cache_not_enabled(i - 1)
+            return fd
+        elseif not evinfo then
+            -- failed to create io-event
+            revoke_events_if_cache_not_enabled(i - 1)
+            return nil, err
+        end
+
+        -- cache act.event.info
+        self.ioevents[fd] = evinfo
+        IOWAIT[asa][fd] = self
     end
 
     -- register to runq with sec
@@ -365,34 +405,22 @@ local function waitable(self, asa, fd, sec)
     -- clear cancel flag
     self.is_cancel = nil
 
-    -- cache act.event.info
-    self.ioevents[evinfo] = true
-    IOWAIT[asa][fd] = self
-
-    -- wait event until fired or canceled
+    -- wait event until event fired, timeout or canceled
     local fdno = yield()
-
-    -- uncached act.event.info
-    IOWAIT[asa][fd] = nil
-    self.ioevents[evinfo] = nil
 
     -- canceled by unwaitfd method
     if self.is_cancel then
-        -- revoke event
-        event:revoke(asa, fd)
+        revoke_events()
         self.is_cancel = nil
         return nil, ECANCELED:new()
     end
 
     -- timed out
     if self.op == OP_RUNQ then
-        event:revoke(asa, fd)
+        revoke_events()
         assert(sec ~= nil, 'invalid implements')
         return nil, nil, true
     end
-
-    -- cache registered event
-    event:cache(asa, fd)
 
     -- event occurred
     if sec then
@@ -400,31 +428,34 @@ local function waitable(self, asa, fd, sec)
     end
 
     -- opertion type must be OP_EVENT and fdno must be fd
-    if self.op == OP_EVENT and fdno == fd then
-        return fd
+    if self.op == OP_EVENT and self.ioevents[fdno] then
+        revoke_events_if_cache_not_enabled()
+        return fdno
     end
-    event:revoke(asa, fd)
+    revoke_events()
     error('invalid implements')
 end
 
 --- wait_readable
 --- @param fd integer
 --- @param sec number
+--- @param ... integer additional fds
 --- @return integer fd
 --- @return any err
 --- @return boolean? timeout
-function Callee:wait_readable(fd, sec)
-    return waitable(self, 'readable', fd, sec)
+function Callee:wait_readable(fd, sec, ...)
+    return waitable(self, 'readable', fd, sec, ...)
 end
 
 --- wait_writable
 --- @param fd integer
 --- @param sec number
+--- @param ... integer additional fds
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
-function Callee:wait_writable(fd, sec)
-    return waitable(self, 'writable', fd, sec)
+function Callee:wait_writable(fd, sec, ...)
+    return waitable(self, 'writable', fd, sec, ...)
 end
 
 --- unwaitfd
@@ -588,7 +619,7 @@ function Callee:dispose(status)
     -- revoke all events currently in use
     local event = self.ctx.event
     -- revoke self-managed io events
-    for evinfo in pairs(self.ioevents) do
+    for _, evinfo in pairs(self.ioevents) do
         IOWAIT[evinfo.asa][evinfo.val] = nil
         event:revoke(evinfo.asa, evinfo.val)
     end
