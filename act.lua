@@ -427,6 +427,7 @@ end
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
+--- @return boolean? hup
 local function wait_readable(fd, sec, ...)
     local callee = callee_acquire()
 
@@ -449,6 +450,7 @@ end
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
+--- @return boolean? hup
 local function wait_writable(fd, sec, ...)
     local callee = callee_acquire()
     if callee then

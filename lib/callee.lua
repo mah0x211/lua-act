@@ -344,6 +344,7 @@ local IOWAIT = {
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
+--- @return boolean? hup
 local function waitable(self, asa, fd, sec, ...)
     local event = self.ctx.event
     local nfd = select('#', ...) + 1
@@ -406,7 +407,7 @@ local function waitable(self, asa, fd, sec, ...)
     self.is_cancel = nil
 
     -- wait event until event fired, timeout or canceled
-    local fdno = yield()
+    local fdno, hup = yield()
 
     -- canceled by unwaitfd method
     if self.is_cancel then
@@ -430,7 +431,7 @@ local function waitable(self, asa, fd, sec, ...)
     -- opertion type must be OP_EVENT and fdno must be fd
     if self.op == OP_EVENT and self.ioevents[fdno] then
         revoke_events_if_cache_not_enabled()
-        return fdno
+        return fdno, nil, nil, hup
     end
     revoke_events()
     error('invalid implements')
@@ -443,6 +444,7 @@ end
 --- @return integer fd
 --- @return any err
 --- @return boolean? timeout
+--- @return boolean? hup
 function Callee:wait_readable(fd, sec, ...)
     return waitable(self, 'readable', fd, sec, ...)
 end
@@ -454,6 +456,7 @@ end
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
+--- @return boolean? hup
 function Callee:wait_writable(fd, sec, ...)
     return waitable(self, 'writable', fd, sec, ...)
 end
