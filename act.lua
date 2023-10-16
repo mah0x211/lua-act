@@ -423,10 +423,11 @@ end
 --- wait_readable
 --- @param fd integer
 --- @param sec? number
+--- @param ... integer additional fds
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
-local function wait_readable(fd, sec)
+local function wait_readable(fd, sec, ...)
     local callee = callee_acquire()
 
     if callee then
@@ -435,7 +436,7 @@ local function wait_readable(fd, sec)
         elseif sec ~= nil and not is_unsigned(sec) then
             error('sec must be unsigned number or nil', 2)
         end
-        return callee:wait_readable(fd, sec)
+        return callee:wait_readable(fd, sec, ...)
     end
 
     error('cannot call wait_readable() from outside of execution context', 2)
@@ -444,10 +445,11 @@ end
 --- wait_writable
 --- @param fd integer
 --- @param sec? number
+--- @param ... integer additional fds
 --- @return integer? fd
 --- @return any err
 --- @return boolean? timeout
-local function wait_writable(fd, sec)
+local function wait_writable(fd, sec, ...)
     local callee = callee_acquire()
     if callee then
         if not is_uint(fd) then
@@ -455,7 +457,7 @@ local function wait_writable(fd, sec)
         elseif sec ~= nil and not is_unsigned(sec) then
             error('sec must be unsigned number or nil', 2)
         end
-        return callee:wait_writable(fd, sec)
+        return callee:wait_writable(fd, sec, ...)
     end
 
     error('cannot call wait_writable() from outside of execution context', 2)

@@ -127,15 +127,15 @@ function Event:revoke(asa, val)
     return false
 end
 
---- cache
+--- revoke_if_cache_not_enabled
 --- @param asa string
 ---| 'signal' signal event
 ---| 'readable' readable event
 ---| 'writable' writable event
 --- @param val integer
-function Event:cache(asa, val)
+function Event:revoke_if_cache_not_enabled(asa, val)
     if not self.cache_enabled then
-        -- revoke cached event
+        -- revoke cached event if cache is not enabled
         self:revoke(asa, val)
     end
 end
