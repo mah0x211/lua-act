@@ -116,6 +116,45 @@ function testcase.wait_readable_writable()
             })
         end)))
     end
+
+    -- test that return hangup if connection peer is closed
+    sock:close()
+    peer:close()
+    for _, waitfn in ipairs({
+        act.wait_readable,
+        act.wait_writable,
+    }) do
+        sock, peer = socketpair()
+        if waitfn == act.wait_writable then
+            assert(sock:sendbuf(5))
+            while sock:write(msg) == #msg do
+            end
+        end
+
+        assert(act.run(with_luacov(function()
+            local wait = false
+            local cid = act.spawn(with_luacov(function()
+                wait = true
+                local fd, err, timeout, hup = waitfn(sock:fd(), 0.05)
+                wait = false
+                assert.equal(fd, sock:fd())
+                assert.is_nil(err)
+                assert.is_nil(timeout)
+                assert.is_true(hup)
+                sock:close()
+            end))
+
+            act.later()
+            assert.is_true(wait)
+            peer:close()
+            local res = assert(act.await())
+            assert.equal(res, {
+                cid = cid,
+                status = 'ok',
+                result = {},
+            })
+        end)))
+    end
 end
 
 function testcase.unwait_readable_writable()
