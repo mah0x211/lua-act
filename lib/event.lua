@@ -221,26 +221,29 @@ function Event:consume(sec)
             -- got critical error
             return nil, new_errno(errno, err)
         elseif nev > 0 then
-            -- consuming events
-            local ev, evinfo, disabled = monitor:consume()
-
-            while ev do
-                -- resume
-                local callee = evinfo.callee
-                if callee then
-                    -- clear callee reference from event-info
-                    evinfo.callee = nil
-                    callee:call(OP_EVENT, evinfo.ev:ident(), disabled)
-                else
-                    -- set a flag to confirm that the event has already occurred
-                    evinfo.is_ready = true
+            for _ = 1, nev do
+                -- consuming events
+                local ev, evinfo, eof, _
+                ev, evinfo, _, eof, err, errno = monitor:consume()
+                if err then
+                    -- got critical error
+                    return nil, new_errno(errno, err)
+                elseif ev then
+                    -- resume coroutine
+                    local callee = evinfo.callee
+                    if callee then
+                        -- clear callee reference from event-info
+                        evinfo.callee = nil
+                        callee:call(OP_EVENT, evinfo.ev:ident(), eof)
+                    else
+                        -- set a flag to confirm that the event has already occurred
+                        evinfo.is_ready = true
+                    end
                 end
-                -- get next event
-                ev, evinfo, disabled = monitor:consume()
             end
         end
 
-        return #self.monitor
+        return #self.monitor, err
     end
 
     return 0
