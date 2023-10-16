@@ -421,7 +421,7 @@ local function unwait(fd)
 end
 
 --- wait_readable
---- @param fd integer
+--- @param fd integer?
 --- @param sec? number
 --- @param ... integer additional fds
 --- @return integer? fd
@@ -432,9 +432,7 @@ local function wait_readable(fd, sec, ...)
     local callee = callee_acquire()
 
     if callee then
-        if not is_uint(fd) then
-            error('fd must be unsigned integer', 2)
-        elseif sec ~= nil and not is_unsigned(sec) then
+        if sec ~= nil and not is_unsigned(sec) then
             error('sec must be unsigned number or nil', 2)
         end
         return callee:wait_readable(fd, sec, ...)
@@ -444,7 +442,7 @@ local function wait_readable(fd, sec, ...)
 end
 
 --- wait_writable
---- @param fd integer
+--- @param fd integer?
 --- @param sec? number
 --- @param ... integer additional fds
 --- @return integer? fd
@@ -454,9 +452,7 @@ end
 local function wait_writable(fd, sec, ...)
     local callee = callee_acquire()
     if callee then
-        if not is_uint(fd) then
-            error('fd must be unsigned integer', 2)
-        elseif sec ~= nil and not is_unsigned(sec) then
+        if sec ~= nil and not is_unsigned(sec) then
             error('sec must be unsigned number or nil', 2)
         end
         return callee:wait_writable(fd, sec, ...)
