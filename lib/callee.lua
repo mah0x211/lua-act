@@ -353,54 +353,77 @@ local function waitable(self, asa, fd, sec, ...)
         ...,
     }
     local revoke_events = function(n)
+        if sec then
+            self.ctx:removeq(self)
+        end
         for i = 1, n or nfd do
             fd = fds[i]
-            self.ioevents[fd] = nil
-            IOWAIT[asa][fd] = nil
-            event:revoke(asa, fd)
+            if fd ~= nil then
+                self.ioevents[fd] = nil
+                IOWAIT[asa][fd] = nil
+                event:revoke(asa, fd)
+            end
         end
     end
     local revoke_events_if_cache_not_enabled = function(n)
+        if sec then
+            self.ctx:removeq(self)
+        end
         for i = 1, n or nfd do
             fd = fds[i]
-            self.ioevents[fd] = nil
-            IOWAIT[asa][fd] = nil
-            event:revoke_if_cache_not_enabled(asa, fd)
+            if fd ~= nil then
+                self.ioevents[fd] = nil
+                IOWAIT[asa][fd] = nil
+                event:revoke_if_cache_not_enabled(asa, fd)
+            end
         end
-    end
-
-    for i = 1, nfd do
-        fd = fds[i]
-        if not is_uint(fd) then
-            revoke_events_if_cache_not_enabled(i - 1)
-            error('invalid fd#' .. i .. ' must be unsigned integer', 2)
-        end
-
-        if IOWAIT[asa][fd] then
-            -- other callee is already waiting for the fd
-            revoke_events_if_cache_not_enabled(i - 1)
-            return nil, EALREADY:new()
-        end
-
-        local evinfo, err, is_ready = event:register(self, asa, fd, 'edge')
-        if is_ready then
-            -- fd is ready to read or write
-            revoke_events_if_cache_not_enabled(i - 1)
-            return fd
-        elseif not evinfo then
-            -- failed to create io-event
-            revoke_events_if_cache_not_enabled(i - 1)
-            return nil, err
-        end
-
-        -- cache act.event.info
-        self.ioevents[fd] = evinfo
-        IOWAIT[asa][fd] = self
     end
 
     -- register to runq with sec
     if sec ~= nil then
         self.ctx:pushq(self, sec)
+    end
+
+    local nreg = 0
+    for i = 1, nfd do
+        fd = fds[i]
+        if fd ~= nil then
+            if not is_uint(fd) then
+                revoke_events_if_cache_not_enabled(i - 1)
+                error('invalid fd#' .. i .. ' must be unsigned integer', 2)
+            end
+
+            if IOWAIT[asa][fd] then
+                -- other callee is already waiting for the fd
+                revoke_events_if_cache_not_enabled(i - 1)
+                return nil, EALREADY:new(
+                           tostring(fd) .. ' is already waiting by other callee')
+            end
+
+            local evinfo, err, is_ready = event:register(self, asa, fd, 'edge')
+            if is_ready then
+                -- fd is ready to read or write
+                revoke_events_if_cache_not_enabled(i - 1)
+                return fd
+            elseif not evinfo then
+                -- failed to create io-event
+                revoke_events_if_cache_not_enabled(i - 1)
+                return nil, err
+            end
+
+            -- cache act.event.info
+            self.ioevents[fd] = evinfo
+            IOWAIT[asa][fd] = self
+            nreg = nreg + 1
+        end
+    end
+
+    if nreg == 0 then
+        -- no need to wait if no fds are registered
+        if sec then
+            self.ctx:removeq(self)
+        end
+        return
     end
 
     -- clear cancel flag
@@ -424,9 +447,6 @@ local function waitable(self, asa, fd, sec, ...)
     end
 
     -- event occurred
-    if sec then
-        self.ctx:removeq(self)
-    end
 
     -- opertion type must be OP_EVENT and fdno must be fd
     if self.op == OP_EVENT and self.ioevents[fdno] then

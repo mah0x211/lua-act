@@ -320,6 +320,19 @@ function testcase.wait_multiple_fds()
         })
     end)))
 
+    -- test that do not wait if no fds are specified
+    for _, waitfn in ipairs({
+        act.wait_readable,
+        act.wait_writable,
+    }) do
+        assert(act.run(with_luacov(function()
+            local fd, err, timeout = waitfn()
+            assert.is_nil(fd)
+            assert.is_nil(err)
+            assert.is_nil(timeout)
+        end)))
+    end
+
     -- test that throws an error if additional fds are invalid
     for _, waitfn in ipairs({
         act.wait_readable,
@@ -384,7 +397,7 @@ function testcase.wait_unwait_throws_error_for_invalid_arguments()
     }) do
         assert(act.run(with_luacov(function()
             local err = assert.throws(waitfn, -1)
-            assert.match(err, 'fd must be unsigned integer')
+            assert.match(err, 'must be unsigned integer')
 
             err = assert.throws(waitfn, 0, -1)
             assert.match(err, 'sec must be unsigned number')
