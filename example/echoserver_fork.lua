@@ -30,6 +30,7 @@
 --  act
 --  net
 --
+local assert = require('assert')
 local dump = require('dump')
 local signal = require('signal')
 local new_server = require('net.stream.inet').server.new
@@ -95,11 +96,8 @@ end
 local function kill_workers(workers)
     print('send SIGUSR1 to all worker-processes')
     for _, proc in pairs(workers) do
-        local res, err = proc:kill(signal.SIGUSR1, 'nohang')
-        if res then
-            print('worker-process exit', res.pid)
-            workers[res.pid] = nil
-        elseif err then
+        local _, err = proc:kill(signal.SIGUSR1, 'nohang')
+        if err then
             print('failed to proc:kill():', err)
         end
     end
@@ -109,7 +107,7 @@ local function wait_worker_exit(workers)
     if next(workers) then
         print('wait all worker-processes exit')
         repeat
-            local res, err = act.waitpid(200)
+            local res, err = act.waitpid(0.2)
             if res then
                 print('worker-process exit', res.pid)
                 workers[res.pid] = nil
@@ -125,7 +123,9 @@ local function wait_worker_exit(workers)
 end
 
 local function main()
-    local server = assert(new_server('127.0.0.1', 5000))
+    local host = '127.0.0.1'
+    local port = 8000
+    local server = assert(new_server(host, port))
     local workers = {}
     signal.blockAll()
 
@@ -136,7 +136,7 @@ local function main()
         print('end server')
     end)
 
-    print('start server: ', '127.0.0.1', 5000)
+    print('start server: ', host, port)
     -- create worker-processes
     for _ = 1, getcpus() do
         local proc, err = act.fork()
