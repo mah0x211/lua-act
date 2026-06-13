@@ -22,9 +22,10 @@
  * this code copied from lua-nosigpipe
  */
 
-#include <signal.h>
-// lualib
+// lua
 #include <lauxlib.h>
+// system
+#include <signal.h>
 
 LUALIB_API int luaopen_act_ignsigpipe(lua_State *L)
 {

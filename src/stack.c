@@ -20,7 +20,10 @@
  *  IN THE SOFTWARE.
  */
 
+// depend
 #include "lauxhlib.h"
+// lua
+#include <lauxlib.h>
 
 #define MODULE_MT "act.stack"
 
@@ -89,7 +92,6 @@ static int set_lua(lua_State *L)
 {
     int argc       = lua_gettop(L) - 1;
     act_stack_t *s = luaL_checkudata(L, 1, MODULE_MT);
-    lua_Integer n  = 0;
 
     // clear arguments
     lua_settop(s->L, 0);

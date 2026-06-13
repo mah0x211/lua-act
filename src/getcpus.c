@@ -19,9 +19,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include <unistd.h>
 // lua
 #include <lua.h>
+// system
+#include <unistd.h>
 
 static int getcpus_lua(lua_State *L)
 {
