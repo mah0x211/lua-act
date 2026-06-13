@@ -1,7 +1,6 @@
 local with_luacov = require('luacov').with_luacov
 local testcase = require('testcase')
 local getpid = require('testcase.getpid')
-local errno = require('errno')
 local act = require('act')
 local gettime = require('time.clock').gettime
 
@@ -123,11 +122,11 @@ function testcase.waitpid()
         return
     end
 
-    -- test that return error if no child process exists
+    -- test that return all nil if no child process exists
     assert(act.run(with_luacov(function()
         local res, err, timeout = act.waitpid()
         assert.is_nil(res)
-        assert.equal(err.type, errno.ECHILD)
+        assert.is_nil(err)
         assert.is_nil(timeout)
     end)))
 
