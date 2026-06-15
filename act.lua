@@ -138,7 +138,7 @@ local function pwaitpid(sec, wpid, ...)
         end
 
         while true do
-            local res, err, again = waitpid(wpid, 'nohang', ...)
+            local res, err, again = waitpid(wpid, nil, 'nohang', ...)
             if res then
                 return res
             elseif not again then

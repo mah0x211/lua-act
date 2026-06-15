@@ -1,3 +1,4 @@
+rockspec_format = "3.0"
 package = "act"
 version = "scm-1"
 source = {
@@ -11,24 +12,45 @@ description = {
 }
 dependencies = {
     "lua >= 5.1",
-    "lauxhlib >= 0.5",
-    "denque >= 0.5",
-    "fork >= 0.2",
-    "metamodule >= 0.4",
-    "minheap >= 0.2",
-    "reco >= 1.6",
-    "epoll >= 0.5.0",
-    "kqueue >= 0.6.0",
-    "time-clock >= 0.4.0",
-    "time-sleep >= 0.2.1",
-    "waitpid >= 0.1.0",
+    "lauxhlib >= 0.6.3",
+    "denque >= 0.5.2",
+    "fork >= 0.4.2",
+    "metamodule >= 0.5.1",
+    "minheap >= 0.2.0",
+    "reco >= 1.6.1",
+    "epoll >= 0.6.0",
+    "kqueue >= 0.7.0",
+    "time-clock >= 0.5.2",
+    "time-sleep >= 0.2.3",
+    "waitpid >= 0.3.4",
+}
+build_dependencies = {
+    "luarocks-build-hooks >= 0.8.0",
 }
 build = {
-    type = "builtin",
+    type = "hooks",
+    before_build = {
+        "$(extra-vars)",
+    },
+    extra_variables = {
+        CFLAGS = "-Wall -Wno-trigraphs -Wmissing-field-initializers -Wreturn-type -Wmissing-braces -Wparentheses -Wno-switch -Wunused-function -Wunused-label -Wunused-parameter -Wunused-variable -Wunused-value -Wuninitialized -Wunknown-pragmas -Wshadow -Wsign-compare",
+    },
+    conditional_variables = {
+        ACT_COVERAGE = {
+            CFLAGS = "--coverage",
+            LIBFLAG = "--coverage",
+        },
+    },
     modules = {
         act = "act.lua",
         ["act.aux"] = "lib/aux.lua",
-        ["act.bitset"] = "src/bitset.c",
+        ["act.bitset"] = {
+            sources = "src/bitset.c",
+            incdirs = {
+                "src",
+                "$(DEP_LAUXHLIB_INCDIR)",
+            },
+        },
         ["act.callee"] = "lib/callee.lua",
         ["act.context"] = "lib/context.lua",
         ["act.coro"] = "lib/coro.lua",
@@ -42,6 +64,11 @@ build = {
         ["act.poller"] = "lib/poller.lua",
         ["act.pool"] = "lib/pool.lua",
         ["act.runq"] = "lib/runq.lua",
-        ["act.stack"] = "src/stack.c",
+        ["act.stack"] = {
+            sources = "src/stack.c",
+            incdirs = {
+                "$(DEP_LAUXHLIB_INCDIR)",
+            },
+        },
     },
 }

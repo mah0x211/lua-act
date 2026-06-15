@@ -20,8 +20,14 @@
  *  IN THE SOFTWARE.
  */
 
+// project
 #include "bitset.h"
+// depend
 #include "lauxhlib.h"
+// lua
+#include <lauxlib.h>
+// system
+#include <string.h>
 
 #define MODULE_MT "act.bitset"
 
